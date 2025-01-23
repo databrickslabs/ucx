@@ -100,10 +100,10 @@ class AWSCredentialCandidate:
 class AWSResources:
     S3_ACTIONS: ClassVar[set[str]] = {"s3:PutObject", "s3:GetObject", "s3:DeleteObject", "s3:PutObjectAcl"}
     S3_READONLY: ClassVar[str] = "s3:GetObject"
-    S3_REGEX: ClassVar[str] = r"arn:aws:s3:::([a-zA-Z0-9\/+=,.@_-]*)\/\*$"
-    S3_BUCKET: ClassVar[str] = r"((s3:\/\/|s3a:\/\/)([a-zA-Z0-9+=,.@_-]*))(\/.*$)?"
+    S3_REGEX: ClassVar[re.Pattern] = re.compile(r"arn:aws:s3:::([a-zA-Z0-9\/+=,.@_-]*)\/\*$")
+    S3_BUCKET: ClassVar[re.Pattern] = re.compile(r"((s3:\/\/|s3a:\/\/)([a-zA-Z0-9+=,.@_-]*))(\/.*$)?")
     S3_PREFIX: ClassVar[str] = "arn:aws:s3:::"
-    S3_PATH_REGEX: ClassVar[str] = r"((s3:\/\/)|(s3a:\/\/))(.*)"
+    S3_PATH_REGEX: ClassVar[re.Pattern] = re.compile(r"((s3:\/\/)|(s3a:\/\/))(.*)")
     GLUE_REQUIRED_ACTIONS: ClassVar[set[str]] = {
         "glue:BatchCreatePartition",
         "glue:BatchDeletePartition",
@@ -268,9 +268,8 @@ class AWSResources:
             privilege = Privilege.READ_FILES
         else:
             return []
-
         for resource in action.get("Resource", []):
-            match = re.match(self.S3_REGEX, resource)
+            match = self.S3_REGEX.match(resource)
             if match:
                 s3_policy_actions.append(AWSPolicyAction(AWSResourceType.S3, privilege, f"s3://{match.group(1)}"))
                 s3_policy_actions.append(AWSPolicyAction(AWSResourceType.S3, privilege, f"s3a://{match.group(1)}"))
@@ -330,7 +329,7 @@ class AWSResources:
         """
         s3_prefixes_strip = set()
         for path in s3_prefixes:
-            match = re.match(AWSResources.S3_PATH_REGEX, path)
+            match = AWSResources.S3_PATH_REGEX.match(path)
             if match:
                 s3_prefixes_strip.add(match.group(4))
 

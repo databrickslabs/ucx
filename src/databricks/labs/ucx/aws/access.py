@@ -80,7 +80,7 @@ class AWSResourcePermissions:
             return roles
         s3_buckets = set()
         for missing_path in missing_paths:
-            match = re.match(AWSResources.S3_BUCKET, missing_path)
+            match = AWSResources.S3_BUCKET.match(missing_path)
             if match:
                 s3_buckets.add(match.group(1))
         if single_role:
