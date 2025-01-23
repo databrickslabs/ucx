@@ -172,7 +172,7 @@ class IamRoleMigration:
         self._storage_credential_manager = storage_credential_manager
 
     @staticmethod
-    def _print_action_plan(iam_list: list[AWSCredentialCandidate]):
+    def print_action_plan(iam_list: list[AWSCredentialCandidate]):
         # print action plan to console for customer to review.
         for iam in iam_list:
             logger.info(f"Credential {iam.role_name} --> {iam.role_arn}: {iam.privilege}")
@@ -190,7 +190,7 @@ class IamRoleMigration:
         filtered_iam_list = [iam for iam in iam_list if iam.role_arn not in sc_set]
 
         # output the action plan for customer to confirm
-        self._print_action_plan(filtered_iam_list)
+        self.print_action_plan(filtered_iam_list)
 
         return filtered_iam_list
 
@@ -216,8 +216,6 @@ class IamRoleMigration:
                     paths={"*"},
                 )
             )
-        # output the action plan for customer to confirm
-        self._print_action_plan(credential_candidates)
 
         return credential_candidates
 
@@ -230,6 +228,8 @@ class IamRoleMigration:
         if len(iam_list) == 0:
             logger.info("No IAM Role to migrate")
             return []
+
+        self.print_action_plan(iam_list)
 
         plan_confirmed = prompts.confirm(
             "Above IAM roles will be migrated to UC storage credentials, please review and confirm."
@@ -269,6 +269,8 @@ class IamRoleMigration:
         if len(iam_list) == 0:
             logger.info("No Glue IAM Role to migrate")
             return []
+
+        self.print_action_plan(iam_list)
 
         plan_confirmed = prompts.confirm(
             "Above IAM roles will be migrated to UC service credentials for Glue Access, please review and confirm."
