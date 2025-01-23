@@ -204,7 +204,7 @@ def test_skip_with_schema(ws) -> None:
 
     ws.statement_execution.execute_statement.assert_called_with(
         warehouse_id='test',
-        statement="ALTER SCHEMA `schema` SET DBPROPERTIES('databricks.labs.ucx.skip' = true)",
+        statement="ALTER SCHEMA hive_metastore.`schema` SET DBPROPERTIES('databricks.labs.ucx.skip' = true)",
         byte_limit=None,
         catalog=None,
         schema=None,
@@ -261,7 +261,7 @@ def test_unskip_with_schema(ws) -> None:
 
     ws.statement_execution.execute_statement.assert_called_with(
         warehouse_id='test',
-        statement="ALTER SCHEMA hive_metastore.`schema` UNSET DBPROPERTIES IF EXISTS('databricks.labs.ucx.skip');",
+        statement="ALTER SCHEMA hive_metastore.`schema` SET DBPROPERTIES('databricks.labs.ucx.skip' = false);",
         byte_limit=None,
         catalog=None,
         schema=None,
