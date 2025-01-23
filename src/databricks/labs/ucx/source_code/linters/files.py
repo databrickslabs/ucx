@@ -244,7 +244,8 @@ class LocalCodeMigrator(LocalCodeLinter):
             for child_path in path.iterdir():
                 fix_indicators.append(self.apply(child_path))
             return all(fix_indicators)
-        return self._fix_file(path)
+        advices = self.apply_path(path)
+        return next(advices, None) is None
 
 
 class StubContainer(SourceContainer):
