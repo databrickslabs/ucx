@@ -859,12 +859,20 @@ def lint_local_code(
 
 @ucx.command
 def migrate_local_code(
-    w: WorkspaceClient, prompts: Prompts, path: str | None = None, ctx: LocalCheckoutContext | None = None
+    w: WorkspaceClient, prompts: Prompts, path: Path | str | None = None, ctx: LocalCheckoutContext | None = None
 ):
     """Fix the code files based on their language."""
     if ctx is None:
         ctx = LocalCheckoutContext(w)
-    ctx.local_code_linter.apply(prompts, None if path is None else Path(path))
+    if not path:
+        response = prompts.question(
+            "Which file or directory do you want to lint?",
+            default=Path.cwd().as_posix(),
+            validate=lambda p_: Path(p_).exists(),
+        )
+        assert response
+        path = Path(response)
+    ctx.local_code_linter.apply(None if path is None else Path(path))
 
 
 @ucx.command

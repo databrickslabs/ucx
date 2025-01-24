@@ -117,7 +117,7 @@ def test_local_code_linter_apply_skips_non_existing_file(mock_path_lookup, simpl
     path = Path("non_existing_file.py")
     buffer = io.StringIO()
 
-    linter.apply(MockPrompts({}), path, buffer)
+    linter.apply(path, buffer)
 
     assert f"{path.as_posix()}:1:0: [path-corrupted] Could not load dependency" in buffer.getvalue()
 
@@ -139,7 +139,7 @@ def test_local_code_linter_apply_ignores_unsupported_extensions(
     path = tmp_path / "unsupported.ext"
     path.touch()
 
-    linter.apply(MockPrompts({}), path, buffer)
+    linter.apply(path, buffer)
 
     assert f"{path.as_posix()}:1:0: [unknown-language] Cannot detect language for" in buffer.getvalue()
 
@@ -162,7 +162,7 @@ def test_local_code_linter_apply_with_supported_language(
     path = tmp_path / "any.py"
     path.write_text("import tempfile", encoding="utf-8")
 
-    linter.apply(MockPrompts({}), path)
+    linter.apply(path)
 
     assert path.read_text("utf-8") == "Hi there!"
 
@@ -183,7 +183,7 @@ def test_local_code_linter_apply_walks_directory(tmp_path, mock_path_lookup, sim
     path = tmp_path / "any.py"
     path.write_text("import tempfile", encoding="utf-8")
 
-    linter.apply(MockPrompts({}), path.parent)
+    linter.apply(path.parent)
 
     assert path.read_text("utf-8") == "Hi there!"
 
@@ -205,7 +205,7 @@ def test_local_code_linter_fixes_migrated_hive_metastore_table(
     path = tmp_path / "read_table.py"
     path.write_text("df = spark.read.table('hive_metastore.schema.table')")
 
-    linter.apply(MockPrompts({}), path.parent)
+    linter.apply(path.parent)
 
     assert path.read_text().rstrip() == "df = spark.read.table('catalog.schema.table')"
 
@@ -221,7 +221,7 @@ def test_local_code_linter_apply_path_finds_children_in_context(mock_path_lookup
         lambda: LinterContext(TableMigrationIndex([]), CurrentSessionState()),
     )
     path = Path(__file__).parent.parent / "samples" / "parent-child-context"
-    assert not linter.apply(MockPrompts({}), path)
+    assert not linter.apply(path)
 
 
 def test_triple_dot_import() -> None:

@@ -173,24 +173,12 @@ class LocalCodeLinter:
 
         yield from LinterWalker(maybe_graph.graph, linted_paths or set(), self._path_lookup)
 
-    def apply(
-        self,
-        prompts: Prompts,
-        path: Path | None,
-        stdout: TextIO = sys.stdout,
-    ) -> list[LocatedAdvice]:
+    def apply(self, path: Path, stdout: TextIO = sys.stdout) -> list[LocatedAdvice]:
         """Apply the local file migrator.
 
         Fixes the code in the file(s) given the path. If the path is a directory, all files in the directory and its
         subdirectories are fixed.
         """
-        if path is None:
-            response = prompts.question(
-                "Which file or directory do you want to lint?",
-                default=Path.cwd().as_posix(),
-                validate=lambda p_: Path(p_).exists(),
-            )
-            path = Path(response)
         located_advices = list(self.apply_path(path))
         for located in located_advices:
             stdout.write(located.message)
