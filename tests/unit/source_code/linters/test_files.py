@@ -121,6 +121,24 @@ def test_local_code_linter_apply_skips_non_existing_file(mock_path_lookup, simpl
     assert f"{path.as_posix()}:1:0: [path-corrupted] Could not load dependency" in buffer.getvalue()
 
 
+def test_local_code_linter_apply_skips_non_existing_directory(mock_path_lookup, simple_dependency_resolver) -> None:
+    linter = LocalCodeLinter(
+        NotebookLoader(),
+        FileLoader(),
+        FolderLoader(NotebookLoader(), FileLoader()),
+        mock_path_lookup,
+        CurrentSessionState(),
+        simple_dependency_resolver,
+        lambda: LinterContext(TableMigrationIndex([]), CurrentSessionState()),
+    )
+    path = Path("non_existing_directory/")
+    buffer = io.StringIO()
+
+    linter.apply(path)
+
+    assert f"{path.as_posix()}:1:0: [path-corrupted] Could not load dependency" in buffer.getvalue()
+
+
 def test_local_code_linter_apply_ignores_unsupported_extensions(
     tmp_path, mock_path_lookup, simple_dependency_resolver
 ) -> None:
