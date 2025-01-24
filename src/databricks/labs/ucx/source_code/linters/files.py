@@ -139,7 +139,12 @@ class LocalCodeLinter:
         self._context_factory = context_factory
 
     def lint(self, path: Path, linted_paths: set[Path] | None = None) -> Iterable[LocatedAdvice]:
-        """Lint local code files looking for problems in notebooks and python files."""
+        """Lint local code generating advices on becoming Unity Catalog compatible.
+
+        Parameters :
+            path (Path) : The path to the resource(s) to lint. If the path is a directory, then all files within the
+                directory and subdirectories are linted.
+        """
         maybe_graph = self._build_dependency_graph_from_path(path)
         if maybe_graph.problems:
             for problem in maybe_graph.problems:
@@ -164,10 +169,11 @@ class LocalCodeLinter:
         yield from LinterWalker(maybe_graph.graph, linted_paths or set(), self._path_lookup)
 
     def apply(self, path: Path) -> list[LocatedAdvice]:
-        """Apply the local file migrator.
+        """Apply local code fixes to become Unity Catalog compatible.
 
-        Fixes the code in the file(s) given the path. If the path is a directory, all files in the directory and its
-        subdirectories are fixed.
+        Parameters :
+            path (Path) : The path to the resource(s) to lint. If the path is a directory, then all files within the
+                directory and subdirectories are linted.
         """
         maybe_graph = self._build_dependency_graph_from_path(path)
         if maybe_graph.problems:
