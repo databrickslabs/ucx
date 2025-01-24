@@ -14,6 +14,7 @@ from databricks.sdk.service.catalog import (
     ExternalLocationInfo,
     StorageCredentialInfo,
     MetastoreAssignment,
+    Privilege,
 )
 from databricks.sdk.service.compute import InstanceProfile, Policy
 from databricks.sdk.service.sql import (
@@ -23,10 +24,17 @@ from databricks.sdk.service.sql import (
     GetWorkspaceWarehouseConfigResponseSecurityPolicy,
 )
 
-from databricks.labs.ucx.assessment.aws import AWSPolicyAction, AWSResources, AWSRole, AWSUCRoleCandidate
+from databricks.labs.ucx.assessment.aws import (
+    AWSPolicyAction,
+    AWSResources,
+    AWSRole,
+    AWSUCRoleCandidate,
+    AWSResourceType,
+)
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
 from databricks.labs.ucx.aws.credentials import IamRoleCreation
 from databricks.labs.ucx.aws.locations import AWSExternalLocationsMigration
+from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.hive_metastore import ExternalLocations, TablesCrawler
 from databricks.labs.ucx.hive_metastore.grants import PrincipalACL
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocation, MountsCrawler
@@ -58,10 +66,36 @@ def installation_single_role():
                 {
                     "role_arn": "arn:aws:iam::12345:role/uc-role1",
                     "resource_type": "s3",
-                    "privilege": "WRITE_FILES",
+                    "privilege": Privilege.WRITE_FILES,
                     "resource_path": "s3://BUCKETX",
                 }
             ]
+        }
+    )
+
+
+@pytest.fixture
+def installation_glue():
+    return MockInstallation(
+        {
+            "config.yml": {
+                'version': 2,
+                'inventory_database': 'ucx',
+                'policy_id': 'policy_id',
+                'spark_conf': {'spark.databricks.hive.metastore.glueCatalog.enabled': 'true'},
+                'connect': {
+                    'host': 'foo',
+                    'token': 'bar',
+                },
+            },
+            "uc_roles_access.csv": [
+                {
+                    "role_arn": "arn:aws:iam::12345:role/uc-role1",
+                    "resource_type": "s3",
+                    "privilege": Privilege.WRITE_FILES,
+                    "resource_path": "s3://BUCKETX",
+                }
+            ],
         }
     )
 
@@ -75,19 +109,19 @@ def installation_multiple_roles():
                 {
                     "role_arn": "arn:aws:iam::12345:role/uc-role1",
                     "resource_type": "s3",
-                    "privilege": "WRITE_FILES",
+                    "privilege": Privilege.WRITE_FILES,
                     "resource_path": "s3://BUCKET1",
                 },
                 {
                     "role_arn": "arn:aws:iam::12345:role/uc-role1",
                     "resource_type": "s3",
-                    "privilege": "WRITE_FILES",
+                    "privilege": Privilege.WRITE_FILES,
                     "resource_path": "s3://BUCKET2",
                 },
                 {
                     "role_arn": "arn:aws:iam::12345:role/uc-rolex",
                     "resource_type": "s3",
-                    "privilege": "WRITE_FILES",
+                    "privilege": Privilege.WRITE_FILES,
                     "resource_path": "s3://BUCKETX",
                 },
             ]
@@ -135,7 +169,8 @@ def test_create_external_locations(mock_ws, installation_multiple_roles, backend
         ),
     ]
     aws = create_autospec(AWSResources)
-    aws_resource_permissions = AWSResourcePermissions(installation_multiple_roles, mock_ws, aws, locations)
+    config = installation_multiple_roles.load(WorkspaceConfig)
+    aws_resource_permissions = AWSResourcePermissions(installation_multiple_roles, config, mock_ws, aws, locations)
     principal_acl = create_autospec(PrincipalACL)
     external_locations_migration = AWSExternalLocationsMigration(
         mock_ws,
@@ -157,6 +192,7 @@ def test_create_external_locations(mock_ws, installation_multiple_roles, backend
 def test_create_external_locations_skip_existing(mock_ws, backend, locations):
     install = MockInstallation(
         {
+            **DEFAULT_CONFIG,
             "uc_roles_access.csv": [
                 {
                     'privilege': 'WRITE_FILES',
@@ -170,7 +206,7 @@ def test_create_external_locations_skip_existing(mock_ws, backend, locations):
                     'resource_type': 's3',
                     'role_arn': 'arn:aws:iam::12345:role/uc-role1',
                 },
-            ]
+            ],
         }
     )
     mock_ws.storage_credentials.list.return_value = [
@@ -190,7 +226,8 @@ def test_create_external_locations_skip_existing(mock_ws, backend, locations):
     ]
     aws = create_autospec(AWSResources)
     principal_acl = create_autospec(PrincipalACL)
-    aws_resource_permissions = AWSResourcePermissions(install, mock_ws, aws, locations)
+    config = install.load(WorkspaceConfig)
+    aws_resource_permissions = AWSResourcePermissions(install, mock_ws, config, aws, locations)
     external_locations_migration = AWSExternalLocationsMigration(
         mock_ws,
         locations,
@@ -207,11 +244,12 @@ def test_create_external_locations_skip_existing(mock_ws, backend, locations):
 
 
 def test_uc_roles_create_all_roles(mock_ws, backend, locations):
-    install = MockInstallation({"uc_roles_access.csv": []})
+    install = MockInstallation({"uc_roles_access.csv": []} | DEFAULT_CONFIG)
     mock_ws.storage_credentials.list.return_value = []
     mock_ws.external_locations.list.return_value = []
     aws = AWSResources("profile", lambda cmd: (0, '{"Role": {"Arn": "arn:aws:iam::12345:role/role1"}}', ""))
-    aws_resource_permissions = AWSResourcePermissions(install, mock_ws, aws, locations)
+    config = install.load(WorkspaceConfig)
+    aws_resource_permissions = AWSResourcePermissions(install, mock_ws, config, aws, locations)
 
     roles = aws_resource_permissions.list_uc_roles(single_role=False)
     expected_roles = [
@@ -242,9 +280,11 @@ def test_create_uber_principal_existing_role_in_policy(mock_ws, mock_installatio
     aws.validate_connection.return_value = {}
     aws.get_instance_profile_arn.return_value = instance_profile_arn
     prompts = MockPrompts({"We have identified existing UCX migration role *": "yes"})
+    config = mock_installation.load(WorkspaceConfig)
     aws_resource_permissions = AWSResourcePermissions(
         mock_installation,
         mock_ws,
+        config,
         aws,
         locations,
     )
@@ -252,6 +292,7 @@ def test_create_uber_principal_existing_role_in_policy(mock_ws, mock_installatio
     aws.put_role_policy.assert_called_with(
         'UCX_MIGRATION_ROLE_ucx',
         'UCX_MIGRATION_POLICY_ucx',
+        AWSResourceType.S3,
         {'s3://BUCKET1/FOLDER1', 's3://BUCKET2/FOLDER2', 's3://BUCKET4', 's3://BUCKETX/FOLDERX'},
         None,
         None,
@@ -275,9 +316,11 @@ def test_create_uber_principal_existing_role(mock_ws, mock_installation, backend
             "We have identified existing UCX migration role *": "yes",
         }
     )
+    config = mock_installation.load(WorkspaceConfig)
     aws_resource_permissions = AWSResourcePermissions(
         mock_installation,
         mock_ws,
+        config,
         aws,
         locations,
     )
@@ -308,10 +351,12 @@ def test_create_uber_principal_no_existing_role(mock_ws, mock_installation, back
     aws.create_migration_role.return_value = instance_profile_arn
     aws.create_instance_profile.return_value = instance_profile_arn
     aws.get_instance_profile_arn.return_value = instance_profile_arn
+    config = mock_installation.load(WorkspaceConfig)
     prompts = MockPrompts({"Do you want to create new migration role *": "yes"})
     aws_resource_permissions = AWSResourcePermissions(
         mock_installation,
         mock_ws,
+        config,
         aws,
         locations,
     )
@@ -356,9 +401,11 @@ def test_failed_create_uber_principal(mock_ws, mock_installation, backend, locat
     aws = AWSResources("profile", command_call)
 
     prompts = MockPrompts({"Do you want to create new migration role *": "yes"})
+    config = mock_installation.load(WorkspaceConfig)
     aws_resource_permissions = AWSResourcePermissions(
         mock_installation,
         mock_ws,
+        config,
         aws,
         locations,
     )
@@ -395,10 +442,11 @@ def test_create_uber_principal_set_warehouse_config_security_policy(
     instance_profile_arn = "arn:aws:iam::12345:instance-profile/role1"
     aws = create_autospec(AWSResources)
     aws.get_instance_profile_arn.return_value = instance_profile_arn
-
+    config = mock_installation.load(WorkspaceConfig)
     aws_resource_permissions = AWSResourcePermissions(
         mock_installation,
         mock_ws,
+        config,
         aws,
         locations,
     )
@@ -416,9 +464,11 @@ def test_create_uber_principal_no_storage(mock_ws, mock_installation, locations)
     external_locations.external_locations_with_root.return_value = []
     prompts = MockPrompts({})
     aws = create_autospec(AWSResources)
+    config = mock_installation.load(WorkspaceConfig)
     aws_resource_permissions = AWSResourcePermissions(
         mock_installation,
         mock_ws,
+        config,
         aws,
         external_locations,
     )
@@ -431,7 +481,8 @@ def test_create_uc_role_single(mock_ws, installation_single_role, backend, locat
     mock_ws.metastores.current.return_value = MetastoreAssignment(metastore_id="123123", workspace_id="456456")
     aws = create_autospec(AWSResources)
     aws.validate_connection.return_value = {}
-    aws_resource_permissions = AWSResourcePermissions(installation_single_role, mock_ws, aws, locations)
+    config = installation_single_role.load(WorkspaceConfig)
+    aws_resource_permissions = AWSResourcePermissions(installation_single_role, mock_ws, config, aws, locations)
     role_creation = IamRoleCreation(installation_single_role, mock_ws, aws_resource_permissions)
     aws.list_all_uc_roles.return_value = []
     role_creation.run(MockPrompts({"Above *": "yes"}), single_role=True)
@@ -440,7 +491,31 @@ def test_create_uc_role_single(mock_ws, installation_single_role, backend, locat
         call(
             'UC_ROLE_123123',
             'UC_POLICY',
+            AWSResourceType.S3,
             {'s3://BUCKET2/*', 's3://BUCKET4/*', 's3://BUCKET2', 's3://BUCKET4', 's3://BUCKET1', 's3://BUCKET1/*'},
+            None,
+            None,
+        )
+        in aws.put_role_policy.call_args_list
+    )
+
+
+def test_create_uc_role_glue(mock_ws, installation_glue, backend, locations):
+    mock_ws.metastores.current.return_value = MetastoreAssignment(metastore_id="123123", workspace_id="456456")
+    aws = create_autospec(AWSResources)
+    aws.validate_connection.return_value = {}
+    config = installation_glue.load(WorkspaceConfig)
+    aws_resource_permissions = AWSResourcePermissions(installation_glue, mock_ws, config, aws, locations)
+    role_creation = IamRoleCreation(installation_glue, mock_ws, aws_resource_permissions)
+    aws.list_all_uc_roles.return_value = []
+    role_creation.run(MockPrompts({"Above *": "yes"}), single_role=True)
+    assert aws.create_uc_role.assert_called
+    assert (
+        call(
+            'UC_ROLE_123123',
+            'UC_POLICY',
+            AWSResourceType.GLUE,
+            {'*'},
             None,
             None,
         )
@@ -451,18 +526,19 @@ def test_create_uc_role_single(mock_ws, installation_single_role, backend, locat
 def test_create_uc_role_multiple(mock_ws, installation_single_role, backend, locations):
     aws = create_autospec(AWSResources)
     aws.validate_connection.return_value = {}
-    aws_resource_permissions = AWSResourcePermissions(installation_single_role, mock_ws, aws, locations)
+    config = installation_single_role.load(WorkspaceConfig)
+    aws_resource_permissions = AWSResourcePermissions(installation_single_role, mock_ws, config, aws, locations)
     role_creation = IamRoleCreation(installation_single_role, mock_ws, aws_resource_permissions)
     aws.list_all_uc_roles.return_value = []
     role_creation.run(MockPrompts({"Above *": "yes"}), single_role=False)
     assert call('UC_ROLE_BUCKET1') in aws.create_uc_role.call_args_list
     assert call('UC_ROLE_BUCKET2') in aws.create_uc_role.call_args_list
     assert (
-        call('UC_ROLE_BUCKET1', 'UC_POLICY', {'s3://BUCKET1/*', 's3://BUCKET1'}, None, None)
+        call('UC_ROLE_BUCKET1', 'UC_POLICY', AWSResourceType.S3, {'s3://BUCKET1/*', 's3://BUCKET1'}, None, None)
         in aws.put_role_policy.call_args_list
     )
     assert (
-        call('UC_ROLE_BUCKET2', 'UC_POLICY', {'s3://BUCKET2/*', 's3://BUCKET2'}, None, None)
+        call('UC_ROLE_BUCKET2', 'UC_POLICY', AWSResourceType.S3, {'s3://BUCKET2/*', 's3://BUCKET2'}, None, None)
         in aws.put_role_policy.call_args_list
     )
 
@@ -471,7 +547,8 @@ def test_create_uc_role_multiple_raises_error(mock_ws, installation_single_role,
     aws = create_autospec(AWSResources)
     aws.validate_connection.return_value = {}
     aws.create_uc_role.side_effect = ['123', PermissionDenied()]
-    aws_resource_permissions = AWSResourcePermissions(installation_single_role, mock_ws, aws, locations)
+    config = installation_single_role.load(WorkspaceConfig)
+    aws_resource_permissions = AWSResourcePermissions(installation_single_role, mock_ws, config, aws, locations)
     role_creation = IamRoleCreation(installation_single_role, mock_ws, aws_resource_permissions)
     aws.list_all_uc_roles.return_value = []
     with pytest.raises(PermissionDenied):
@@ -483,9 +560,11 @@ def test_create_uc_no_roles(installation_no_roles, mock_ws, caplog):
     external_locations = create_autospec(ExternalLocations)
     external_locations.external_locations_with_root.return_value = []
     aws = create_autospec(AWSResources)
+    config = installation_no_roles.load(WorkspaceConfig)
     aws_resource_permissions = AWSResourcePermissions(
         installation_no_roles,
         mock_ws,
+        config,
         aws,
         external_locations,
     )
@@ -493,7 +572,7 @@ def test_create_uc_no_roles(installation_no_roles, mock_ws, caplog):
     aws.list_all_uc_roles.return_value = []
     with caplog.at_level(logging.INFO):
         role_creation.run(MockPrompts({"Above *": "yes"}), single_role=False)
-        assert ['No IAM Role created'] == caplog.messages
+        assert 'No IAM Role created' in caplog.messages
         aws.create_uc_role.assert_not_called()
 
 
@@ -502,18 +581,18 @@ def test_get_uc_compatible_roles(mock_ws, mock_installation, locations):
     aws.get_role_policy.side_effect = [
         [
             AWSPolicyAction(
-                resource_type="s3",
-                privilege="READ_FILES",
+                resource_type=AWSResourceType.S3,
+                privilege=Privilege.READ_FILES,
                 resource_path="s3://bucket1",
             ),
             AWSPolicyAction(
-                resource_type="s3",
-                privilege="READ_FILES",
+                resource_type=AWSResourceType.S3,
+                privilege=Privilege.READ_FILES,
                 resource_path="s3://bucket2",
             ),
             AWSPolicyAction(
-                resource_type="s3",
-                privilege="READ_FILES",
+                resource_type=AWSResourceType.S3,
+                privilege=Privilege.READ_FILES,
                 resource_path="s3://bucket3",
             ),
         ],
@@ -521,18 +600,18 @@ def test_get_uc_compatible_roles(mock_ws, mock_installation, locations):
         [],
         [
             AWSPolicyAction(
-                resource_type="s3",
-                privilege="WRITE_FILES",
+                resource_type=AWSResourceType.S3,
+                privilege=Privilege.WRITE_FILES,
                 resource_path="s3://bucketA",
             ),
             AWSPolicyAction(
-                resource_type="s3",
-                privilege="WRITE_FILES",
+                resource_type=AWSResourceType.S3,
+                privilege=Privilege.WRITE_FILES,
                 resource_path="s3://bucketB",
             ),
             AWSPolicyAction(
-                resource_type="s3",
-                privilege="WRITE_FILES",
+                resource_type=AWSResourceType.S3,
+                privilege=Privilege.WRITE_FILES,
                 resource_path="s3://bucketC",
             ),
         ],
@@ -547,9 +626,11 @@ def test_get_uc_compatible_roles(mock_ws, mock_installation, locations):
     aws.list_all_uc_roles.return_value = [
         AWSRole(path='/', role_name='uc-role1', role_id='12345', arn='arn:aws:iam::12345:role/uc-role1')
     ]
+    config = mock_installation.load(WorkspaceConfig)
     aws_resource_permissions = AWSResourcePermissions(
         mock_installation,
         mock_ws,
+        config,
         aws,
         locations,
     )
@@ -597,12 +678,94 @@ def test_get_uc_compatible_roles(mock_ws, mock_installation, locations):
     )
 
 
-def test_instance_profiles_empty_mapping(mock_ws, mock_installation, locations, caplog):
+def test_get_uc_compatible_roles_glue(mock_ws, mock_installation, locations):
     aws = create_autospec(AWSResources)
-    aws.get_instance_profile_role_arn.return_value = "arn:aws:iam::12345:role/role1"
+    aws.get_role_policy.side_effect = [
+        [
+            AWSPolicyAction(
+                resource_type=AWSResourceType.S3,
+                privilege=Privilege.READ_FILES,
+                resource_path="s3://bucket1",
+            ),
+            AWSPolicyAction(
+                resource_type=AWSResourceType.S3,
+                privilege=Privilege.READ_FILES,
+                resource_path="s3://bucket2",
+            ),
+            AWSPolicyAction(
+                resource_type=AWSResourceType.S3,
+                privilege=Privilege.READ_FILES,
+                resource_path="s3://bucket3",
+            ),
+        ],
+        [],
+        [],
+        [
+            AWSPolicyAction(
+                resource_type=AWSResourceType.GLUE,
+                privilege=Privilege.USAGE,
+                resource_path="*",
+            ),
+        ],
+        [],
+        [],
+    ]
+    aws.list_role_policies.return_value = ["Policy1", "Policy2", "Policy3"]
+    aws.list_attached_policies_in_role.return_value = [
+        "arn:aws:iam::aws:policy/Policy1",
+        "arn:aws:iam::aws:policy/Policy2",
+    ]
+    aws.list_all_uc_roles.return_value = [
+        AWSRole(path='/', role_name='uc-role1', role_id='12345', arn='arn:aws:iam::12345:role/uc-role1')
+    ]
+    config = mock_installation.load(WorkspaceConfig)
     aws_resource_permissions = AWSResourcePermissions(
         mock_installation,
         mock_ws,
+        config,
+        aws,
+        locations,
+    )
+    aws_resource_permissions.save_uc_compatible_roles()
+    mock_installation.assert_file_written(
+        'uc_roles_access.csv',
+        [
+            {
+                'privilege': 'READ_FILES',
+                'resource_path': 's3://bucket1',
+                'resource_type': 's3',
+                'role_arn': 'arn:aws:iam::12345:role/uc-role1',
+            },
+            {
+                'privilege': 'READ_FILES',
+                'resource_path': 's3://bucket2',
+                'resource_type': 's3',
+                'role_arn': 'arn:aws:iam::12345:role/uc-role1',
+            },
+            {
+                'privilege': 'READ_FILES',
+                'resource_path': 's3://bucket3',
+                'resource_type': 's3',
+                'role_arn': 'arn:aws:iam::12345:role/uc-role1',
+            },
+            {
+                'privilege': 'USAGE',
+                'resource_path': '*',
+                'resource_type': 'glue',
+                'role_arn': 'arn:aws:iam::12345:role/uc-role1',
+            },
+        ],
+    )
+
+
+def test_instance_profiles_empty_mapping(mock_ws, mock_installation, locations, caplog):
+    aws = create_autospec(AWSResources)
+    aws.get_instance_profile_role_arn.return_value = "arn:aws:iam::12345:role/role1"
+    config = mock_installation.load(WorkspaceConfig)
+    aws_resource_permissions = AWSResourcePermissions(
+        mock_installation,
+        mock_ws,
+        config,
         aws,
         locations,
     )
@@ -615,9 +778,11 @@ def test_instance_profiles_empty_mapping(mock_ws, mock_installation, locations, 
 
 def test_uc_roles_empty_mapping(mock_ws, mock_installation, locations, caplog):
     aws = create_autospec(AWSResources)
+    config = mock_installation.load(WorkspaceConfig)
     aws_resource_permissions = AWSResourcePermissions(
         mock_installation,
         mock_ws,
+        config,
         aws,
         locations,
     )
@@ -632,18 +797,18 @@ def test_save_instance_profile_permissions(mock_ws, mock_installation, locations
     aws.get_role_policy.side_effect = [
         [
             AWSPolicyAction(
-                resource_type="s3",
-                privilege="READ_FILES",
+                resource_type=AWSResourceType.S3,
+                privilege=Privilege.READ_FILES,
                 resource_path="s3://bucket1",
             ),
             AWSPolicyAction(
-                resource_type="s3",
-                privilege="READ_FILES",
+                resource_type=AWSResourceType.S3,
+                privilege=Privilege.READ_FILES,
                 resource_path="s3://bucket2",
             ),
             AWSPolicyAction(
-                resource_type="s3",
-                privilege="READ_FILES",
+                resource_type=AWSResourceType.S3,
+                privilege=Privilege.READ_FILES,
                 resource_path="s3://bucket3",
             ),
         ],
@@ -651,18 +816,18 @@ def test_save_instance_profile_permissions(mock_ws, mock_installation, locations
         [],
         [
             AWSPolicyAction(
-                resource_type="s3",
-                privilege="WRITE_FILES",
+                resource_type=AWSResourceType.S3,
+                privilege=Privilege.WRITE_FILES,
                 resource_path="s3://bucketA",
             ),
             AWSPolicyAction(
-                resource_type="s3",
-                privilege="WRITE_FILES",
+                resource_type=AWSResourceType.S3,
+                privilege=Privilege.WRITE_FILES,
                 resource_path="s3://bucketB",
             ),
             AWSPolicyAction(
-                resource_type="s3",
-                privilege="WRITE_FILES",
+                resource_type=AWSResourceType.S3,
+                privilege=Privilege.WRITE_FILES,
                 resource_path="s3://bucketC",
             ),
         ],
@@ -674,9 +839,11 @@ def test_save_instance_profile_permissions(mock_ws, mock_installation, locations
         "arn:aws:iam::aws:policy/Policy1",
         "arn:aws:iam::aws:policy/Policy2",
     ]
+    config = mock_installation.load(WorkspaceConfig)
     aws_resource_permissions = AWSResourcePermissions(
         mock_installation,
         mock_ws,
+        config,
         aws,
         locations,
     )
@@ -730,18 +897,18 @@ def test_save_uc_compatible_roles(mock_ws, mock_installation, locations):
     aws.get_role_policy.side_effect = [
         [
             AWSPolicyAction(
-                resource_type="s3",
-                privilege="READ_FILES",
+                resource_type=AWSResourceType.S3,
+                privilege=Privilege.READ_FILES,
                 resource_path="s3://bucket1",
             ),
             AWSPolicyAction(
-                resource_type="s3",
-                privilege="READ_FILES",
+                resource_type=AWSResourceType.S3,
+                privilege=Privilege.READ_FILES,
                 resource_path="s3://bucket2",
             ),
             AWSPolicyAction(
-                resource_type="s3",
-                privilege="READ_FILES",
+                resource_type=AWSResourceType.S3,
+                privilege=Privilege.READ_FILES,
                 resource_path="s3://bucket3",
             ),
         ],
@@ -749,18 +916,18 @@ def test_save_uc_compatible_roles(mock_ws, mock_installation, locations):
         [],
         [
             AWSPolicyAction(
-                resource_type="s3",
-                privilege="WRITE_FILES",
+                resource_type=AWSResourceType.S3,
+                privilege=Privilege.WRITE_FILES,
                 resource_path="s3://bucketA",
             ),
             AWSPolicyAction(
-                resource_type="s3",
-                privilege="WRITE_FILES",
+                resource_type=AWSResourceType.S3,
+                privilege=Privilege.WRITE_FILES,
                 resource_path="s3://bucketB",
             ),
             AWSPolicyAction(
-                resource_type="s3",
-                privilege="WRITE_FILES",
+                resource_type=AWSResourceType.S3,
+                privilege=Privilege.WRITE_FILES,
                 resource_path="s3://bucketC",
             ),
         ],
@@ -775,9 +942,11 @@ def test_save_uc_compatible_roles(mock_ws, mock_installation, locations):
     aws.list_all_uc_roles.return_value = [
         AWSRole(path='/', role_name='uc-role1', role_id='12345', arn='arn:aws:iam::12345:role/uc-role1')
     ]
+    config = mock_installation.load(WorkspaceConfig)
     aws_resource_permissions = AWSResourcePermissions(
         mock_installation,
         mock_ws,
+        config,
         aws,
         locations,
     )
@@ -893,7 +1062,8 @@ def test_instance_profile_roles_to_migrate(mock_ws, installation_multiple_roles)
         ExternalLocation("s3://BUCKET1", 1),
         ExternalLocation("s3://BUCKET2/Folder1", 1),
     ]
-    resource_permissions = AWSResourcePermissions(installation_multiple_roles, mock_ws, aws, external_locations)
+    config = installation_multiple_roles.load(WorkspaceConfig)
+    resource_permissions = AWSResourcePermissions(installation_multiple_roles, mock_ws, config, aws, external_locations)
     roles = resource_permissions.get_roles_to_migrate()
     assert len(roles) == 1
     assert len(roles[0].paths) == 2
@@ -903,7 +1073,8 @@ def test_instance_profile_roles_to_migrate(mock_ws, installation_multiple_roles)
 def test_delete_uc_roles(mock_ws, installation_multiple_roles, backend, locations):
     aws = create_autospec(AWSResources)
     aws.validate_connection.return_value = {}
-    aws_resource_permissions = AWSResourcePermissions(installation_multiple_roles, mock_ws, aws, locations)
+    config = installation_multiple_roles.load(WorkspaceConfig)
+    aws_resource_permissions = AWSResourcePermissions(installation_multiple_roles, mock_ws, config, aws, locations)
     mock_ws.storage_credentials.list.return_value = [
         StorageCredentialInfo(
             id="1",
@@ -922,7 +1093,8 @@ def test_delete_uc_roles_not_present(mock_ws, installation_no_roles, backend, lo
     aws = create_autospec(AWSResources)
     aws.validate_connection.return_value = {}
     aws.delete_role.return_value = []
-    aws_resource_permissions = AWSResourcePermissions(installation_no_roles, mock_ws, aws, locations)
+    config = installation_no_roles.load(WorkspaceConfig)
+    aws_resource_permissions = AWSResourcePermissions(installation_no_roles, mock_ws, config, aws, locations)
     mock_ws.storage_credentials.list.return_value = [
         StorageCredentialInfo(
             id="1",
@@ -935,8 +1107,8 @@ def test_delete_uc_roles_not_present(mock_ws, installation_no_roles, backend, lo
     aws.get_role_policy.side_effect = [
         [
             AWSPolicyAction(
-                resource_type="s3",
-                privilege="READ_FILES",
+                resource_type=AWSResourceType.S3,
+                privilege=Privilege.READ_FILES,
                 resource_path="s3://bucket1",
             )
         ]
@@ -962,6 +1134,7 @@ def test_delete_role(mock_ws, installation_no_roles, backend, mocker):
     aws = AWSResources("profile", command_call)
     external_locations = create_autospec(ExternalLocations)
     external_locations.external_locations_with_root.return_value = []
-    resource_permissions = AWSResourcePermissions(installation_no_roles, mock_ws, aws, external_locations)
+    config = installation_no_roles.load(WorkspaceConfig)
+    resource_permissions = AWSResourcePermissions(installation_no_roles, mock_ws, config, aws, external_locations)
     resource_permissions.delete_uc_role("uc_role_1")
     assert '/path/aws iam delete-role --role-name uc_role_1 --profile profile --output json' in command_calls

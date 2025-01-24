@@ -1,13 +1,19 @@
 import logging
 
 import pytest
+from databricks.labs.blueprint.installation import MockInstallation
+from databricks.sdk.service.catalog import MetastoreInfo, Privilege
+from databricks.sdk.errors.platform import NotFound
 
 from databricks.labs.ucx.assessment.aws import (
     AWSInstanceProfile,
     AWSPolicyAction,
     AWSResources,
     AWSRole,
+    AWSGlue,
+    AWSResourceType,
 )
+from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.utils import run_command
 
 logger = logging.getLogger(__name__)
@@ -100,6 +106,13 @@ def test_get_role_policy():
                         "arn:aws:s3:::bucket2/*",
                         "arn:aws:s3:::bucket3/*"
                     ]
+                },
+                {
+                    "Effect": "Allow",
+                    "Action":  "s3:GetObject",
+                    "Resource": [
+                        "arn:aws:s3:::bucket4/*"
+                    ]
                 }
         ]
     }
@@ -148,6 +161,16 @@ def test_get_role_policy():
                         "arn:aws:s3:::bucketB/*",
                         "arn:aws:s3:::bucketC/*"
                     ]
+                },
+                {
+                    "sid": "Glue_Action",
+                    "Effect": "Allow",
+                    "Action": [
+                        "glue:*"
+                    ],
+                    "Resource": [
+                        "*"
+                    ]
                 }
             ]
         },
@@ -171,69 +194,74 @@ def test_get_role_policy():
     role_policy = aws.get_role_policy("fake_role", policy_name="fake_policy")
     assert role_policy == [
         AWSPolicyAction(
-            resource_type="s3",
-            privilege="READ_FILES",
+            resource_type=AWSResourceType.S3,
+            privilege=Privilege.READ_FILES,
             resource_path="s3://bucket1",
         ),
         AWSPolicyAction(
-            resource_type="s3",
-            privilege="READ_FILES",
+            resource_type=AWSResourceType.S3,
+            privilege=Privilege.READ_FILES,
             resource_path="s3a://bucket1",
         ),
         AWSPolicyAction(
-            resource_type="s3",
-            privilege="READ_FILES",
+            resource_type=AWSResourceType.S3,
+            privilege=Privilege.READ_FILES,
             resource_path="s3://bucket2",
         ),
         AWSPolicyAction(
-            resource_type="s3",
-            privilege="READ_FILES",
+            resource_type=AWSResourceType.S3,
+            privilege=Privilege.READ_FILES,
             resource_path="s3a://bucket2",
         ),
         AWSPolicyAction(
-            resource_type="s3",
-            privilege="READ_FILES",
+            resource_type=AWSResourceType.S3,
+            privilege=Privilege.READ_FILES,
             resource_path="s3://bucket3",
         ),
         AWSPolicyAction(
-            resource_type="s3",
-            privilege="READ_FILES",
+            resource_type=AWSResourceType.S3,
+            privilege=Privilege.READ_FILES,
             resource_path="s3a://bucket3",
+        ),
+        AWSPolicyAction(resource_type=AWSResourceType.S3, privilege=Privilege.READ_FILES, resource_path='s3://bucket4'),
+        AWSPolicyAction(
+            resource_type=AWSResourceType.S3, privilege=Privilege.READ_FILES, resource_path='s3a://bucket4'
         ),
     ]
 
     role_policy = aws.get_role_policy("fake_role", attached_policy_arn="arn:aws:iam::12345:policy/policy")
     assert role_policy == [
         AWSPolicyAction(
-            resource_type="s3",
-            privilege="WRITE_FILES",
+            resource_type=AWSResourceType.S3,
+            privilege=Privilege.WRITE_FILES,
             resource_path="s3://bucketA",
         ),
         AWSPolicyAction(
-            resource_type="s3",
-            privilege="WRITE_FILES",
+            resource_type=AWSResourceType.S3,
+            privilege=Privilege.WRITE_FILES,
             resource_path="s3a://bucketA",
         ),
         AWSPolicyAction(
-            resource_type="s3",
-            privilege="WRITE_FILES",
+            resource_type=AWSResourceType.S3,
+            privilege=Privilege.WRITE_FILES,
             resource_path="s3://bucketB",
         ),
         AWSPolicyAction(
-            resource_type="s3",
-            privilege="WRITE_FILES",
+            resource_type=AWSResourceType.S3,
+            privilege=Privilege.WRITE_FILES,
             resource_path="s3a://bucketB",
         ),
         AWSPolicyAction(
-            resource_type="s3",
-            privilege="WRITE_FILES",
+            resource_type=AWSResourceType.S3,
+            privilege=Privilege.WRITE_FILES,
             resource_path="s3://bucketC",
         ),
         AWSPolicyAction(
-            resource_type="s3",
-            privilege="WRITE_FILES",
+            resource_type=AWSResourceType.S3,
+            privilege=Privilege.WRITE_FILES,
             resource_path="s3a://bucketC",
         ),
+        AWSPolicyAction(resource_type=AWSResourceType.GLUE, privilege=Privilege.USAGE, resource_path='*'),
     ]
 
 
@@ -654,7 +682,7 @@ def test_create_uc_role_policy_no_kms(mocker):
 
     aws = AWSResources("Fake_Profile", command_call)
     s3_prefixes = {"s3://BUCKET1/FOLDER1", "s3://BUCKET1/FOLDER1/*", "s3://BUCKET2/FOLDER2", "s3://BUCKET2/FOLDER2/*"}
-    aws.put_role_policy("test_role", "test_policy", s3_prefixes, "1234")
+    aws.put_role_policy("test_role", "test_policy", AWSResourceType.S3, s3_prefixes, "1234")
     assert (
         '/path/aws iam put-role-policy --role-name test_role '
         '--policy-name test_policy --policy-document '
@@ -677,7 +705,7 @@ def test_create_uc_role_kms(mocker):
 
     aws = AWSResources("Fake_Profile", command_call)
     s3_prefixes = {"s3://BUCKET1/FOLDER1", "s3://BUCKET1/FOLDER1/*", "s3://BUCKET2/FOLDER2", "s3://BUCKET2/FOLDER2/*"}
-    aws.put_role_policy("test_role", "test_policy", s3_prefixes, "1234", "key_arn")
+    aws.put_role_policy("test_role", "test_policy", AWSResourceType.S3, s3_prefixes, "1234", "key_arn")
     assert (
         '/path/aws iam put-role-policy --role-name test_role '
         '--policy-name test_policy '
@@ -816,3 +844,96 @@ def test_update_uc_role_append(mocker):
         '"arn:aws:iam::0123456789:role/Test-Role"]},"Action":"sts:AssumeRole",'
         '"Condition":{"StringEquals":{"sts:ExternalId":"0000"}}}]} --profile Fake_Profile --output json'
     ) in command_calls
+
+
+def test_aws_glue_config_with_region(ws):
+    installation = MockInstallation(
+        {
+            "config.yml": {
+                'version': 2,
+                'inventory_database': 'ucx',
+                'policy_id': 'policy_id',
+                'instance_profile': 'arn:aws:iam::1234:instance-profile/ip_role',
+                'spark_conf': {
+                    'spark.databricks.hive.metastore.glueCatalog.enabled': 'true',
+                    'spark.hadoop.aws.region': 'us-west-2',
+                },
+                'connect': {
+                    'host': 'foo',
+                    'token': 'bar',
+                },
+            },
+        }
+    )
+    aws_glue = AWSGlue.get_glue_connection_info(ws, installation.load(WorkspaceConfig))
+    assert aws_glue == AWSGlue('us-west-2', '1234')
+
+
+def test_aws_glue_config_no_region(ws):
+    installation = MockInstallation(
+        {
+            "config.yml": {
+                'version': 2,
+                'inventory_database': 'ucx',
+                'policy_id': 'policy_id',
+                'instance_profile': 'arn:aws:iam::1234:instance-profile/ip_role',
+                'spark_conf': {
+                    'spark.databricks.hive.metastore.glueCatalog.enabled': 'true',
+                },
+                'connect': {
+                    'host': 'foo',
+                    'token': 'bar',
+                },
+            },
+        }
+    )
+    ws.metastores.get.return_value = MetastoreInfo(region='us-west-2')
+    aws_glue = AWSGlue.get_glue_connection_info(ws, installation.load(WorkspaceConfig))
+    assert aws_glue == AWSGlue('us-west-2', '1234')
+
+
+def test_aws_glue_config_region_exception(ws, caplog):
+    installation = MockInstallation(
+        {
+            "config.yml": {
+                'version': 2,
+                'inventory_database': 'ucx',
+                'policy_id': 'policy_id',
+                'instance_profile': 'arn:aws:iam::1234:instance-profile/ip_role',
+                'spark_conf': {
+                    'spark.databricks.hive.metastore.glueCatalog.enabled': 'true',
+                },
+                'connect': {
+                    'host': 'foo',
+                    'token': 'bar',
+                },
+            },
+        }
+    )
+    ws.metastores.get.side_effect = NotFound("Can't retrieve aws region")
+    aws_glue = AWSGlue.get_glue_connection_info(ws, installation.load(WorkspaceConfig))
+    assert not aws_glue
+    assert "Can't retrieve aws region" in caplog.messages[0]
+
+
+@pytest.mark.parametrize('glue', [True, False])
+def test_is_aws_glue_config(ws, glue):
+    config_dict = {
+        "config.yml": {
+            'version': 2,
+            'inventory_database': 'ucx',
+            'policy_id': 'policy_id',
+            'instance_profile': 'arn:aws:iam::1234:instance-profile/ip_role',
+            'connect': {
+                'host': 'foo',
+                'token': 'bar',
+            },
+        },
+    }
+    if glue:
+        config_dict['config.yml']['spark_conf'] = {
+            'spark.databricks.hive.metastore.glueCatalog.enabled': 'true',
+        }
+    installation = MockInstallation(config_dict)
+    ws.metastores.get.return_value = MetastoreInfo(region='us-west-2')
+    assert AWSGlue.is_glue_in_config(installation.load(WorkspaceConfig)) == glue

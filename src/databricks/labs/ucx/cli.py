@@ -502,6 +502,27 @@ def migrate_credentials(
 
 
 @ucx.command
+def migrate_glue_credentials(
+    w: WorkspaceClient,
+    prompts: Prompts,
+    ctx: WorkspaceContext | None = None,
+    run_as_collection: bool = False,
+    a: AccountClient | None = None,
+    **named_parameters,
+):
+    """For AWS, this command migrates AWS Glue IAM roles to UC storage credentials. The AWS Glue IAM roles to location"""
+    workspace_contexts = _get_workspace_contexts(w, a, run_as_collection, **named_parameters)
+    if ctx:
+        workspace_contexts = [ctx]
+    if w.config.is_aws:
+        for workspace_ctx in workspace_contexts:
+            logger.info(f"Running cmd for workspace {workspace_ctx.workspace_client.get_workspace_id()}")
+            workspace_ctx.iam_role_migration.migrate_glue(prompts)
+    else:
+        raise ValueError("Unsupported cloud provider")
+
+
+@ucx.command
 def migrate_locations(
     w: WorkspaceClient,
     ctx: WorkspaceContext | None = None,

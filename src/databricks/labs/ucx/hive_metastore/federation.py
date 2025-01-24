@@ -5,7 +5,6 @@ from dataclasses import dataclass, replace
 from functools import cached_property
 from typing import ClassVar
 
-
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import WorkspaceClient
@@ -20,10 +19,11 @@ from databricks.sdk.service.catalog import (
 )
 
 from databricks.labs.ucx.account.workspaces import WorkspaceInfo
+from databricks.labs.ucx.assessment.aws import AWSGlue
 from databricks.labs.ucx.assessment.secrets import SecretsMixin
+from databricks.labs.ucx.aws.credentials import CredentialManager
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.hive_metastore import ExternalLocations
-
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +91,18 @@ class HiveMetastoreFederation(SecretsMixin):
             'Enter the name of the Hive Metastore connection and catalog', default=self._workspace_info.current()
         )
 
-        if self._external_hms and prompts.confirm(
+        aws_glue = AWSGlue.get_glue_connection_info(self._ws, self._config)
+        if aws_glue and prompts.confirm('A supported AWS Glue Metastore connection was identified. Use it?'):
+            credential_manager = CredentialManager(self._ws)
+            credentials = credential_manager.list_glue()
+            credential_names = {key: key for key in credentials}
+            credential = prompts.choice_from_dict(
+                'Select Service Credential to use for Glue access',
+                credential_names,
+            )
+
+            connection_info = self._get_or_create_glue_connection(name, aws_glue, credential)
+        elif self._external_hms and prompts.confirm(
             f'A supported external Hive Metastore connection was identified: {self._external_hms.database_type}. '
             f'Use this connection?'
         ):
@@ -208,7 +219,19 @@ class HiveMetastoreFederation(SecretsMixin):
         try:
             return self._ws.connections.create(
                 name=name,
-                connection_type=ConnectionType.HIVE_METASTORE,  # needs SDK change
+                connection_type=ConnectionType.HIVE_METASTORE,
+                options=options,
+            )
+        except AlreadyExists:
+            return self._get_existing_connection(name)
+
+    def _get_or_create_glue_connection(self, name: str, aws_glue: AWSGlue, credential: str) -> ConnectionInfo:
+        options = aws_glue.as_dict()
+        options["credential"] = credential
+        try:
+            return self._ws.connections.create(
+                name=name,
+                connection_type=ConnectionType.GLUE,
                 options=options,
             )
         except AlreadyExists:
@@ -223,10 +246,7 @@ class HiveMetastoreFederation(SecretsMixin):
         if not current_user.user_name:
             raise NotFound('Current user not found')
         # Get the external locations. If not using external HMS, include the root DBFS location.
-        if self._external_hms is not None:
-            external_locations = self._external_locations.external_locations_with_root()
-        else:
-            external_locations = self._external_locations.snapshot()
+        external_locations = self._external_locations.external_locations_with_root()
 
         for external_location_info in external_locations:
             location = ExternalLocations.clean_location(external_location_info.location)

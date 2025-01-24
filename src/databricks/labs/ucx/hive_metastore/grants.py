@@ -516,7 +516,7 @@ class AwsACL:
                 else:
                     resource_url = permission_mapping.resource_path
                 if location.url.startswith(resource_url) and permission_mapping.role_arn == role_name:
-                    matching_location[location.url] = permission_mapping.privilege
+                    matching_location[location.url] = permission_mapping.privilege.value
         return matching_location
 
 

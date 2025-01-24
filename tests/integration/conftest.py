@@ -982,6 +982,7 @@ def aws_cli_ctx(installation_ctx, env_or_skip):
         return AWSResourcePermissions(
             installation_ctx.installation,
             installation_ctx.workspace_client,
+            installation_ctx.config,
             AWSResources(aws_profile()),
             ExternalLocations(
                 installation_ctx.workspace_client,
