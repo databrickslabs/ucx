@@ -220,7 +220,9 @@ def test_skip_happy_path(caplog):
     )
     assert len(caplog.records) == 0
     mapping.skip_schema(schema="schema")
-    sbe.execute.assert_called_with(f"ALTER SCHEMA `schema` SET DBPROPERTIES('{mapping.UCX_SKIP_PROPERTY}' = true)")
+    sbe.execute.assert_called_with(
+        f"ALTER SCHEMA hive_metastore.`schema` SET DBPROPERTIES('{mapping.UCX_SKIP_PROPERTY}' = true)"
+    )
     assert len(caplog.records) == 0
 
 
@@ -262,7 +264,7 @@ def test_unskip_on_schema() -> None:
     mapping.unskip_schema(schema="schema")
     ws.tables.get.assert_not_called()
     assert (
-        f"ALTER SCHEMA hive_metastore.`schema` UNSET DBPROPERTIES IF EXISTS('{mapping.UCX_SKIP_PROPERTY}');"
+        f"ALTER SCHEMA hive_metastore.`schema` SET DBPROPERTIES('{mapping.UCX_SKIP_PROPERTY}' = false);"
         in mock_backend.queries
     )
 
