@@ -135,7 +135,7 @@ def test_local_code_migrator_fixes_migrated_hive_metastore_table(
 
 
 @pytest.fixture()
-def local_code_linter(mock_path_lookup, migration_index) -> LocalCodeMigrator:
+def local_code_linter(mock_path_lookup, migration_index) -> LocalCodeLinter:
     notebook_loader = NotebookLoader()
     file_loader = FileLoader()
     folder_loader = FolderLoader(notebook_loader, file_loader)
@@ -150,7 +150,7 @@ def local_code_linter(mock_path_lookup, migration_index) -> LocalCodeMigrator:
         import_file_resolver,
         mock_path_lookup,
     )
-    return LocalCodeMigrator(
+    return LocalCodeLinter(
         notebook_loader,
         file_loader,
         folder_loader,
