@@ -194,14 +194,14 @@ class MockPathLookup(PathLookup):
     def __init__(self, cwd='source_code/samples', sys_paths: list[Path] | None = None, *, resolved_path: set[Path] | None = None):
         super().__init__(Path(__file__).parent / cwd, sys_paths or [])
 
-        self.resolved_paths = resolved_path or set()
+        self.successfully_resolved_paths = resolved_path or set()  # The paths that were successfully resolved
 
     def resolve(self, path: Path) -> Path | None:
         """Resolve a path from the context of the lookup."""
-        path = super().resolve(path)
-        if path:
-            self.resolved_paths.add(path)
-        return path
+        resolved_path = super().resolve(path)
+        if resolved_path:
+            self.successfully_resolved_paths.add(path)
+        return resolved_path
 
     def change_directory(self, new_working_directory: Path) -> 'MockPathLookup':
         return MockPathLookup(new_working_directory, self._sys_paths, resolved_path=self.resolved_paths)
