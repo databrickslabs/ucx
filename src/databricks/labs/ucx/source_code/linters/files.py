@@ -12,7 +12,6 @@ from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.source_code.base import (
     CurrentSessionState,
-    Failure,
     LocatedAdvice,
     file_language,
     is_a_notebook,
@@ -163,7 +162,13 @@ class LocalCodeLinter:
         return located_advices
 
     def lint_path(self, path: Path, linted_paths: set[Path] | None = None) -> Iterable[LocatedAdvice]:
-        graph = self._build_dependency_graph_from_path(path)
+        maybe_graph = self._build_dependency_graph_from_path(path)
+        if maybe_graph.problems:
+            for problem in maybe_graph.problems:
+                yield problem.as_located_advice()
+            return
+        assert maybe_graph.graph
+
         context_factory = self._context_factory
         session_state = self._session_state
 
@@ -178,7 +183,7 @@ class LocalCodeLinter:
                 for advice in linter.lint():
                     yield LocatedAdvice(advice, dependency.path)
 
-        yield from LinterWalker(graph, linted_paths or set(), self._path_lookup)
+        yield from LinterWalker(maybe_graph.graph, linted_paths or set(), self._path_lookup)
 
     def apply(
         self,
@@ -204,7 +209,13 @@ class LocalCodeLinter:
         return located_advices
 
     def apply_path(self, path: Path, linted_paths: set[Path] | None = None) -> Iterable[LocatedAdvice]:
-        graph = self._build_dependency_graph_from_path(path)
+        maybe_graph = self._build_dependency_graph_from_path(path)
+        if maybe_graph.problems:
+            for problem in maybe_graph.problems:
+                yield problem.as_located_advice()
+            return
+        assert maybe_graph.graph
+
         context_factory = self._context_factory
         session_state = self._session_state
 
@@ -219,9 +230,17 @@ class LocalCodeLinter:
                 for advice in linter.apply():
                     yield LocatedAdvice(advice, dependency.path)
 
-        yield from FixerWalker(graph, linted_paths or set(), self._path_lookup)
+        yield from FixerWalker(maybe_graph.graph, linted_paths or set(), self._path_lookup)
 
     def _build_dependency_graph_from_path(self, path: Path) -> MaybeGraph:
+        """Build a dependency graph from the path.
+
+        It tries to load the path as a directory, file or notebook.
+
+        Returns :
+            MaybeGraph : If the loading fails, the returned maybe graph contains a problem. Otherwise, returned maybe
+            graph contains the graph.
+        """
         is_dir = path.is_dir()
         loader: DependencyLoader
         if is_a_notebook(path):
@@ -235,15 +254,12 @@ class LocalCodeLinter:
         graph = DependencyGraph(root_dependency, None, self._dependency_resolver, path_lookup, self._session_state)
         container = root_dependency.load(path_lookup)
         if container is None:
-            failure = Failure("path-corrupted", "Could not load dependency", 0, 0, 1, 1)
-            yield LocatedAdvice(failure, path)
-            return
+            problem = DependencyProblem("dependency-not-found", "Dependency not found", source_path=path)
+            return MaybeGraph(None, [problem])
         problems = list(container.build_dependency_graph(graph))
-
-        for problem in problems:
-            problem_path = Path('UNKNOWN') if problem.is_path_missing() else problem.source_path.absolute()
-            yield problem.as_advisory().for_path(problem_path)
-        return graph
+        if problems:
+            return MaybeGraph(None, problems)
+        return MaybeGraph(graph)
 
 
 class StubContainer(SourceContainer):
