@@ -2,10 +2,13 @@ from __future__ import annotations  # for type hints
 
 import dataclasses
 import logging
+import sys
 from collections.abc import Iterable, Callable
 from pathlib import Path
-import sys
 from typing import TextIO
+
+from databricks.labs.blueprint.tui import Prompts
+from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.source_code.base import (
     CurrentSessionState,
@@ -13,16 +16,6 @@ from databricks.labs.ucx.source_code.base import (
     file_language,
     is_a_notebook,
 )
-from databricks.labs.ucx.source_code.python.python_ast import Tree
-from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader
-from databricks.labs.ucx.source_code.notebooks.sources import FileLinter
-from databricks.labs.ucx.source_code.path_lookup import PathLookup
-from databricks.labs.ucx.source_code.known import KnownList
-from databricks.sdk.service.workspace import Language
-from databricks.labs.blueprint.tui import Prompts
-
-from databricks.labs.ucx.source_code.linters.context import LinterContext
-from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage, PythonCodeAnalyzer
 from databricks.labs.ucx.source_code.graph import (
     BaseImportResolver,
     BaseFileResolver,
@@ -37,6 +30,13 @@ from databricks.labs.ucx.source_code.graph import (
     MaybeGraph,
     SourceContainer,
 )
+from databricks.labs.ucx.source_code.known import KnownList
+from databricks.labs.ucx.source_code.linters.context import LinterContext
+from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage, PythonCodeAnalyzer
+from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader
+from databricks.labs.ucx.source_code.notebooks.sources import FileLinter
+from databricks.labs.ucx.source_code.path_lookup import PathLookup
+from databricks.labs.ucx.source_code.python.python_ast import Tree
 
 logger = logging.getLogger(__name__)
 
