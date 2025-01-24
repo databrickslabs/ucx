@@ -2,10 +2,8 @@ from __future__ import annotations  # for type hints
 
 import dataclasses
 import logging
-import sys
 from collections.abc import Iterable, Callable
 from pathlib import Path
-from typing import TextIO
 
 from databricks.sdk.service.workspace import Language
 
