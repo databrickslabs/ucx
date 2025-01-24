@@ -131,7 +131,7 @@ def test_local_code_migrator_fixes_migrated_hive_metastore_table(
 
     migrator.apply(MockPrompts({}), path.parent)
 
-    assert "df = spark.read.table('catalog.schema.table')" == path.read_text().rstrip()
+    assert path.read_text().rstrip() == "df = spark.read.table('catalog.schema.table')"
 
 
 def test_local_code_migrator_apply_path_finds_children_in_context(mock_path_lookup, simple_dependency_resolver) -> None:
