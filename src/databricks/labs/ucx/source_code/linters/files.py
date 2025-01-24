@@ -236,19 +236,28 @@ class LocalCodeMigrator(LocalCodeLinter):
         walker = LintingWalker(graph, linted_paths, self._path_lookup)
         yield from walker
 
-    def apply(self, path: Path) -> bool:
+    def apply(
+        self,
+        prompts: Prompts,
+        path: Path | None,
+        stdout: TextIO = sys.stdout,
+    ) -> list[LocatedAdvice]:
         """Apply the local file migrator.
 
         Fixes the code in the file(s) given the path. If the path is a directory, all files in the directory and its
         subdirectories are fixed.
         """
-        if path.is_dir():
-            fix_indicators = []
-            for child_path in path.iterdir():
-                fix_indicators.append(self.apply(child_path))
-            return all(fix_indicators)
-        advices = self.apply_path(path)
-        return next(advices, None) is None
+        if path is None:
+            response = prompts.question(
+                "Which file or directory do you want to lint?",
+                default=Path.cwd().as_posix(),
+                validate=lambda p_: Path(p_).exists(),
+            )
+            path = Path(response)
+        located_advices = list(self.apply_path(path))
+        for located in located_advices:
+            stdout.write(located.message)
+        return located_advices
 
 
 class StubContainer(SourceContainer):
