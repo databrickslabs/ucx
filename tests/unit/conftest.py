@@ -189,11 +189,22 @@ def acc_client():
 
 
 class MockPathLookup(PathLookup):
-    def __init__(self, cwd='source_code/samples', sys_paths: list[Path] | None = None):
+    """A path look up for the testing code samples."""
+
+    def __init__(self, cwd='source_code/samples', sys_paths: list[Path] | None = None, *, resolved_path: set[Path] | None = None):
         super().__init__(Path(__file__).parent / cwd, sys_paths or [])
 
+        self.resolved_paths = resolved_path or set()
+
+    def resolve(self, path: Path) -> Path | None:
+        """Resolve a path from the context of the lookup."""
+        path = super().resolve(path)
+        if path:
+            self.resolved_paths.add(path)
+        return path
+
     def change_directory(self, new_working_directory: Path) -> 'MockPathLookup':
-        return MockPathLookup(new_working_directory, self._sys_paths)
+        return MockPathLookup(new_working_directory, self._sys_paths, resolved_path=self.resolved_paths)
 
     def __repr__(self):
         return f"<MockPathLookup {self._cwd}, sys.path: {self._sys_paths}>"
