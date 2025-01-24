@@ -223,7 +223,16 @@ class LocalCheckoutContext(WorkspaceContext):
 
     @cached_property
     def local_code_migrator(self) -> LocalCodeMigrator:
-        return LocalCodeMigrator(lambda: self.linter_context_factory(CurrentSessionState()))
+        session_state = CurrentSessionState()
+        return LocalCodeMigrator(
+            self.notebook_loader,
+            self.file_loader,
+            self.folder_loader,
+            self.path_lookup,
+            session_state,
+            self.dependency_resolver,
+            lambda: self.linter_context_factory(CurrentSessionState())
+        )
 
     @cached_property
     def local_code_linter(self) -> LocalCodeLinter:
