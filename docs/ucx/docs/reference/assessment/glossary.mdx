@@ -1,0 +1,40 @@
+# Glossary and common terms
+
+## UC
+
+Abbreviation for Unity Catalog
+
+## DELTA
+
+DELTA refers to the table format for Delta Lake tables.
+## CTAS
+
+Abbreviation for *Create Table As Select* which is a method of copying table data from one source to another. The CREATE statement can include USING and LOCATION keywords while the SELECT portion can cast columns to other data types.
+
+## DEEP CLONE
+
+Is shortcut for `CREATE TABLE DEEP CLONE <target table> <source table>` which only works for DELTA formatted tables.
+
+## EXTERNAL LOCATION
+
+[EXTERNAL LOCATION](https://docs.databricks.com/en/connect/unity-catalog/external-locations.html#create-an-external-location) is a UC object type describing a url to a cloud storage bucket + folder or storage account + container and folder
+
+## STORAGE CREDENTIAL
+
+[STORAGE CREDENTIAL](https://docs.databricks.com/en/sql/language-manual/sql-ref-storage-credentials.html) are a UC object encapsulating the credentials necessary to access cloud storage.
+
+## Assigned Clusters or Single User Clusters
+"Assigned Clusters" are Interactive clusters assigned to a single principal. Implicit in this term is that these clusters are enabled for Unity Catalog. Publicly available today, "Assigned Clusters" can be assigned to a user and the user's identity is used to access data resources. The access to the cluster is restricted to that single user to ensure accountability and accuracy of the audit logs.
+
+"Single User Clusters" are Interactive clusters that name one specific user account as user.
+
+The `data_security_mode` for these clusters are `SINGLE_USER`
+
+## Shared Clusters
+"Shared Clusters are Interactive or Job clusters with an access mode of "SHARED".
+
+
+The `data_security_mode` for these clusters are `USER_ISOLATION`.
+
+
+
