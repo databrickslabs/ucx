@@ -34,6 +34,8 @@ from databricks.labs.ucx.source_code.linters.from_table import FromTableSqlLinte
 
 
 class LinterContext:
+    """The linter context allows access to UCX's linter, fixers and collectors."""
+
     def __init__(
         self,
         index: TableMigrationIndex | None = None,
@@ -112,10 +114,16 @@ class LinterContext:
         raise ValueError(f"Unsupported language: {language}")
 
     def fixer(self, language: Language, diagnostic_code: str) -> Fixer | None:
-        if language not in self._fixers:
-            return None
-        for fixer in self._fixers[language]:
-            if fixer.name == diagnostic_code:
+        """Get the fixer for a language that matches the code.
+
+        The first fixer which name matches with the diagnostic code is returned. This logic assumes the fixers have
+        unique names, which is enforced by the assert during initialization.
+
+        Returns :
+            Fixer | None : The fixer if a match is found, otherwise None.
+        """
+        for fixer in self._fixers.get(language, []):
+            if fixer.is_supported(diagnostic_code):
                 return fixer
         return None
 
@@ -138,6 +146,7 @@ class LinterContext:
         raise ValueError(f"Unsupported language: {language}")
 
     def apply_fixes(self, language: Language, code: str) -> str:
+        """Apply fixes from linters belonging to the language."""
         linter = self.linter(language)
         for advice in linter.lint(code):
             fixer = self.fixer(language, advice.code)

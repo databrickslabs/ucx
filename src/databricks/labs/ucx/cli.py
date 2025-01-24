@@ -19,7 +19,6 @@ from databricks.labs.ucx.contexts.account_cli import AccountContext
 from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext, LocalCheckoutContext
 from databricks.labs.ucx.hive_metastore.tables import What
 from databricks.labs.ucx.install import AccountInstaller
-from databricks.labs.ucx.source_code.linters.files import LocalCodeLinter
 from databricks.labs.ucx.workspace_access.groups import AccountGroupLookup
 
 ucx = App(__file__)
@@ -584,16 +583,6 @@ def revert_cluster_remap(w: WorkspaceClient, prompts: Prompts):
     ctx.cluster_access.revert_cluster_remap(cluster_list, cluster_ids)
 
 
-@ucx.command
-def migrate_local_code(w: WorkspaceClient, prompts: Prompts):
-    """Fix the code files based on their language."""
-    ctx = LocalCheckoutContext(w)
-    working_directory = Path.cwd()
-    if not prompts.confirm("Do you want to apply UC migration to all files in the current directory?"):
-        return
-    ctx.local_file_migrator.apply(working_directory)
-
-
 @ucx.command(is_account=True)
 def show_all_metastores(a: AccountClient, workspace_id: str | None = None):
     """Show all metastores in the account"""
@@ -857,8 +846,17 @@ def lint_local_code(
     """Lint local code files looking for problems."""
     if ctx is None:
         ctx = LocalCheckoutContext(w)
-    linter: LocalCodeLinter = ctx.local_code_linter
-    linter.lint(prompts, None if path is None else Path(path))
+    ctx.local_code_linter.lint(prompts, None if path is None else Path(path))
+
+
+@ucx.command
+def migrate_local_code(
+    w: WorkspaceClient, prompts: Prompts, path: str | None = None, ctx: LocalCheckoutContext | None = None
+):
+    """Fix the code files based on their language."""
+    if ctx is None:
+        ctx = LocalCheckoutContext(w)
+    ctx.local_code_migrator.apply(prompts, None if path is None else Path(path))
 
 
 @ucx.command
