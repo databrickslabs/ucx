@@ -464,7 +464,7 @@ class FileLinter:
         else:
             try:
                 fixed_content = self._ctx.apply_fixes(language, self._content)
-                if self._content == fixed_content:
+                if self._content != fixed_content:
                     self._path.write_text(fixed_content)
             except ValueError as err:
                 failure_message = f"Error while parsing content of {self._path.as_posix()}: {err}"
