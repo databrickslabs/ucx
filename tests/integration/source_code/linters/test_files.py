@@ -1,4 +1,3 @@
-from io import StringIO
 from pathlib import Path
 
 import pytest
@@ -25,7 +24,7 @@ def ucx_source_path() -> Path:
 
 
 def test_local_code_linter_lints_ucx(local_checkout_context, ucx_source_path) -> None:
-    problems = local_checkout_context.local_code_linter.lint(Prompts(), ucx_source_path, StringIO())
+    problems = local_checkout_context.local_code_linter.lint(ucx_source_path)
     assert len(problems) > 0, "Found no problems while linting ucx"
 
 

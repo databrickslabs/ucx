@@ -141,20 +141,8 @@ class LocalCodeLinter:
         self._extensions = {".py": Language.PYTHON, ".sql": Language.SQL}
         self._context_factory = context_factory
 
-    def lint(
-        self,
-        prompts: Prompts,
-        path: Path | None,
-        stdout: TextIO = sys.stdout,
-    ) -> list[LocatedAdvice]:
+    def lint(self, path: Path, stdout: TextIO = sys.stdout) -> list[LocatedAdvice]:
         """Lint local code files looking for problems in notebooks and python files."""
-        if path is None:
-            response = prompts.question(
-                "Which file or directory do you want to lint?",
-                default=Path.cwd().as_posix(),
-                validate=lambda p_: Path(p_).exists(),
-            )
-            path = Path(response)
         located_advices = list(self.lint_path(path))
         for located in located_advices:
             message = located.message_relative_to(path)

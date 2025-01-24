@@ -4,7 +4,7 @@ import abc
 import dataclasses
 import itertools
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from collections.abc import Callable, Iterable, Iterator
 from typing import TypeVar, Generic
@@ -12,7 +12,13 @@ from typing import TypeVar, Generic
 from astroid import (  # type: ignore
     NodeNG,
 )
-from databricks.labs.ucx.source_code.base import Advisory, CurrentSessionState, is_a_notebook, LineageAtom
+from databricks.labs.ucx.source_code.base import (
+    Advisory,
+    CurrentSessionState,
+    LocatedAdvice,
+    is_a_notebook,
+    LineageAtom,
+)
 from databricks.labs.ucx.source_code.python.python_ast import Tree
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
@@ -504,6 +510,9 @@ class DependencyProblem:
             end_col=self.end_col,
         )
 
+    def as_located_advice(self) -> LocatedAdvice:
+        return LocatedAdvice(self.as_advisory(), self.source_path)
+
     @staticmethod
     def from_node(code: str, message: str, node: NodeNG) -> DependencyProblem:
         # Astroid line numbers are 1-based.
@@ -519,8 +528,10 @@ class DependencyProblem:
 
 @dataclass
 class MaybeGraph:
+    # TODO: Add docstring like for MaybeTree
     graph: DependencyGraph | None
-    problems: list[DependencyProblem]
+
+    problems: list[DependencyProblem] = field(default_factory=list)
 
     @property
     def failed(self) -> bool:
