@@ -118,6 +118,18 @@ def test_file_linter_lints_file_with_missing_read_permission(migration_index, mo
     assert advices[0].message == f"Missing read permission for {path}"
 
 
+def test_file_linter_lints_simple_notebook_from_samples(migration_index, mock_path_lookup) -> None:
+    linter = FileLinter(
+        LinterContext(migration_index),
+        mock_path_lookup,
+        CurrentSessionState(),
+        Path("simple_notebook.py"),  # Resolved via mock path lookup
+    )
+    advices = list(linter.lint())
+    assert not advices
+    assert Path("simple_notebook.py") in mock_path_lookup.successfully_resolved_paths
+
+
 class _NotebookLinter(NotebookLinter):
     """A helper class to construct the notebook linter from source code for testing simplification."""
 
