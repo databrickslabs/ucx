@@ -231,7 +231,7 @@ class LocalCheckoutContext(WorkspaceContext):
             self.path_lookup,
             session_state,
             self.dependency_resolver,
-            lambda: self.linter_context_factory(CurrentSessionState())
+            lambda: self.linter_context_factory(CurrentSessionState()),
         )
 
     @cached_property
