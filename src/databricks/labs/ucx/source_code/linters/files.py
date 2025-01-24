@@ -7,7 +7,13 @@ from pathlib import Path
 import sys
 from typing import TextIO
 
-from databricks.labs.ucx.source_code.base import LocatedAdvice, CurrentSessionState, file_language, is_a_notebook
+from databricks.labs.ucx.source_code.base import (
+    CurrentSessionState,
+    Failure,
+    LocatedAdvice,
+    file_language,
+    is_a_notebook,
+)
 from databricks.labs.ucx.source_code.python.python_ast import Tree
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader
 from databricks.labs.ucx.source_code.notebooks.sources import FileLinter
