@@ -9,7 +9,7 @@ from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyResolver, DependencyProblem
 from databricks.labs.ucx.source_code.linters.files import FileLoader, ImportFileResolver
 from databricks.labs.ucx.source_code.notebooks.magic import MagicLine
-from databricks.labs.ucx.source_code.python.python_ast import Tree
+from databricks.labs.ucx.source_code.python.python_ast import MaybeTree
 from databricks.labs.ucx.source_code.notebooks.cells import (
     CellLanguage,
     PipCell,
@@ -268,7 +268,7 @@ def test_unsupported_magic_raises_problem(simple_dependency_resolver, mock_path_
     source = """
 %unsupported stuff '"%#@!
 """
-    maybe_tree = Tree.maybe_normalized_parse(source)
+    maybe_tree = MaybeTree.from_source_code(source)
     assert maybe_tree.tree, maybe_tree.failure
     tree = maybe_tree.tree
     commands, _ = MagicLine.extract_from_tree(tree, DependencyProblem.from_node)

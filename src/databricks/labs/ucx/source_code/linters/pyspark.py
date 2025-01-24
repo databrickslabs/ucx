@@ -22,12 +22,13 @@ from databricks.labs.ucx.source_code.linters.directfs import DIRECT_FS_ACCESS_PA
 from databricks.labs.ucx.source_code.python.python_infer import InferredValue
 from databricks.labs.ucx.source_code.linters.from_table import FromTableSqlLinter
 from databricks.labs.ucx.source_code.python.python_ast import (
-    Tree,
-    TreeHelper,
+    DfsaPyCollector,
     MatchingVisitor,
+    MaybeTree,
     PythonLinter,
     TablePyCollector,
-    DfsaPyCollector,
+    Tree,
+    TreeHelper,
 )
 
 logger = logging.getLogger(__name__)
@@ -412,7 +413,7 @@ class SparkTableNamePyLinter(PythonLinter, Fixer, TablePyCollector):
             yield from matcher.lint(self._from_table, self._index, self._session_state, node)
 
     def apply(self, code: str) -> str:
-        maybe_tree = Tree.maybe_parse(code)
+        maybe_tree = MaybeTree.from_source_code(code)
         if not maybe_tree.tree:
             assert maybe_tree.failure is not None
             logger.warning(maybe_tree.failure.message)
@@ -486,7 +487,7 @@ class SparkSqlPyLinter(_SparkSqlAnalyzer, PythonLinter, Fixer):
     def apply(self, code: str) -> str:
         if not self._sql_fixer:
             return code
-        maybe_tree = Tree.maybe_normalized_parse(code)
+        maybe_tree = MaybeTree.from_source_code(code)
         if maybe_tree.failure:
             logger.warning(maybe_tree.failure.message)
             return code

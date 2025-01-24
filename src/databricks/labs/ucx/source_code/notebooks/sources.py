@@ -36,7 +36,7 @@ from databricks.labs.ucx.source_code.linters.imports import (
     UnresolvedPath,
 )
 from databricks.labs.ucx.source_code.notebooks.magic import MagicLine
-from databricks.labs.ucx.source_code.python.python_ast import Tree, NodeBase, PythonSequentialLinter
+from databricks.labs.ucx.source_code.python.python_ast import MaybeTree, NodeBase, PythonSequentialLinter, Tree
 from databricks.labs.ucx.source_code.notebooks.cells import (
     CellLanguage,
     Cell,
@@ -196,7 +196,7 @@ class NotebookLinter:
                 continue
 
     def _load_tree_from_python_cell(self, python_cell: PythonCell, register_trees: bool) -> Iterable[Advice]:
-        maybe_tree = Tree.maybe_normalized_parse(python_cell.original_code)
+        maybe_tree = MaybeTree.from_source_code(python_cell.original_code)
         if maybe_tree.failure:
             yield maybe_tree.failure
         tree = maybe_tree.tree
