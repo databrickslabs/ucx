@@ -11,7 +11,9 @@ from databricks.labs.ucx.source_code.linters.context import LinterContext
 
 @pytest.fixture
 def local_checkout_context(ws) -> LocalCheckoutContext:
-    context = LocalCheckoutContext(ws).replace(linter_context_factory=lambda session_state: LinterContext(TableMigrationIndex([]), session_state))
+    context = LocalCheckoutContext(ws).replace(
+        linter_context_factory=lambda session_state: LinterContext(TableMigrationIndex([]), session_state)
+    )
     return context
 
 
