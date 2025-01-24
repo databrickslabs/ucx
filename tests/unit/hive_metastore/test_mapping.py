@@ -220,7 +220,9 @@ def test_skip_happy_path(caplog):
     )
     assert len(caplog.records) == 0
     mapping.skip_schema(schema="schema")
-    sbe.execute.assert_called_with(f"ALTER SCHEMA hive_metastore.`schema` SET DBPROPERTIES('{mapping.UCX_SKIP_PROPERTY}' = true)")
+    sbe.execute.assert_called_with(
+        f"ALTER SCHEMA hive_metastore.`schema` SET DBPROPERTIES('{mapping.UCX_SKIP_PROPERTY}' = true)"
+    )
     assert len(caplog.records) == 0
 
 
