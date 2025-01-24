@@ -366,7 +366,7 @@ class FileLinter:
         encoding = locale.getpreferredencoding(False)
         try:
             # Not using `safe_read_text` here to surface read errors
-            self._content = self._content or read_text(self._path)
+            self._content = self._content or read_text(self._path_lookup.resolve(self._path))
         except FileNotFoundError:
             failure_message = f"File not found: {self._path}"
             yield Failure("file-not-found", failure_message, 0, 0, 1, 1)
