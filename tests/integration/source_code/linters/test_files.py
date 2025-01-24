@@ -1,7 +1,6 @@
 from pathlib import Path
 
 import pytest
-from databricks.labs.blueprint.tui import Prompts
 
 from databricks.labs.ucx.contexts.workspace_cli import LocalCheckoutContext
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex

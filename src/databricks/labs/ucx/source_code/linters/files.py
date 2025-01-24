@@ -7,7 +7,6 @@ from collections.abc import Iterable, Callable
 from pathlib import Path
 from typing import TextIO
 
-from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.source_code.base import (
@@ -141,15 +140,8 @@ class LocalCodeLinter:
         self._extensions = {".py": Language.PYTHON, ".sql": Language.SQL}
         self._context_factory = context_factory
 
-    def lint(self, path: Path, stdout: TextIO = sys.stdout) -> list[LocatedAdvice]:
+    def lint(self, path: Path, linted_paths: set[Path] | None = None) -> Iterable[LocatedAdvice]:
         """Lint local code files looking for problems in notebooks and python files."""
-        located_advices = list(self.lint_path(path))
-        for located in located_advices:
-            message = located.message_relative_to(path)
-            stdout.write(f"{message}\n")
-        return located_advices
-
-    def lint_path(self, path: Path, linted_paths: set[Path] | None = None) -> Iterable[LocatedAdvice]:
         maybe_graph = self._build_dependency_graph_from_path(path)
         if maybe_graph.problems:
             for problem in maybe_graph.problems:

@@ -3,7 +3,6 @@ from pathlib import Path
 from unittest.mock import create_autospec
 
 import pytest
-from databricks.labs.blueprint.tui import MockPrompts
 
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex, TableMigrationStatus
 from databricks.labs.ucx.source_code.base import Advice, CurrentSessionState, Deprecation, LocatedAdvice
@@ -40,7 +39,7 @@ def test_local_code_linter_lint_path_detects_migrated_hive_metastore_table(
     path = tmp_path / "read_table.py"
     path.write_text("df = spark.read.table('hive_metastore.old.things')")
 
-    advices = list(linter.lint_path(path))
+    advices = list(linter.lint(path))
 
     assert len(advices) > 0, "Expect at least one advice"
     assert advices[0] == LocatedAdvice(
@@ -69,7 +68,7 @@ def test_local_code_linter_lint_path_walks_directory(mock_path_lookup, simple_de
     mock_path_lookup.append_path(Path(_samples_path(SourceContainer)))
     path = Path(__file__).parent.parent / "samples" / "simulate-sys-path"
     paths: set[Path] = set()
-    advices = list(linter.lint_path(path, paths))
+    advices = list(linter.lint(path, paths))
     assert len(paths) > 10
     assert not advices
 
@@ -87,7 +86,7 @@ def test_local_code_linter_lint_path_finds_children_in_context(mock_path_lookup,
     mock_path_lookup.append_path(Path(_samples_path(SourceContainer)))
     path = Path(__file__).parent.parent / "samples" / "parent-child-context"
     paths: set[Path] = set()
-    advices = list(linter.lint_path(path, paths))
+    advices = list(linter.lint(path, paths))
     assert len(paths) == 3
     assert advices == [
         LocatedAdvice(

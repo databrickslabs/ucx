@@ -854,7 +854,8 @@ def lint_local_code(
         )
         assert response
         path = Path(response)
-    ctx.local_code_linter.lint(Path(path))
+    for advice in ctx.local_code_linter.lint(Path(path)):
+        print(advice.message)
 
 
 @ucx.command
