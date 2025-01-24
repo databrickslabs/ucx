@@ -51,6 +51,7 @@ const config: Config = {
       }
     },
     'docusaurus-plugin-image-zoom',
+    'docusaurus-lunr-search'
   ],
 
   presets: [
@@ -85,6 +86,10 @@ const config: Config = {
         src: 'img/logo.svg',
       },
       items: [
+        {
+          type: 'search',
+          position: 'right',
+        },
         {
           href: 'https://github.com/databrickslabs/ucx',
           position: 'right',

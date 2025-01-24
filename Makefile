@@ -36,8 +36,11 @@ solacc:
 docs-install:
 	yarn --cwd docs/ucx install
 
-docs-serve:
+docs-serve-dev:
 	yarn --cwd docs/ucx start
 
 docs-build:
 	yarn --cwd docs/ucx build
+
+docs-serve: docs-build
+	yarn --cwd docs/ucx serve

@@ -9,7 +9,9 @@ on:
 jobs:
   build:
     name: Build Docusaurus
-    runs-on: ubuntu-latest
+    runs-on: 
+      group: databrickslabs-protected-runner-group
+      labels: linux-ubuntu-latest
     defaults:
       run:
         working-directory: docs/ucx
