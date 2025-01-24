@@ -134,6 +134,21 @@ def test_local_code_migrator_fixes_migrated_hive_metastore_table(
     assert "df = spark.read.table('catalog.schema.table')" == path.read_text().rstrip()
 
 
+def test_local_code_migrator_apply_path_finds_children_in_context(mock_path_lookup, simple_dependency_resolver) -> None:
+    migrator = LocalCodeMigrator(
+        NotebookLoader(),
+        FileLoader(),
+        FolderLoader(NotebookLoader(), FileLoader()),
+        mock_path_lookup,
+        CurrentSessionState(),
+        simple_dependency_resolver,
+        lambda: LinterContext(TableMigrationIndex([]), CurrentSessionState()),
+    )
+    path = Path(__file__).parent.parent / "samples" / "parent-child-context"
+
+    assert not migrator.apply(MockPrompts({}), path)
+
+
 @pytest.fixture()
 def local_code_linter(mock_path_lookup, migration_index) -> LocalCodeLinter:
     notebook_loader = NotebookLoader()
@@ -209,14 +224,6 @@ def test_local_code_linter_lint_path_finds_children_in_context(mock_path_lookup,
             path=path / "child.py",
         )
     ]
-
-
-def test_local_code_linter_apply_path_finds_children_in_context(mock_path_lookup, local_code_linter) -> None:
-    path = Path(__file__).parent.parent / "samples" / "parent-child-context"
-
-    failures = list(local_code_linter.apply_path(path))
-
-    assert not failures
 
 
 def test_triple_dot_import() -> None:
