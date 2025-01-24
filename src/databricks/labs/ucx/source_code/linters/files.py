@@ -165,18 +165,12 @@ class LocalCodeLinter:
 
         yield from LinterWalker(maybe_graph.graph, linted_paths or set(), self._path_lookup)
 
-    def apply(self, path: Path, stdout: TextIO = sys.stdout) -> list[LocatedAdvice]:
+    def apply(self, path: Path) -> list[LocatedAdvice]:
         """Apply the local file migrator.
 
         Fixes the code in the file(s) given the path. If the path is a directory, all files in the directory and its
         subdirectories are fixed.
         """
-        located_advices = list(self.apply_path(path))
-        for located in located_advices:
-            stdout.write(located.message)
-        return located_advices
-
-    def apply_path(self, path: Path, linted_paths: set[Path] | None = None) -> Iterable[LocatedAdvice]:
         maybe_graph = self._build_dependency_graph_from_path(path)
         if maybe_graph.problems:
             for problem in maybe_graph.problems:

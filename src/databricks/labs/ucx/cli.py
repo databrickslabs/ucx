@@ -873,7 +873,8 @@ def migrate_local_code(
         )
         assert response
         path = Path(response)
-    ctx.local_code_linter.apply(None if path is None else Path(path))
+    for advice in ctx.local_code_linter.apply(Path(path)):
+        print(advice.message)
 
 
 @ucx.command

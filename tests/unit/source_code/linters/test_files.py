@@ -116,7 +116,7 @@ def test_local_code_linter_apply_skips_non_existing_file(mock_path_lookup, simpl
     path = Path("non_existing_file.py")
     buffer = io.StringIO()
 
-    linter.apply(path, buffer)
+    linter.apply(path)
 
     assert f"{path.as_posix()}:1:0: [path-corrupted] Could not load dependency" in buffer.getvalue()
 
@@ -138,7 +138,7 @@ def test_local_code_linter_apply_ignores_unsupported_extensions(
     path = tmp_path / "unsupported.ext"
     path.touch()
 
-    linter.apply(path, buffer)
+    linter.apply(path)
 
     assert f"{path.as_posix()}:1:0: [unknown-language] Cannot detect language for" in buffer.getvalue()
 
