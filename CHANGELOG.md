@@ -1,5 +1,11 @@
 # Version changelog
 
+## 0.55.0
+
+* Introducing UCX docs! ([#3458](https://github.com/databrickslabs/ucx/pull/3458)). In this release, we introduced the new documents for UCX, you can find them here: [https://databrickslabs.github.io/ucx/](https://databrickslabs.github.io/ucx/)
+* Hosted Runner for release ([#3532](https://github.com/databrickslabs/ucx/issues/3532)). In this release, we have made improvements to the release job's security and control by moving the release.yml file to a new location within a hosted runner group labeled "linux-ubuntu-latest." This change ensures that the release job now runs in a protected runner group, enhancing the overall security and reliability of the release process. The job's environment remains set to "release," and it retains the same authentication and artifact signing permissions as before the move, ensuring a seamless transition while improving the security and control of the release process.
+
+
 ## 0.54.0
 
 *  Implement disposition field in SQL backend ([#3477](https://github.com/databrickslabs/ucx/issues/3477)). This commit adds a `query_statement_disposition` configuration option for the SQL backend in the UCX tool, allowing users to specify the disposition of SQL statements during assessment results export and preventing failures when dealing with large workspaces and a large number of findings. The new configuration option is added to the `config.yml` file and used by the `SqlBackend` definition. The `databricks labs install ucx` and `databricks labs ucx export-assessment` commands have been modified to support this new functionality. A new `Disposition` enum has been added to the `databricks.sdk.service.sql` module. This change resolves issue [#3447](https://github.com/databrickslabs/ucx/issues/3447) and is related to pull request [#3455](https://github.com/databrickslabs/ucx/issues/3455). The functionality has been manually tested.
