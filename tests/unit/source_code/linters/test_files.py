@@ -1,10 +1,9 @@
-import logging
+import io
 from pathlib import Path
 from unittest.mock import create_autospec
 
 import pytest
 from databricks.labs.blueprint.tui import MockPrompts
-from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex, TableMigrationStatus
 from databricks.labs.ucx.source_code.base import Advice, CurrentSessionState, Deprecation, LocatedAdvice
@@ -26,72 +25,113 @@ from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolv
 from tests.unit import locate_site_packages, _samples_path
 
 
-def test_local_code_migrator_apply_skips_non_existing_file(caplog) -> None:
-    context = LinterContext(TableMigrationIndex([]))
-    migrator = LocalCodeMigrator(lambda: context)
+def test_local_code_migrator_apply_skips_non_existing_file(mock_path_lookup, simple_dependency_resolver) -> None:
+    context = create_autospec(LinterContext)
+    migrator = LocalCodeMigrator(
+        NotebookLoader(),
+        FileLoader(),
+        FolderLoader(NotebookLoader(), FileLoader()),
+        mock_path_lookup,
+        CurrentSessionState(),
+        simple_dependency_resolver,
+        lambda: context,
+    )
     path = Path("non_existing_file.py")
-    with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.source_code.linters.files"):
-        assert not migrator.apply(path)
-    assert f"Skip non-existing file: {path}" in caplog.messages
+    buffer = io.StringIO()
+
+    migrator.apply(MockPrompts({}), path, buffer)
+
+    assert f"{path.as_posix()}:1:0: [path-corrupted] Could not load dependency" in buffer.getvalue()
+    context.apply_fixes.assert_not_called()
 
 
-def test_local_code_migrator_apply_ignores_unsupported_extensions(caplog, tmp_path) -> None:
-    context = LinterContext(TableMigrationIndex([]))
-    migrator = LocalCodeMigrator(lambda: context)
+def test_local_code_migrator_apply_ignores_unsupported_extensions(
+    tmp_path, mock_path_lookup, simple_dependency_resolver
+) -> None:
+    context = create_autospec(LinterContext)
+    migrator = LocalCodeMigrator(
+        NotebookLoader(),
+        FileLoader(),
+        FolderLoader(NotebookLoader(), FileLoader()),
+        mock_path_lookup,
+        CurrentSessionState(),
+        simple_dependency_resolver,
+        lambda: context,
+    )
+    buffer = io.StringIO()
+
     path = tmp_path / "unsupported.ext"
     path.touch()
-    with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.source_code.linters.files"):
-        assert not migrator.apply(path)
-    assert f"Skip fixing file with unsupported extension: {path}" in caplog.messages
+
+    migrator.apply(MockPrompts({}), path, buffer)
+
+    assert f"{path.as_posix()}:1:0: [unknown-language] Cannot detect language for" in buffer.getvalue()
+    context.apply_fixes.assert_not_called()
 
 
-def test_local_code_migrator_apply_ignores_unsupported_language_on_context(tmp_path, caplog) -> None:
-    context = LinterContext(TableMigrationIndex([]))
-    migrator = LocalCodeMigrator(lambda: context)
-    migrator._extensions[".py"] = Language.R  # pylint: disable=protected-access
-    path = tmp_path / 'unsupported.py'
-    path.touch()
-    with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.source_code.linters.files"):
-        assert not migrator.apply(path)
-    assert "Skip fixing unsupported language: R" in caplog.messages
-
-
-def test_linter_context_apply_with_supported_language(tmp_path) -> None:
-    path = tmp_path / "any.py"
-    path.write_text("import tempfile", encoding="utf-8")
+def test_linter_context_apply_with_supported_language(tmp_path, mock_path_lookup, simple_dependency_resolver) -> None:
     context = create_autospec(LinterContext)
     context.apply_fixes.return_value = "Hi there!"
-    migrator = LocalCodeMigrator(lambda: context)
+    migrator = LocalCodeMigrator(
+        NotebookLoader(),
+        FileLoader(),
+        FolderLoader(NotebookLoader(), FileLoader()),
+        mock_path_lookup,
+        CurrentSessionState(),
+        simple_dependency_resolver,
+        lambda: context,
+    )
 
-    migrator.apply(path)
+    path = tmp_path / "any.py"
+    path.write_text("import tempfile", encoding="utf-8")
+
+    migrator.apply(MockPrompts({}), path)
 
     assert path.read_text("utf-8") == "Hi there!"
 
 
-def test_local_code_migrator_apply_walks_directory(tmp_path) -> None:
-    path = tmp_path / "any.py"
-    path.write_text("import tempfile", encoding="utf-8")
+def test_local_code_migrator_apply_walks_directory(tmp_path, mock_path_lookup, simple_dependency_resolver) -> None:
     context = create_autospec(LinterContext)
     context.apply_fixes.return_value = "Hi there!"
-    migrator = LocalCodeMigrator(lambda: context)
+    migrator = LocalCodeMigrator(
+        NotebookLoader(),
+        FileLoader(),
+        FolderLoader(NotebookLoader(), FileLoader()),
+        mock_path_lookup,
+        CurrentSessionState(),
+        simple_dependency_resolver,
+        lambda: context,
+    )
 
-    migrator.apply(path.parent)
+    path = tmp_path / "any.py"
+    path.write_text("import tempfile", encoding="utf-8")
+
+    migrator.apply(MockPrompts({}), path.parent)
 
     assert path.read_text("utf-8") == "Hi there!"
 
 
-def test_local_code_migrator_fixes_migrated_hive_metastore_table(tmp_path) -> None:
+def test_local_code_migrator_fixes_migrated_hive_metastore_table(
+    tmp_path, mock_path_lookup, simple_dependency_resolver
+) -> None:
+    index = TableMigrationIndex([TableMigrationStatus("schema", "table", "catalog", "schema", "table")])
+    context = LinterContext(index, CurrentSessionState())
+    migrator = LocalCodeMigrator(
+        NotebookLoader(),
+        FileLoader(),
+        FolderLoader(NotebookLoader(), FileLoader()),
+        mock_path_lookup,
+        CurrentSessionState(),
+        simple_dependency_resolver,
+        lambda: context,
+    )
+
     path = tmp_path / "read_table.py"
     path.write_text("df = spark.read.table('hive_metastore.schema.table')")
 
-    index = TableMigrationIndex([TableMigrationStatus("schema", "table", "catalog", "schema", "table")])
-    linter_context = LinterContext(index, CurrentSessionState())
-    migrator = LocalCodeMigrator(lambda: linter_context)
+    migrator.apply(MockPrompts({}), path.parent)
 
-    has_code_changes = migrator.apply(path)
-
-    assert has_code_changes, "Expected the Hive metastore table to be rewritten to a UC table"
-    assert "df = spark.read.table('catalog.schema.table')" == path.read_text()
+    assert "df = spark.read.table('catalog.schema.table')" == path.read_text().rstrip()
 
 
 @pytest.fixture()
