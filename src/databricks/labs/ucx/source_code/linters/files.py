@@ -12,6 +12,7 @@ from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.source_code.base import (
     CurrentSessionState,
+    Failure,
     LocatedAdvice,
     file_language,
     is_a_notebook,
@@ -233,7 +234,10 @@ class LocalCodeLinter:
         root_dependency = Dependency(loader, path, not is_dir)  # don't inherit context when traversing folders
         graph = DependencyGraph(root_dependency, None, self._dependency_resolver, path_lookup, self._session_state)
         container = root_dependency.load(path_lookup)
-        assert container is not None  # because we just created it
+        if container is None:
+            failure = Failure("path-corrupted", "Could not load dependency", 0, 0, 1, 1)
+            yield LocatedAdvice(failure, path)
+            return
         problems = list(container.build_dependency_graph(graph))
 
         for problem in problems:
