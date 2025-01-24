@@ -168,7 +168,7 @@ class LocalCodeLinter:
 
         yield from LinterWalker(maybe_graph.graph, linted_paths or set(), self._path_lookup)
 
-    def apply(self, path: Path) -> list[LocatedAdvice]:
+    def apply(self, path: Path) -> Iterable[LocatedAdvice]:
         """Apply local code fixes to become Unity Catalog compatible.
 
         Parameters :
