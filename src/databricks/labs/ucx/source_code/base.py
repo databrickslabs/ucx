@@ -100,6 +100,10 @@ class LocatedAdvice:
     def is_unknown(self) -> bool:
         return self.path == Path('UNKNOWN')
 
+    @property
+    def message(self) -> str:
+        return f"{self.path.as_posix()}:{self.advice.start_line+1}:{self.advice.start_col}: [{self.advice.code}] {self.advice.message}"
+
     def message_relative_to(self, base: Path, *, default: Path | None = None) -> str:
         advice = self.advice
         path = self.path
