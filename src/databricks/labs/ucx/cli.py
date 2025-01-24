@@ -856,7 +856,7 @@ def migrate_local_code(
     """Fix the code files based on their language."""
     if ctx is None:
         ctx = LocalCheckoutContext(w)
-    ctx.local_code_migrator.apply(prompts, None if path is None else Path(path))
+    ctx.local_code_linter.apply(prompts, None if path is None else Path(path))
 
 
 @ucx.command

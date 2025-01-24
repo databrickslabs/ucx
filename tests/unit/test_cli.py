@@ -74,7 +74,7 @@ from databricks.labs.ucx.hive_metastore import TablesCrawler, ExternalLocations
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocation
 from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.progress.install import VerifyProgressTracking
-from databricks.labs.ucx.source_code.linters.files import LocalCodeMigrator
+from databricks.labs.ucx.source_code.linters.files import LocalCodeLinter
 from databricks.labs.ucx.source_code.redash import Redash
 
 
@@ -950,7 +950,7 @@ def test_relay_logs(ws, caplog) -> None:
 
 def test_migrate_local_code(ws) -> None:
     prompts = MockPrompts({'.*': 'yes'})
-    with patch.object(LocalCodeMigrator, 'apply') as mock_apply:
+    with patch.object(LocalCodeLinter, 'apply') as mock_apply:
         migrate_local_code(ws, prompts, Path.cwd().as_posix())
 
         mock_apply.assert_called_once_with(prompts, Path.cwd())

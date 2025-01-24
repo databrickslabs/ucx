@@ -198,10 +198,6 @@ class LocalCodeLinter:
         walker = LintingWalker(graph, linted_paths, self._path_lookup)
         yield from walker
 
-
-class LocalCodeMigrator(LocalCodeLinter):
-    """Fix local code files based on their language."""
-
     def apply_path(self, path: Path, linted_paths: set[Path] | None = None) -> Iterable[LocatedAdvice]:
         is_dir = path.is_dir()
         loader: DependencyLoader
