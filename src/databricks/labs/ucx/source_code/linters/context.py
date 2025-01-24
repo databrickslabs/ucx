@@ -108,8 +108,7 @@ class LinterContext:
         if language not in self._linters:
             raise ValueError(f"Unsupported language: {language}")
         if language is Language.PYTHON:
-            linter = PythonSequentialLinter(cast(list[PythonLinter], self._linters[language]), [], [])
-            return linter
+            return PythonSequentialLinter(cast(list[PythonLinter], self._linters[language]), [], [])
         if language is Language.SQL:
             return SqlSequentialLinter(cast(list[SqlLinter], self._linters[language]), [], [])
         raise ValueError(f"Unsupported language: {language}")
