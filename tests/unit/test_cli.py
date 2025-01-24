@@ -951,17 +951,9 @@ def test_relay_logs(ws, caplog) -> None:
 def test_migrate_local_code(ws) -> None:
     prompts = MockPrompts({'.*': 'yes'})
     with patch.object(LocalCodeMigrator, 'apply') as mock_apply:
-        migrate_local_code(ws, prompts)
+        migrate_local_code(ws, prompts, Path.cwd().as_posix())
 
-        mock_apply.assert_called_once_with(Path.cwd())
-
-
-def test_migrate_local_code_aborted_via_prompt(ws) -> None:
-    prompts = MockPrompts({'.*apply UC migration to all files.*': 'no'})
-    with patch.object(LocalCodeMigrator, 'apply') as mock_apply:
-        migrate_local_code(ws, prompts)
-
-        mock_apply.assert_not_called()
+        mock_apply.assert_called_once_with(prompts, Path.cwd())
 
 
 def test_show_all_metastores(acc_client, caplog):
