@@ -196,7 +196,7 @@ class LocalCodeLinter:
                 for advice in linter.apply():
                     yield LocatedAdvice(advice, dependency.path)
 
-        yield from FixerWalker(maybe_graph.graph, linted_paths or set(), self._path_lookup)
+        yield from FixerWalker(maybe_graph.graph, set(), self._path_lookup)
 
     def _build_dependency_graph_from_path(self, path: Path) -> MaybeGraph:
         """Build a dependency graph from the path.
