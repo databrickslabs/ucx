@@ -26,7 +26,7 @@ from databricks.labs.ucx.source_code.graph import (
     MaybeGraph,
     SourceContainer,
 )
-from databricks.labs.ucx.source_code.graph_walkers import DependencyGraphWalker
+from databricks.labs.ucx.source_code.graph_walkers import DependencyGraphWalker, LintingWalker
 from databricks.labs.ucx.source_code.known import KnownList
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage, PythonCodeAnalyzer
@@ -151,22 +151,8 @@ class LocalCodeLinter:
                 yield problem.as_located_advice()
             return
         assert maybe_graph.graph
-
-        context_factory = self._context_factory
-        session_state = self._session_state
-
-        class LinterWalker(DependencyGraphWalker[LocatedAdvice]):
-
-            def _process_dependency(
-                self, dependency: Dependency, path_lookup: PathLookup, inherited_tree: Tree | None
-            ) -> Iterable[LocatedAdvice]:
-                ctx = context_factory()
-                # FileLinter will determine which file/notebook linter to use
-                linter = FileLinter(ctx, path_lookup, session_state, dependency.path, inherited_tree)
-                for advice in linter.lint():
-                    yield LocatedAdvice(advice, dependency.path)
-
-        yield from LinterWalker(maybe_graph.graph, self._path_lookup)
+        walker = LintingWalker(maybe_graph.graph, self._path_lookup, self._context_factory)
+        yield from walker
 
     def apply(self, path: Path) -> Iterable[LocatedAdvice]:
         """Apply local code fixes to become Unity Catalog compatible.
