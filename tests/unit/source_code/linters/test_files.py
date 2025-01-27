@@ -188,7 +188,7 @@ def test_local_code_linter_apply_with_supported_language(
     path = tmp_path / "any.py"
     path.write_text("import tempfile", encoding="utf-8")
 
-    linter.apply(path)
+    list(linter.apply(path))
 
     assert path.read_text("utf-8") == "Hi there!"
 
@@ -209,7 +209,7 @@ def test_local_code_linter_apply_walks_directory(tmp_path, mock_path_lookup, sim
     path = tmp_path / "any.py"
     path.write_text("import tempfile", encoding="utf-8")
 
-    linter.apply(path.parent)
+    list(linter.apply(path.parent))
 
     assert path.read_text("utf-8") == "Hi there!"
 
@@ -231,7 +231,7 @@ def test_local_code_linter_fixes_migrated_hive_metastore_table(
     path = tmp_path / "read_table.py"
     path.write_text("df = spark.read.table('hive_metastore.schema.table')")
 
-    linter.apply(path.parent)
+    list(linter.apply(path.parent))
 
     assert path.read_text().rstrip() == "df = spark.read.table('catalog.schema.table')"
 
@@ -247,7 +247,7 @@ def test_local_code_linter_apply_path_finds_children_in_context(mock_path_lookup
         lambda: LinterContext(TableMigrationIndex([]), CurrentSessionState()),
     )
     path = Path(__file__).parent.parent / "samples" / "parent-child-context"
-    assert not linter.apply(path)
+    assert not list(linter.apply(path))
 
 
 def test_triple_dot_import() -> None:
