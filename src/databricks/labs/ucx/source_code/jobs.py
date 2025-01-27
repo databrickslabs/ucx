@@ -47,13 +47,13 @@ from databricks.labs.ucx.source_code.graph import (
     DependencyResolver,
     SourceContainer,
     WrappingLoader,
-    DependencyGraphWalker,
 )
+from databricks.labs.ucx.source_code.graph_walkers import DependencyGraphWalker, LintingWalker
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage
-from databricks.labs.ucx.source_code.python.python_ast import Tree, PythonSequentialLinter
-from databricks.labs.ucx.source_code.notebooks.sources import FileLinter, Notebook
+from databricks.labs.ucx.source_code.notebooks.sources import Notebook
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
+from databricks.labs.ucx.source_code.python.python_ast import Tree, PythonSequentialLinter
 from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
 
 logger = logging.getLogger(__name__)
@@ -565,36 +565,6 @@ class WorkflowLinter:
                 LineageAtom(object_type="TASK", object_id=f"{job_id}/{task.task_key}"),
             ]
             yield dataclasses.replace(used_table, source_lineage=atoms + used_table.source_lineage)
-
-
-class LintingWalker(DependencyGraphWalker[LocatedAdvice]):
-
-    def __init__(
-        self,
-        graph: DependencyGraph,
-        path_lookup: PathLookup,
-        key: str,
-        session_state: CurrentSessionState,
-        migration_index: TableMigrationIndex,
-    ):
-        super().__init__(graph, path_lookup)
-        self._key = key
-        self._session_state = session_state
-        self._linter_context = LinterContext(migration_index, session_state)
-
-    def _log_walk_one(self, dependency: Dependency) -> None:
-        logger.info(f'Linting {self._key} dependency: {dependency}')
-
-    def _process_dependency(
-        self,
-        dependency: Dependency,
-        path_lookup: PathLookup,
-        inherited_tree: Tree | None,
-    ) -> Iterable[LocatedAdvice]:
-        # FileLinter determines which file/notebook linter to use
-        linter = FileLinter(self._linter_context, path_lookup, self._session_state, dependency.path, inherited_tree)
-        for advice in linter.lint():
-            yield LocatedAdvice(advice, dependency.path)
 
 
 T = TypeVar("T", bound=SourceInfo)

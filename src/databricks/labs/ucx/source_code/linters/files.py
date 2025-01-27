@@ -18,7 +18,6 @@ from databricks.labs.ucx.source_code.graph import (
     BaseFileResolver,
     Dependency,
     DependencyGraph,
-    DependencyGraphWalker,
     DependencyLoader,
     DependencyProblem,
     DependencyResolver,
@@ -27,6 +26,7 @@ from databricks.labs.ucx.source_code.graph import (
     MaybeGraph,
     SourceContainer,
 )
+from databricks.labs.ucx.source_code.graph_walkers import DependencyGraphWalker
 from databricks.labs.ucx.source_code.known import KnownList
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage, PythonCodeAnalyzer
