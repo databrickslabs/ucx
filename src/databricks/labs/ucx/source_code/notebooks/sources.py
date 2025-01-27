@@ -364,21 +364,25 @@ class FileLinter:
 
     def lint(self) -> Iterable[Advice]:
         encoding = locale.getpreferredencoding(False)
-        try:
-            # Not using `safe_read_text` here to surface read errors
-            self._content = self._content or read_text(self._path_lookup.resolve(self._path))
-        except FileNotFoundError:
-            failure_message = f"File not found: {self._path}"
-            yield Failure("file-not-found", failure_message, 0, 0, 1, 1)
-            return
-        except UnicodeDecodeError:
-            failure_message = f"File without {encoding} encoding is not supported {self._path}"
-            yield Failure("unsupported-file-encoding", failure_message, 0, 0, 1, 1)
-            return
-        except PermissionError:
-            failure_message = f"Missing read permission for {self._path}"
-            yield Failure("file-permission", failure_message, 0, 0, 1, 1)
-            return
+        if not self._content:
+            try:
+                # Not using `safe_read_text` here to surface read errors
+                path = self._path_lookup.resolve(self._path)
+                if not path:
+                    raise FileNotFoundError(f"File not found: {path}")
+                self._content = read_text(path)
+            except FileNotFoundError:
+                failure_message = f"File not found: {self._path}"
+                yield Failure("file-not-found", failure_message, 0, 0, 1, 1)
+                return
+            except UnicodeDecodeError:
+                failure_message = f"File without {encoding} encoding is not supported {self._path}"
+                yield Failure("unsupported-file-encoding", failure_message, 0, 0, 1, 1)
+                return
+            except PermissionError:
+                failure_message = f"Missing read permission for {self._path}"
+                yield Failure("file-permission", failure_message, 0, 0, 1, 1)
+                return
 
         if self._is_notebook():
             yield from self._lint_notebook()

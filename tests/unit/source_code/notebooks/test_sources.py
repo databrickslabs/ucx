@@ -92,30 +92,26 @@ def test_file_linter_lints_non_ascii_encoded_file(migration_index, mock_path_loo
     assert advices[0].message == f"File without {preferred_encoding} encoding is not supported {non_ascii_encoded_file}"
 
 
-def test_file_linter_lints_file_with_missing_file(migration_index, mock_path_lookup) -> None:
-    path = create_autospec(Path)
-    path.suffix = ".py"
-    path.open.side_effect = FileNotFoundError("No such file or directory: 'test.py'")
+def test_file_linter_lints_file_with_missing_file(tmp_path, migration_index, mock_path_lookup) -> None:
+    path = tmp_path / "non_existing_file.py"
     linter = FileLinter(LinterContext(migration_index), mock_path_lookup, CurrentSessionState(), path)
 
     advices = list(linter.lint())
 
-    assert len(advices) == 1
-    assert advices[0].code == "file-not-found"
-    assert advices[0].message == f"File not found: {path}"
+    assert advices == [Failure("file-not-found", f"File not found: {path}", 0, 0, 1, 1)]
 
 
 def test_file_linter_lints_file_with_missing_read_permission(migration_index, mock_path_lookup) -> None:
+    path_lookup = create_autospec(PathLookup)
     path = create_autospec(Path)
     path.suffix = ".py"
     path.open.side_effect = PermissionError("Permission denied")
-    linter = FileLinter(LinterContext(migration_index), mock_path_lookup, CurrentSessionState(), path)
+    path_lookup.resolve.return_value = path
+    linter = FileLinter(LinterContext(migration_index), path_lookup, CurrentSessionState(), path)
 
     advices = list(linter.lint())
 
-    assert len(advices) == 1
-    assert advices[0].code == "file-permission"
-    assert advices[0].message == f"Missing read permission for {path}"
+    assert advices == [Failure("file-permission", f"Missing read permission for {path}", 0, 0, 1, 1)]
 
 
 def test_file_linter_lints_simple_notebook_from_samples(migration_index, mock_path_lookup) -> None:
