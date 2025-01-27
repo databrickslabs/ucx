@@ -953,7 +953,7 @@ def test_migrate_local_code(ws) -> None:
     with patch.object(LocalCodeLinter, 'apply') as mock_apply:
         migrate_local_code(ws, prompts, Path.cwd().as_posix())
 
-        mock_apply.assert_called_once_with(prompts, Path.cwd())
+        mock_apply.assert_called_once_with(Path.cwd())
 
 
 def test_show_all_metastores(acc_client, caplog):
