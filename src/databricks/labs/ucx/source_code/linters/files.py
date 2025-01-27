@@ -169,7 +169,6 @@ class LocalCodeLinter:
         assert maybe_graph.graph
 
         context_factory = self._context_factory
-        session_state = self._session_state
 
         class FixerWalker(DependencyGraphWalker[LocatedAdvice]):
 
@@ -178,7 +177,7 @@ class LocalCodeLinter:
             ) -> Iterable[LocatedAdvice]:
                 ctx = context_factory()
                 # FileLinter will determine which file/notebook linter to use
-                linter = FileLinter(ctx, path_lookup, session_state, dependency.path, inherited_tree)
+                linter = FileLinter(ctx, path_lookup, dependency.path, inherited_tree)
                 for advice in linter.apply():
                     yield LocatedAdvice(advice, dependency.path)
 
