@@ -13,6 +13,7 @@ from databricks.sdk.service.pipelines import NotebookLibrary, GetPipelineRespons
 from databricks.labs.blueprint.paths import DBFSPath, WorkspacePath
 from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.directfs_access import DirectFsAccessCrawler
+from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
 from databricks.labs.ucx.source_code.known import KnownList
 from databricks.sdk import WorkspaceClient
@@ -520,7 +521,7 @@ def test_linting_walker_populates_paths(dependency_resolver, mock_path_lookup, m
     path = mock_path_lookup.resolve(Path("functional/values_across_cells.py"))
     root = Dependency(NotebookLoader(), path)
     xgraph = DependencyGraph(root, None, dependency_resolver, mock_path_lookup, CurrentSessionState())
-    walker = LintingWalker(xgraph, mock_path_lookup, "key", CurrentSessionState(), migration_index)
+    walker = LintingWalker(xgraph, mock_path_lookup, lambda: LinterContext(migration_index))
     advices = 0
     for advice in walker:
         advices += 1

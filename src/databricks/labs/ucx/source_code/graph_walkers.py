@@ -70,21 +70,9 @@ class DependencyGraphWalker(abc.ABC, Generic[T]):
 
 class LintingWalker(DependencyGraphWalker[LocatedAdvice]):  # TODO : Use this and introduce a Fixer walker
 
-    def __init__(
-        self,
-        graph: DependencyGraph,
-        path_lookup: PathLookup,
-        key: str,
-        session_state: CurrentSessionState,
-        migration_index: TableMigrationIndex,
-    ):
+    def __init__(self, graph: DependencyGraph, path_lookup: PathLookup, context_factory: Callable[[], LinterContext]):
         super().__init__(graph, path_lookup)
-        self._key = key
-        self._session_state = session_state
-        self._linter_context = LinterContext(migration_index, session_state)
-
-    def _log_walk_one(self, dependency: Dependency) -> None:
-        logger.info(f'Linting {self._key} dependency: {dependency}')
+        self._context_factory = context_factory
 
     def _process_dependency(
         self,
@@ -93,6 +81,7 @@ class LintingWalker(DependencyGraphWalker[LocatedAdvice]):  # TODO : Use this an
         inherited_tree: Tree | None,
     ) -> Iterable[LocatedAdvice]:
         # FileLinter determines which file/notebook linter to use
-        linter = FileLinter(self._linter_context, path_lookup, self._session_state, dependency.path, inherited_tree)
+        linter_context = self._context_factory()
+        linter = FileLinter(linter_context, path_lookup, dependency.path, inherited_tree)
         for advice in linter.lint():
             yield LocatedAdvice(advice, dependency.path)

@@ -469,9 +469,9 @@ class WorkflowLinter:
         assert job.settings.name is not None
         assert job.settings.tasks is not None
         for task in job.settings.tasks:
-            graph, advices, session_state = self._build_task_dependency_graph(task, job)
+            graph, advices, linter_context_factory = self._build_task_dependency_graph(task, job)
             if not advices:
-                advices = self._lint_task(task, graph, session_state)
+                advices = LintingWalker(graph, self._path_lookup, linter_context_factory)
             for advice in advices:
                 absolute_path = advice.path.absolute().as_posix() if advice.path != self._UNKNOWN else 'UNKNOWN'
                 job_problem = JobProblem(
@@ -488,13 +488,13 @@ class WorkflowLinter:
                 )
                 problems.append(job_problem)
             assessment_start = datetime.now(timezone.utc)
-            task_dfsas = self._collect_task_dfsas(job, task, graph, session_state)
+            task_dfsas = self._collect_task_dfsas(job, task, graph, linter_context_factory)
             assessment_end = datetime.now(timezone.utc)
             for dfsa in task_dfsas:
                 dfsa = dfsa.replace_assessment_infos(assessment_start=assessment_start, assessment_end=assessment_end)
                 dfsas.append(dfsa)
             assessment_start = datetime.now(timezone.utc)
-            task_tables = self._collect_task_tables(job, task, graph, session_state)
+            task_tables = self._collect_task_tables(job, task, graph, linter_context_factory)
             assessment_end = datetime.now(timezone.utc)
             for used_table in task_tables:
                 used_table = used_table.replace_assessment_infos(
@@ -507,7 +507,7 @@ class WorkflowLinter:
 
     def _build_task_dependency_graph(
         self, task: jobs.Task, job: jobs.Job
-    ) -> tuple[DependencyGraph, Iterable[LocatedAdvice], CurrentSessionState]:
+    ) -> tuple[DependencyGraph, Iterable[LocatedAdvice], Callable[[], LinterContext]]:
         root_dependency: Dependency = WorkflowTask(self._ws, task, job)
         # we can load it without further preparation since the WorkflowTask is merely a wrapper
         container = root_dependency.load(self._path_lookup)
@@ -524,25 +524,19 @@ class WorkflowLinter:
         for problem in problems:
             source_path = self._UNKNOWN if problem.is_path_missing() else problem.source_path
             located_advices.append(LocatedAdvice(problem.as_advisory(), source_path))
-        return graph, located_advices, session_state
-
-    def _lint_task(
-        self, task: jobs.Task, graph: DependencyGraph, session_state: CurrentSessionState
-    ) -> Iterable[LocatedAdvice]:
-        walker = LintingWalker(graph, self._path_lookup, task.task_key, session_state, self._migration_index)
-        yield from walker
+        return graph, located_advices, lambda: LinterContext(self._migration_index, session_state)
 
     def _collect_task_dfsas(
         self,
         job: jobs.Job,
         task: jobs.Task,
         graph: DependencyGraph,
-        session_state: CurrentSessionState,
+        context_factory: Callable[[], LinterContext],
     ) -> Iterable[DirectFsAccess]:
         # need to add lineage for job/task because walker doesn't register them
         job_id = str(job.job_id)
         job_name = job.settings.name if job.settings and job.settings.name else "<anonymous>"
-        for dfsa in DfsaCollectorWalker(graph, self._path_lookup, session_state, self._migration_index):
+        for dfsa in DfsaCollectorWalker(graph, self._path_lookup, context_factory):
             atoms = [
                 LineageAtom(object_type="WORKFLOW", object_id=job_id, other={"name": job_name}),
                 LineageAtom(object_type="TASK", object_id=f"{job_id}/{task.task_key}"),
@@ -554,12 +548,12 @@ class WorkflowLinter:
         job: jobs.Job,
         task: jobs.Task,
         graph: DependencyGraph,
-        session_state: CurrentSessionState,
+        context_factory: Callable[[], LinterContext],
     ) -> Iterable[UsedTable]:
         # need to add lineage for job/task because walker doesn't register them
         job_id = str(job.job_id)
         job_name = job.settings.name if job.settings and job.settings.name else "<anonymous>"
-        for used_table in TablesCollectorWalker(graph, self._path_lookup, session_state, self._migration_index):
+        for used_table in TablesCollectorWalker(graph, self._path_lookup, context_factory):
             atoms = [
                 LineageAtom(object_type="WORKFLOW", object_id=job_id, other={"name": job_name}),
                 LineageAtom(object_type="TASK", object_id=f"{job_id}/{task.task_key}"),
@@ -576,12 +570,10 @@ class _CollectorWalker(DependencyGraphWalker[T], ABC):
         self,
         graph: DependencyGraph,
         path_lookup: PathLookup,
-        session_state: CurrentSessionState,
-        migration_index: TableMigrationIndex,
+        context_factory: Callable[[], LinterContext],
     ):
         super().__init__(graph, path_lookup)
-        self._session_state = session_state
-        self._linter_context = LinterContext(migration_index, session_state)
+        self._context_factory = context_factory
 
     def _process_dependency(
         self,
@@ -676,21 +668,25 @@ class _CollectorWalker(DependencyGraphWalker[T], ABC):
 class DfsaCollectorWalker(_CollectorWalker[DirectFsAccess]):
 
     def _collect_from_python(self, source: str, inherited_tree: Tree | None) -> Iterable[DirectFsAccess]:
-        collector = self._linter_context.dfsa_collector(Language.PYTHON)
+        linter_context = self._context_factory()
+        collector = linter_context.dfsa_collector(Language.PYTHON)
         yield from collector.collect_dfsas(source)
 
     def _collect_from_sql(self, source: str) -> Iterable[DirectFsAccess]:
-        collector = self._linter_context.dfsa_collector(Language.SQL)
+        linter_context = self._context_factory()
+        collector = linter_context.dfsa_collector(Language.SQL)
         yield from collector.collect_dfsas(source)
 
 
 class TablesCollectorWalker(_CollectorWalker[UsedTable]):
 
     def _collect_from_python(self, source: str, inherited_tree: Tree | None) -> Iterable[UsedTable]:
-        collector = self._linter_context.tables_collector(Language.PYTHON)
+        linter_context = self._context_factory()
+        collector = linter_context.tables_collector(Language.PYTHON)
         assert isinstance(collector, PythonSequentialLinter)
         yield from collector.collect_tables(source)
 
     def _collect_from_sql(self, source: str) -> Iterable[UsedTable]:
-        collector = self._linter_context.tables_collector(Language.SQL)
+        linter_context = self._context_factory()
+        collector = linter_context.tables_collector(Language.SQL)
         yield from collector.collect_tables(source)
