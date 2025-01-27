@@ -1,11 +1,17 @@
-import io
 from pathlib import Path
 from unittest.mock import create_autospec
 
 import pytest
 
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex, TableMigrationStatus
-from databricks.labs.ucx.source_code.base import Advice, CurrentSessionState, Deprecation, LocatedAdvice
+from databricks.labs.ucx.source_code.base import (
+    Advice,
+    Advisory,
+    CurrentSessionState,
+    Deprecation,
+    Failure,
+    LocatedAdvice,
+)
 from databricks.labs.ucx.source_code.graph import DependencyResolver, SourceContainer
 from databricks.labs.ucx.source_code.known import KnownList
 from databricks.labs.ucx.source_code.linters.files import (
@@ -112,7 +118,7 @@ def test_local_code_linter_lint_path_finds_children_in_context(mock_path_lookup,
     ]
 
 
-def test_local_code_linter_apply_skips_non_existing_file(mock_path_lookup, simple_dependency_resolver) -> None:
+def test_local_code_linter_apply_warns_about_non_existing_file(mock_path_lookup, simple_dependency_resolver) -> None:
     linter = LocalCodeLinter(
         NotebookLoader(),
         FileLoader(),
@@ -123,14 +129,21 @@ def test_local_code_linter_apply_skips_non_existing_file(mock_path_lookup, simpl
         lambda: LinterContext(TableMigrationIndex([]), CurrentSessionState()),
     )
     path = Path("non_existing_file.py")
-    buffer = io.StringIO()
 
-    linter.apply(path)
+    advices = list(linter.apply(path))
 
-    assert f"{path.as_posix()}:1:0: [path-corrupted] Could not load dependency" in buffer.getvalue()
+    advisory = Advisory(
+        code="dependency-not-found",
+        message="Dependency not found",
+        start_line=-1,
+        start_col=-1,
+        end_line=-1,
+        end_col=-1,
+    )
+    assert advices == [LocatedAdvice(advisory, path)]
 
 
-def test_local_code_linter_apply_skips_non_existing_directory(mock_path_lookup, simple_dependency_resolver) -> None:
+def test_local_code_linter_warns_about_non_existing_directory(mock_path_lookup, simple_dependency_resolver) -> None:
     linter = LocalCodeLinter(
         NotebookLoader(),
         FileLoader(),
@@ -141,14 +154,21 @@ def test_local_code_linter_apply_skips_non_existing_directory(mock_path_lookup, 
         lambda: LinterContext(TableMigrationIndex([]), CurrentSessionState()),
     )
     path = Path("non_existing_directory/")
-    buffer = io.StringIO()
 
-    linter.apply(path)
+    advices = list(linter.apply(path))
 
-    assert f"{path.as_posix()}:1:0: [path-corrupted] Could not load dependency" in buffer.getvalue()
+    advisory = Advisory(
+        code="dependency-not-found",
+        message="Dependency not found",
+        start_line=-1,
+        start_col=-1,
+        end_line=-1,
+        end_col=-1,
+    )
+    assert advices == [LocatedAdvice(advisory, path)]
 
 
-def test_local_code_linter_apply_ignores_unsupported_extensions(
+def test_local_code_linter_apply_warns_about_unsupported_extensions(
     tmp_path, mock_path_lookup, simple_dependency_resolver
 ) -> None:
     linter = LocalCodeLinter(
@@ -160,14 +180,22 @@ def test_local_code_linter_apply_ignores_unsupported_extensions(
         simple_dependency_resolver,
         lambda: LinterContext(TableMigrationIndex([]), CurrentSessionState()),
     )
-    buffer = io.StringIO()
 
     path = tmp_path / "unsupported.ext"
     path.touch()
 
-    linter.apply(path)
+    advices = list(linter.apply(path))
 
-    assert f"{path.as_posix()}:1:0: [unknown-language] Cannot detect language for" in buffer.getvalue()
+    advisory = Failure(
+        code="unknown-language",
+        message=f"Cannot detect language for {path}",  # TODO: Should this contain the path?
+        # TODO: Consistent line numbering for failures
+        start_line=0,
+        start_col=0,
+        end_line=1,
+        end_col=1,
+    )
+    assert advices == [LocatedAdvice(advisory, path)]
 
 
 def test_local_code_linter_apply_with_supported_language(
