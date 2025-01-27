@@ -48,7 +48,7 @@ from databricks.labs.ucx.source_code.graph import (
     SourceContainer,
     WrappingLoader,
 )
-from databricks.labs.ucx.source_code.graph_walkers import DependencyGraphWalker, LintingWalker
+from databricks.labs.ucx.source_code.graph_walkers import DependencyGraphWalker, LinterWalker
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage
 from databricks.labs.ucx.source_code.notebooks.sources import Notebook
@@ -471,7 +471,7 @@ class WorkflowLinter:
         for task in job.settings.tasks:
             graph, advices, linter_context_factory = self._build_task_dependency_graph(task, job)
             if not advices:
-                advices = LintingWalker(graph, self._path_lookup, linter_context_factory)
+                advices = LinterWalker(graph, self._path_lookup, linter_context_factory)
             for advice in advices:
                 absolute_path = advice.path.absolute().as_posix() if advice.path != self._UNKNOWN else 'UNKNOWN'
                 job_problem = JobProblem(

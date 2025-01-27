@@ -27,7 +27,7 @@ from databricks.labs.ucx.source_code.graph import (
     DependencyGraph,
     DependencyResolver,
 )
-from databricks.labs.ucx.source_code.graph_walkers import LintingWalker
+from databricks.labs.ucx.source_code.graph_walkers import LinterWalker
 from databricks.labs.ucx.source_code.jobs import JobProblem, WorkflowLinter, WorkflowTaskContainer
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
 from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
@@ -521,7 +521,7 @@ def test_linting_walker_populates_paths(dependency_resolver, mock_path_lookup, m
     path = mock_path_lookup.resolve(Path("functional/values_across_cells.py"))
     root = Dependency(NotebookLoader(), path)
     xgraph = DependencyGraph(root, None, dependency_resolver, mock_path_lookup, CurrentSessionState())
-    walker = LintingWalker(xgraph, mock_path_lookup, lambda: LinterContext(migration_index))
+    walker = LinterWalker(xgraph, mock_path_lookup, lambda: LinterContext(migration_index))
     advices = 0
     for advice in walker:
         advices += 1

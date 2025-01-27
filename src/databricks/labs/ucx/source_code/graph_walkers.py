@@ -68,11 +68,16 @@ class DependencyGraphWalker(abc.ABC, Generic[T]):
         return list(itertools.chain(*lists))
 
 
-class LintingWalker(DependencyGraphWalker[LocatedAdvice]):
+class _LinterWalker(DependencyGraphWalker[LocatedAdvice]):
+    """Dependency graph walker with linter context."""
 
     def __init__(self, graph: DependencyGraph, path_lookup: PathLookup, context_factory: Callable[[], LinterContext]):
         super().__init__(graph, path_lookup)
         self._context_factory = context_factory
+
+
+class LinterWalker(_LinterWalker):
+    """Lint while walking the dependencies."""
 
     def _process_dependency(
         self,
@@ -87,11 +92,8 @@ class LintingWalker(DependencyGraphWalker[LocatedAdvice]):
             yield LocatedAdvice(advice, dependency.path)
 
 
-class FixingWalker(DependencyGraphWalker[LocatedAdvice]):
-
-    def __init__(self, graph: DependencyGraph, path_lookup: PathLookup, context_factory: Callable[[], LinterContext]):
-        super().__init__(graph, path_lookup)
-        self._context_factory = context_factory
+class FixerWalker(_LinterWalker):
+    """Apply the linter fixes while walking the dependencies."""
 
     def _process_dependency(
         self,

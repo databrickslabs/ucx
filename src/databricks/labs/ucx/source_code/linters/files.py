@@ -26,7 +26,7 @@ from databricks.labs.ucx.source_code.graph import (
     MaybeGraph,
     SourceContainer,
 )
-from databricks.labs.ucx.source_code.graph_walkers import FixingWalker, LintingWalker
+from databricks.labs.ucx.source_code.graph_walkers import FixerWalker, LinterWalker
 from databricks.labs.ucx.source_code.known import KnownList
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage, PythonCodeAnalyzer
@@ -149,7 +149,7 @@ class LocalCodeLinter:
                 yield problem.as_located_advice()
             return
         assert maybe_graph.graph
-        walker = LintingWalker(maybe_graph.graph, self._path_lookup, self._context_factory)
+        walker = LinterWalker(maybe_graph.graph, self._path_lookup, self._context_factory)
         yield from walker
 
     def apply(self, path: Path) -> Iterable[LocatedAdvice]:
@@ -165,7 +165,7 @@ class LocalCodeLinter:
                 yield problem.as_located_advice()
             return
         assert maybe_graph.graph
-        walker = FixingWalker(maybe_graph.graph, self._path_lookup, self._context_factory)
+        walker = FixerWalker(maybe_graph.graph, self._path_lookup, self._context_factory)
         yield from walker
 
     def _build_dependency_graph_from_path(self, path: Path) -> MaybeGraph:
