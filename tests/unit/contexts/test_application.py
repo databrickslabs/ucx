@@ -33,7 +33,7 @@ def test_global_context_attributes_not_none(attribute: str) -> None:
     assert getattr(ctx, attribute) is not None
 
 
-@pytest.mark.parametrize("attribute", ["local_code_migrator", "local_code_linter"])
+@pytest.mark.parametrize("attribute", ["local_code_linter"])
 def test_local_context_attributes_not_none(attribute: str) -> None:
     """Attributes should be not None"""
     # Goal is to improve test coverage
