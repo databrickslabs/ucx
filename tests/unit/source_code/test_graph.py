@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from databricks.labs.ucx.source_code.base import Advisory, CurrentSessionState
+from databricks.labs.ucx.source_code.base import Advice, CurrentSessionState, Failure
 from databricks.labs.ucx.source_code.linters.files import FileLoader, FolderLoader
 from databricks.labs.ucx.source_code.graph import (
     Dependency,
@@ -220,7 +220,13 @@ def test_graph_walker_captures_lineage(mock_path_lookup, simple_dependency_resol
     list(walker)
 
 
-def test_dependency_problem_as_advisory() -> None:
+def test_dependency_problem_as_advice() -> None:
     dependency_problem = DependencyProblem("test", "test")
-    advice = dependency_problem.as_advisory()
-    assert advice == Advisory("test", "test", -1, -1, -1, -1)
+    advice = dependency_problem.as_advice()
+    assert advice == Advice("test", "test", -1, -1, -1, -1)
+
+
+def test_dependency_problem_as_advice_with_class() -> None:
+    dependency_problem = DependencyProblem("test", "test")
+    advice = dependency_problem.as_advice(Failure)
+    assert advice == Failure("test", "test", -1, -1, -1, -1)

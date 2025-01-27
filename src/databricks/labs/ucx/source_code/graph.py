@@ -13,7 +13,7 @@ from astroid import (  # type: ignore
 )
 
 from databricks.labs.ucx.source_code.base import (
-    Advisory,
+    Advice,
     CurrentSessionState,
     LocatedAdvice,
     is_a_notebook,
@@ -501,8 +501,10 @@ class DependencyProblem:
     def is_path_missing(self) -> bool:
         return self.source_path == _MISSING_SOURCE_PATH
 
-    def as_advisory(self) -> 'Advisory':
-        return Advisory(
+    def as_advice(self, klass: type[Advice] = Advice) -> Advice:
+        if not issubclass(klass, Advice):
+            raise ValueError("Class should be instance of advice")
+        return klass(
             code=self.code,
             message=self.message,
             start_line=self.start_line,
