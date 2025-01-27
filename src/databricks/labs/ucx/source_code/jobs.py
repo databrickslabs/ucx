@@ -473,7 +473,7 @@ class WorkflowLinter:
             if not advices:
                 advices = LinterWalker(graph, self._path_lookup, linter_context_factory)
             for advice in advices:
-                absolute_path = advice.path.absolute().as_posix() if advice.path != self._UNKNOWN else 'UNKNOWN'
+                absolute_path = "UNKNOWN" if advice.has_unknown_path() else advice.path.absolute().as_posix()
                 job_problem = JobProblem(
                     job_id=job.job_id,
                     job_name=job.settings.name,

@@ -6,7 +6,6 @@ import pytest
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex, TableMigrationStatus
 from databricks.labs.ucx.source_code.base import (
     Advice,
-    Advisory,
     CurrentSessionState,
     Deprecation,
     Failure,

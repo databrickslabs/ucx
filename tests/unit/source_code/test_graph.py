@@ -232,3 +232,9 @@ def test_dependency_problem_as_located_advice_with_failure_class() -> None:
     located_advice = dependency_problem.as_located_advice(Failure)
     advice = Failure("test", "test", -1, -1, -1, -1)
     assert located_advice == LocatedAdvice(advice, Path("<MISSING_SOURCE_PATH>"))
+
+
+def test_dependency_problem_as_located_advice_has_unknown_path_by_default() -> None:
+    dependency_problem = DependencyProblem("test", "test")
+    located_advice = dependency_problem.as_located_advice()
+    assert located_advice.has_unknown_path()
