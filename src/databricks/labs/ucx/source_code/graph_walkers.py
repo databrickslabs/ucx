@@ -2,12 +2,11 @@ from __future__ import annotations
 
 import abc
 import itertools
-from collections.abc import Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from pathlib import Path
 from typing import Generic, TypeVar
 
-from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
-from databricks.labs.ucx.source_code.base import is_a_notebook, LineageAtom, LocatedAdvice, CurrentSessionState
+from databricks.labs.ucx.source_code.base import is_a_notebook, LineageAtom, LocatedAdvice
 from databricks.labs.ucx.source_code.graph import DependencyGraph, Dependency, logger
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.notebooks.sources import FileLinter

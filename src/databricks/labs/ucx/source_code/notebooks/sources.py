@@ -16,7 +16,6 @@ from databricks.labs.ucx.source_code.base import (
     safe_read_text,
     read_text,
     Advice,
-    CurrentSessionState,
     Failure,
 )
 
@@ -126,16 +125,10 @@ class NotebookLinter:
     """
 
     def __init__(
-        self,
-        context: LinterContext,
-        path_lookup: PathLookup,
-        session_state: CurrentSessionState,
-        notebook: Notebook,
-        parent_tree: Tree | None = None,
+        self, context: LinterContext, path_lookup: PathLookup, notebook: Notebook, parent_tree: Tree | None = None
     ):
-        self._context: LinterContext = context
+        self._context = context
         self._path_lookup = path_lookup
-        self._session_state = session_state
         self._notebook: Notebook = notebook
         self._parent_tree = parent_tree or Tree.new_module()
 
@@ -224,7 +217,7 @@ class NotebookLinter:
     def _parse_tree(self, tree: Tree) -> MaybeTree:
         """Parse tree by looking for referred notebooks and path changes that might affect loading notebooks."""
         code_path_nodes = self._list_magic_lines_with_run_command(tree) + SysPathChange.extract_from_tree(
-            self._session_state, tree
+            self._context.session_state, tree
         )
         maybe_tree = MaybeTree(None, None)
         # Sys path changes require to load children in order of reading
@@ -350,14 +343,12 @@ class FileLinter:
         self,
         ctx: LinterContext,
         path_lookup: PathLookup,
-        session_state: CurrentSessionState,
         path: Path,
         inherited_tree: Tree | None = None,
         content: str | None = None,
     ):
         self._ctx: LinterContext = ctx
         self._path_lookup = path_lookup
-        self._session_state = session_state
         self._path = path
         self._inherited_tree = inherited_tree
         self._content = content
@@ -423,9 +414,7 @@ class FileLinter:
             yield Failure("unknown-language", f"Cannot detect language for {self._path}", 0, 0, 1, 1)
             return
         notebook = Notebook.parse(self._path, self._content, language)
-        notebook_linter = NotebookLinter(
-            self._ctx, self._path_lookup, self._session_state, notebook, self._inherited_tree
-        )
+        notebook_linter = NotebookLinter(self._ctx, self._path_lookup, notebook, self._inherited_tree)
         yield from notebook_linter.lint()
 
     def apply(self) -> Iterable[Advice]:
