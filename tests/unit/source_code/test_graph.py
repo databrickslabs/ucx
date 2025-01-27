@@ -3,11 +3,12 @@ from pathlib import Path
 
 import pytest
 
-from databricks.labs.ucx.source_code.base import CurrentSessionState
+from databricks.labs.ucx.source_code.base import Advisory, CurrentSessionState
 from databricks.labs.ucx.source_code.linters.files import FileLoader, FolderLoader
 from databricks.labs.ucx.source_code.graph import (
     Dependency,
     DependencyGraph,
+    DependencyProblem,
     InheritedContext,
 )
 from databricks.labs.ucx.source_code.graph_walkers import DependencyGraphWalker
@@ -217,3 +218,9 @@ def test_graph_walker_captures_lineage(mock_path_lookup, simple_dependency_resol
 
     walker = _TestWalker(root_graph, mock_path_lookup)
     list(walker)
+
+
+def test_dependency_problem_as_advisory() -> None:
+    dependency_problem = DependencyProblem("test", "test")
+    advice = dependency_problem.as_advisory()
+    assert advice == Advisory("test", "test", -1, -1, -1, -1)
