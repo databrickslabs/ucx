@@ -26,14 +26,12 @@ from databricks.labs.ucx.source_code.graph import (
     MaybeGraph,
     SourceContainer,
 )
-from databricks.labs.ucx.source_code.graph_walkers import DependencyGraphWalker, LintingWalker
+from databricks.labs.ucx.source_code.graph_walkers import FixingWalker, LintingWalker
 from databricks.labs.ucx.source_code.known import KnownList
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage, PythonCodeAnalyzer
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader
-from databricks.labs.ucx.source_code.notebooks.sources import FileLinter
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
-from databricks.labs.ucx.source_code.python.python_ast import Tree
 
 logger = logging.getLogger(__name__)
 
@@ -167,21 +165,8 @@ class LocalCodeLinter:
                 yield problem.as_located_advice()
             return
         assert maybe_graph.graph
-
-        context_factory = self._context_factory
-
-        class FixerWalker(DependencyGraphWalker[LocatedAdvice]):
-
-            def _process_dependency(
-                self, dependency: Dependency, path_lookup: PathLookup, inherited_tree: Tree | None
-            ) -> Iterable[LocatedAdvice]:
-                ctx = context_factory()
-                # FileLinter will determine which file/notebook linter to use
-                linter = FileLinter(ctx, path_lookup, dependency.path, inherited_tree)
-                for advice in linter.apply():
-                    yield LocatedAdvice(advice, dependency.path)
-
-        yield from FixerWalker(maybe_graph.graph, self._path_lookup)
+        walker = FixingWalker(maybe_graph.graph, self._path_lookup, self._context_factory)
+        yield from walker
 
     def _build_dependency_graph_from_path(self, path: Path) -> MaybeGraph:
         """Build a dependency graph from the path.

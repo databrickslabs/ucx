@@ -68,7 +68,7 @@ class DependencyGraphWalker(abc.ABC, Generic[T]):
         return list(itertools.chain(*lists))
 
 
-class LintingWalker(DependencyGraphWalker[LocatedAdvice]):  # TODO : Use this and introduce a Fixer walker
+class LintingWalker(DependencyGraphWalker[LocatedAdvice]):
 
     def __init__(self, graph: DependencyGraph, path_lookup: PathLookup, context_factory: Callable[[], LinterContext]):
         super().__init__(graph, path_lookup)
@@ -84,4 +84,23 @@ class LintingWalker(DependencyGraphWalker[LocatedAdvice]):  # TODO : Use this an
         linter_context = self._context_factory()
         linter = FileLinter(linter_context, path_lookup, dependency.path, inherited_tree)
         for advice in linter.lint():
+            yield LocatedAdvice(advice, dependency.path)
+
+
+class FixingWalker(DependencyGraphWalker[LocatedAdvice]):
+
+    def __init__(self, graph: DependencyGraph, path_lookup: PathLookup, context_factory: Callable[[], LinterContext]):
+        super().__init__(graph, path_lookup)
+        self._context_factory = context_factory
+
+    def _process_dependency(
+        self,
+        dependency: Dependency,
+        path_lookup: PathLookup,
+        inherited_tree: Tree | None,
+    ) -> Iterable[LocatedAdvice]:
+        # FileLinter determines which file/notebook linter to use
+        linter_context = self._context_factory()
+        linter = FileLinter(linter_context, path_lookup, dependency.path, inherited_tree)
+        for advice in linter.apply():
             yield LocatedAdvice(advice, dependency.path)
