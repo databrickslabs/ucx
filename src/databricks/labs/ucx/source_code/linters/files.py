@@ -186,13 +186,14 @@ class LocalCodeLinter:
             loader = self._folder_loader
         else:
             loader = self._file_loader
-        path_lookup = self._path_lookup.change_directory(path if is_dir else path.parent)
         root_dependency = Dependency(loader, path, not is_dir)  # don't inherit context when traversing folders
-        graph = DependencyGraph(root_dependency, None, self._dependency_resolver, path_lookup, self._session_state)
-        container = root_dependency.load(path_lookup)
+        container = root_dependency.load(self._path_lookup)
         if container is None:
             problem = DependencyProblem("dependency-not-found", "Dependency not found", source_path=path)
             return MaybeGraph(None, [problem])
+        graph = DependencyGraph(
+            root_dependency, None, self._dependency_resolver, self._path_lookup, self._session_state
+        )
         problems = list(container.build_dependency_graph(graph))
         if problems:
             return MaybeGraph(None, problems)
