@@ -501,7 +501,7 @@ class DependencyProblem:
     def is_path_missing(self) -> bool:
         return self.source_path == _MISSING_SOURCE_PATH
 
-    def as_advice(self, klass: type[Advice] = Advice) -> Advice:
+    def _as_advice(self, klass: type[Advice] = Advice) -> Advice:
         if not issubclass(klass, Advice):
             raise ValueError("Class should be instance of advice")
         return klass(
@@ -513,8 +513,8 @@ class DependencyProblem:
             end_col=self.end_col,
         )
 
-    def as_located_advice(self) -> LocatedAdvice:
-        return LocatedAdvice(self.as_advisory(), self.source_path)
+    def as_located_advice(self, klass: type[Advice] = Advice) -> LocatedAdvice:
+        return LocatedAdvice(self._as_advice(klass), self.source_path)
 
     @staticmethod
     def from_node(code: str, message: str, node: NodeNG) -> DependencyProblem:

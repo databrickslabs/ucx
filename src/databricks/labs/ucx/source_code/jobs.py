@@ -522,8 +522,7 @@ class WorkflowLinter:
         problems = container.build_dependency_graph(graph)
         located_advices: list[LocatedAdvice] = []
         for problem in problems:
-            source_path = self._UNKNOWN if problem.is_path_missing() else problem.source_path
-            located_advices.append(LocatedAdvice(problem.as_advice().as_advisory(), source_path))
+            located_advices.append(problem.as_located_advice())
         return graph, located_advices, lambda: LinterContext(self._migration_index, session_state)
 
     def _collect_task_dfsas(

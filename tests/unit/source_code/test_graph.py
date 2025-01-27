@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from databricks.labs.ucx.source_code.base import Advice, CurrentSessionState, Failure
+from databricks.labs.ucx.source_code.base import Advice, CurrentSessionState, Failure, LocatedAdvice
 from databricks.labs.ucx.source_code.linters.files import FileLoader, FolderLoader
 from databricks.labs.ucx.source_code.graph import (
     Dependency,
@@ -220,13 +220,15 @@ def test_graph_walker_captures_lineage(mock_path_lookup, simple_dependency_resol
     list(walker)
 
 
-def test_dependency_problem_as_advice() -> None:
+def test_dependency_problem_as_located_advice() -> None:
     dependency_problem = DependencyProblem("test", "test")
-    advice = dependency_problem.as_advice()
-    assert advice == Advice("test", "test", -1, -1, -1, -1)
+    located_advice = dependency_problem.as_located_advice()
+    advice = Advice("test", "test", -1, -1, -1, -1)
+    assert located_advice == LocatedAdvice(advice, Path("<MISSING_SOURCE_PATH>"))
 
 
-def test_dependency_problem_as_advice_with_class() -> None:
+def test_dependency_problem_as_located_advice_with_failure_class() -> None:
     dependency_problem = DependencyProblem("test", "test")
-    advice = dependency_problem.as_advice(Failure)
-    assert advice == Failure("test", "test", -1, -1, -1, -1)
+    located_advice = dependency_problem.as_located_advice(Failure)
+    advice = Failure("test", "test", -1, -1, -1, -1)
+    assert located_advice == LocatedAdvice(advice, Path("<MISSING_SOURCE_PATH>"))
