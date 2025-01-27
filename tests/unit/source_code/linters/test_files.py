@@ -132,7 +132,7 @@ def test_local_code_linter_apply_warns_about_non_existing_file(mock_path_lookup,
 
     advices = list(linter.apply(path))
 
-    advisory = Advisory(
+    failure = Failure(
         code="dependency-not-found",
         message="Dependency not found",
         start_line=-1,
@@ -140,7 +140,7 @@ def test_local_code_linter_apply_warns_about_non_existing_file(mock_path_lookup,
         end_line=-1,
         end_col=-1,
     )
-    assert advices == [LocatedAdvice(advisory, path)]
+    assert advices == [LocatedAdvice(failure, path)]
 
 
 def test_local_code_linter_warns_about_non_existing_directory(mock_path_lookup, simple_dependency_resolver) -> None:
@@ -157,7 +157,7 @@ def test_local_code_linter_warns_about_non_existing_directory(mock_path_lookup, 
 
     advices = list(linter.apply(path))
 
-    advisory = Advisory(
+    failure = Failure(
         code="dependency-not-found",
         message="Dependency not found",
         start_line=-1,
@@ -165,7 +165,7 @@ def test_local_code_linter_warns_about_non_existing_directory(mock_path_lookup, 
         end_line=-1,
         end_col=-1,
     )
-    assert advices == [LocatedAdvice(advisory, path)]
+    assert advices == [LocatedAdvice(failure, path)]
 
 
 def test_local_code_linter_apply_warns_about_unsupported_extensions(

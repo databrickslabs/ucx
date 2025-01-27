@@ -9,6 +9,7 @@ from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.source_code.base import (
     CurrentSessionState,
+    Failure,
     LocatedAdvice,
     file_language,
     is_a_notebook,
@@ -146,7 +147,7 @@ class LocalCodeLinter:
         maybe_graph = self._build_dependency_graph_from_path(path)
         if maybe_graph.problems:
             for problem in maybe_graph.problems:
-                yield problem.as_located_advice()
+                yield problem.as_located_advice(Failure)
             return
         assert maybe_graph.graph
         walker = LinterWalker(maybe_graph.graph, self._path_lookup, self._context_factory)
@@ -162,7 +163,7 @@ class LocalCodeLinter:
         maybe_graph = self._build_dependency_graph_from_path(path)
         if maybe_graph.problems:
             for problem in maybe_graph.problems:
-                yield problem.as_located_advice()
+                yield problem.as_located_advice(Failure)
             return
         assert maybe_graph.graph
         walker = FixerWalker(maybe_graph.graph, self._path_lookup, self._context_factory)
