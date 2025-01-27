@@ -3,14 +3,12 @@ import functools
 import logging
 import shutil
 import tempfile
-from abc import ABC, abstractmethod
 from collections.abc import Generator, Iterable, Callable
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from importlib import metadata
 from pathlib import Path
-from typing import TypeVar
 from urllib import parse
 
 from databricks.labs.blueprint.parallel import Threads
@@ -21,7 +19,6 @@ from databricks.sdk.errors import NotFound, ResourceDoesNotExist, BadRequest, In
 from databricks.sdk.service import compute, jobs
 from databricks.sdk.service.compute import DataSecurityMode
 from databricks.sdk.service.jobs import Source
-from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.assessment.crawlers import runtime_version_tuple
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
@@ -29,12 +26,8 @@ from databricks.labs.ucx.mixins.cached_workspace_path import WorkspaceCache, Inv
 from databricks.labs.ucx.source_code.base import (
     CurrentSessionState,
     LocatedAdvice,
-    is_a_notebook,
-    file_language,
-    SourceInfo,
     UsedTable,
     LineageAtom,
-    safe_read_text,
 )
 from databricks.labs.ucx.source_code.directfs_access import (
     DirectFsAccessCrawler,
@@ -48,12 +41,9 @@ from databricks.labs.ucx.source_code.graph import (
     SourceContainer,
     WrappingLoader,
 )
-from databricks.labs.ucx.source_code.graph_walkers import DependencyGraphWalker, LinterWalker
+from databricks.labs.ucx.source_code.graph_walkers import LinterWalker, DfsaCollectorWalker, TablesCollectorWalker
 from databricks.labs.ucx.source_code.linters.context import LinterContext
-from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage
-from databricks.labs.ucx.source_code.notebooks.sources import Notebook
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
-from databricks.labs.ucx.source_code.python.python_ast import Tree, PythonSequentialLinter
 from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
 
 logger = logging.getLogger(__name__)
@@ -558,134 +548,3 @@ class WorkflowLinter:
                 LineageAtom(object_type="TASK", object_id=f"{job_id}/{task.task_key}"),
             ]
             yield dataclasses.replace(used_table, source_lineage=atoms + used_table.source_lineage)
-
-
-T = TypeVar("T", bound=SourceInfo)
-
-
-class _CollectorWalker(DependencyGraphWalker[T], ABC):
-
-    def __init__(
-        self,
-        graph: DependencyGraph,
-        path_lookup: PathLookup,
-        context_factory: Callable[[], LinterContext],
-    ):
-        super().__init__(graph, path_lookup)
-        self._context_factory = context_factory
-
-    def _process_dependency(
-        self,
-        dependency: Dependency,
-        path_lookup: PathLookup,
-        inherited_tree: Tree | None,
-    ) -> Iterable[T]:
-        language = file_language(dependency.path)
-        if not language:
-            logger.warning(f"Unknown language for {dependency.path}")
-            return
-        cell_language = CellLanguage.of_language(language)
-        source = safe_read_text(dependency.path)
-        if not source:
-            return
-        if is_a_notebook(dependency.path):
-            yield from self._collect_from_notebook(source, cell_language, dependency.path, inherited_tree)
-        elif dependency.path.is_file():
-            yield from self._collect_from_source(source, cell_language, dependency.path, inherited_tree)
-
-    def _collect_from_notebook(
-        self,
-        source: str,
-        language: CellLanguage,
-        path: Path,
-        inherited_tree: Tree | None,
-    ) -> Iterable[T]:
-        notebook = Notebook.parse(path, source, language.language)
-        src_timestamp = datetime.fromtimestamp(path.stat().st_mtime, timezone.utc)
-        src_id = str(path)
-        for cell in notebook.cells:
-            for item in self._collect_from_source(cell.original_code, cell.language, path, inherited_tree):
-                yield item.replace_source(source_id=src_id, source_lineage=self.lineage, source_timestamp=src_timestamp)
-            if cell.language is CellLanguage.PYTHON:
-                if inherited_tree is None:
-                    inherited_tree = Tree.new_module()
-                maybe_tree = Tree.maybe_normalized_parse(cell.original_code)
-                if maybe_tree.failure:
-                    logger.warning(maybe_tree.failure.message)
-                    continue
-                assert maybe_tree.tree is not None
-                inherited_tree.attach_child_tree(maybe_tree.tree)
-
-    def _collect_from_source(
-        self,
-        source: str,
-        language: CellLanguage,
-        path: Path,
-        inherited_tree: Tree | None,
-    ) -> Iterable[T]:
-        if language is CellLanguage.PYTHON:
-            iterable = self._collect_from_python(source, inherited_tree)
-        else:
-            fn: Callable[[str], Iterable[T]] | None = getattr(self, f"_collect_from_{language.name.lower()}", None)
-            if not fn:
-                raise ValueError(f"Language {language.name} not supported yet!")
-            # the below is for disabling a false pylint positive
-            # pylint: disable=not-callable
-            iterable = fn(source)
-        src_timestamp = datetime.fromtimestamp(path.stat().st_mtime, timezone.utc)
-        src_id = str(path)
-        for item in iterable:
-            yield item.replace_source(source_id=src_id, source_lineage=self.lineage, source_timestamp=src_timestamp)
-
-    @abstractmethod
-    def _collect_from_python(self, source: str, inherited_tree: Tree | None) -> Iterable[T]: ...
-
-    def _collect_from_sql(self, _source: str) -> Iterable[T]:
-        return []
-
-    def _collect_from_r(self, _source: str) -> Iterable[T]:
-        logger.warning("Language R not supported yet!")
-        return []
-
-    def _collect_from_scala(self, _source: str) -> Iterable[T]:
-        logger.warning("Language scala not supported yet!")
-        return []
-
-    def _collect_from_shell(self, _source: str) -> Iterable[T]:
-        return []
-
-    def _collect_from_markdown(self, _source: str) -> Iterable[T]:
-        return []
-
-    def _collect_from_run(self, _source: str) -> Iterable[T]:
-        return []
-
-    def _collect_from_pip(self, _source: str) -> Iterable[T]:
-        return []
-
-
-class DfsaCollectorWalker(_CollectorWalker[DirectFsAccess]):
-
-    def _collect_from_python(self, source: str, inherited_tree: Tree | None) -> Iterable[DirectFsAccess]:
-        linter_context = self._context_factory()
-        collector = linter_context.dfsa_collector(Language.PYTHON)
-        yield from collector.collect_dfsas(source)
-
-    def _collect_from_sql(self, source: str) -> Iterable[DirectFsAccess]:
-        linter_context = self._context_factory()
-        collector = linter_context.dfsa_collector(Language.SQL)
-        yield from collector.collect_dfsas(source)
-
-
-class TablesCollectorWalker(_CollectorWalker[UsedTable]):
-
-    def _collect_from_python(self, source: str, inherited_tree: Tree | None) -> Iterable[UsedTable]:
-        linter_context = self._context_factory()
-        collector = linter_context.tables_collector(Language.PYTHON)
-        assert isinstance(collector, PythonSequentialLinter)
-        yield from collector.collect_tables(source)
-
-    def _collect_from_sql(self, source: str) -> Iterable[UsedTable]:
-        linter_context = self._context_factory()
-        collector = linter_context.tables_collector(Language.SQL)
-        yield from collector.collect_tables(source)
