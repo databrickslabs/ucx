@@ -106,7 +106,7 @@ class _SolaccStats:
 @dataclass
 class _SolaccContext:
     unparsed_files_path: Path | None = None
-    files_to_skip: set[Path] | None = None
+    files_to_skip: set[Path] | None = None  # TODO: Refactor to use this attribute
     total_count = 0
     parseable_count = 0
     uninferrable_count = 0
@@ -177,7 +177,7 @@ def _lint_dir(solacc: _SolaccContext, soldir: Path):
     linted_files = set(files_to_skip)
     # lint solution
     start_timestamp = datetime.now(timezone.utc)
-    advices = list(ctx.local_code_linter.lint(soldir, linted_files))
+    advices = list(ctx.local_code_linter.lint(soldir))
     end_timestamp = datetime.now(timezone.utc)
     # record stats
     stats = _SolaccStats(

@@ -591,11 +591,12 @@ T = TypeVar("T")
 
 class DependencyGraphWalker(abc.ABC, Generic[T]):
 
-    def __init__(self, graph: DependencyGraph, walked_paths: set[Path], path_lookup: PathLookup):
+    def __init__(self, graph: DependencyGraph, path_lookup: PathLookup):
         self._graph = graph
-        self._walked_paths = walked_paths
         self._path_lookup = path_lookup
-        self._lineage: list[Dependency] = []
+
+        self._walked_paths = set[Path]()
+        self._lineage = list[Dependency]()
 
     def __iter__(self) -> Iterator[T]:
         for dependency in self._graph.root_dependencies:

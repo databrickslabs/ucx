@@ -67,9 +67,10 @@ def test_local_code_linter_lint_path_walks_directory(mock_path_lookup, simple_de
     )
     mock_path_lookup.append_path(Path(_samples_path(SourceContainer)))
     path = Path(__file__).parent.parent / "samples" / "simulate-sys-path"
-    paths: set[Path] = set()
-    advices = list(linter.lint(path, paths))
-    assert len(paths) > 10
+
+    advices = list(linter.lint(path))
+
+    assert len(mock_path_lookup.successfully_resolved_paths) > 10
     assert not advices
 
 
@@ -85,9 +86,17 @@ def test_local_code_linter_lint_path_finds_children_in_context(mock_path_lookup,
     )
     mock_path_lookup.append_path(Path(_samples_path(SourceContainer)))
     path = Path(__file__).parent.parent / "samples" / "parent-child-context"
-    paths: set[Path] = set()
-    advices = list(linter.lint(path, paths))
-    assert len(paths) == 3
+
+    advices = list(linter.lint(path))
+
+    assert mock_path_lookup.successfully_resolved_paths == {
+        path,
+        path / "grand_parent.py",
+        path / "parent.py",
+        path / "child.py",
+        Path("./parent.py"),  # Ran by `grand_parent.py`
+        Path("./child.py"),  # Ran by `parent.py`
+    }
     assert advices == [
         LocatedAdvice(
             advice=Advice(

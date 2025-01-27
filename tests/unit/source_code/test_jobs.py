@@ -519,7 +519,7 @@ def test_linting_walker_populates_paths(dependency_resolver, mock_path_lookup, m
     path = mock_path_lookup.resolve(Path("functional/values_across_cells.py"))
     root = Dependency(NotebookLoader(), path)
     xgraph = DependencyGraph(root, None, dependency_resolver, mock_path_lookup, CurrentSessionState())
-    walker = LintingWalker(xgraph, set(), mock_path_lookup, "key", CurrentSessionState(), migration_index)
+    walker = LintingWalker(xgraph, mock_path_lookup, "key", CurrentSessionState(), migration_index)
     advices = 0
     for advice in walker:
         advices += 1

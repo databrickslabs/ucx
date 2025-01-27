@@ -215,5 +215,5 @@ def test_graph_walker_captures_lineage(mock_path_lookup, simple_dependency_resol
                 assert len(self._lineage) == 3  # there's a parent between grand_parent and child
             return []
 
-    walker = _TestWalker(root_graph, set(), mock_path_lookup)
-    _ = list(_ for _ in walker)
+    walker = _TestWalker(root_graph, mock_path_lookup)
+    list(walker)

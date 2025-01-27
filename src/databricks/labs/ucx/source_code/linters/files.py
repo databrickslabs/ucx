@@ -138,7 +138,7 @@ class LocalCodeLinter:
         self._extensions = {".py": Language.PYTHON, ".sql": Language.SQL}
         self._context_factory = context_factory
 
-    def lint(self, path: Path, linted_paths: set[Path] | None = None) -> Iterable[LocatedAdvice]:
+    def lint(self, path: Path) -> Iterable[LocatedAdvice]:
         """Lint local code generating advices on becoming Unity Catalog compatible.
 
         Parameters :
@@ -166,7 +166,7 @@ class LocalCodeLinter:
                 for advice in linter.lint():
                     yield LocatedAdvice(advice, dependency.path)
 
-        yield from LinterWalker(maybe_graph.graph, linted_paths or set(), self._path_lookup)
+        yield from LinterWalker(maybe_graph.graph, self._path_lookup)
 
     def apply(self, path: Path) -> Iterable[LocatedAdvice]:
         """Apply local code fixes to become Unity Catalog compatible.
@@ -196,7 +196,7 @@ class LocalCodeLinter:
                 for advice in linter.apply():
                     yield LocatedAdvice(advice, dependency.path)
 
-        yield from FixerWalker(maybe_graph.graph, set(), self._path_lookup)
+        yield from FixerWalker(maybe_graph.graph, self._path_lookup)
 
     def _build_dependency_graph_from_path(self, path: Path) -> MaybeGraph:
         """Build a dependency graph from the path.
