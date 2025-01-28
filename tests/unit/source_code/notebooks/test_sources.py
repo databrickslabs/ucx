@@ -141,7 +141,7 @@ def test_notebook_linter_lints_source_yielding_no_advices(migration_index, mock_
         migration_index,
         mock_path_lookup,
         CurrentSessionState(),
-        "# Databricks notebook source\nprint(1)",
+        "# Databricks notebook source\nprint(1)\n",
         Language.PYTHON,
     )
 
@@ -155,7 +155,7 @@ def test_notebook_linter_lints_source_yielding_parse_failure(migration_index, mo
         migration_index,
         mock_path_lookup,
         CurrentSessionState(),
-        "# Databricks notebook source\nprint(1",  # Missing parenthesis is on purpose
+        "# Databricks notebook source\nprint(1\n",  # Missing parenthesis is on purpose
         Language.PYTHON,
     )
 
