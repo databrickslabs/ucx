@@ -312,10 +312,9 @@ table_name = "not_migrated.table"  # NOT a migrated table according to the migra
         Language.PYTHON,
     )
 
-    advices = list(linter.lint())
+    first_advice = next(iter(linter.lint()))
 
-    assert advices
-    assert advices[0] == Deprecation(
+    assert first_advice == Deprecation(
         code='table-migrated-to-uc',
         message='Table old.things is migrated to brand.new.stuff in Unity Catalog',
         start_line=6,
