@@ -21,7 +21,6 @@ from databricks.sdk.service.workspace import Language
 
 from databricks.labs.blueprint.paths import WorkspacePath
 
-
 if sys.version_info >= (3, 11):
     from typing import Self
 else:

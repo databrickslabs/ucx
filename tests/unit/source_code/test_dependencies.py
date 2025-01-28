@@ -7,7 +7,8 @@ from databricks.labs.ucx.source_code.graph import (
     DependencyResolver,
     SourceContainer,
 )
-from databricks.labs.ucx.source_code.linters.files import FileLoader, ImportFileResolver
+from databricks.labs.ucx.source_code.linters.files import ImportFileResolver
+from databricks.labs.ucx.source_code.files import FileLoader
 from databricks.labs.ucx.source_code.notebooks.loaders import (
     NotebookLoader,
     NotebookResolver,

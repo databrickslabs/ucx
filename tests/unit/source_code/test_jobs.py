@@ -21,7 +21,8 @@ from databricks.sdk.errors import NotFound
 from databricks.sdk.service import compute, jobs, pipelines
 from databricks.sdk.service.workspace import ExportFormat, ObjectInfo, Language
 
-from databricks.labs.ucx.source_code.linters.files import FileLoader, ImportFileResolver
+from databricks.labs.ucx.source_code.linters.files import ImportFileResolver
+from databricks.labs.ucx.source_code.files import FileLoader
 from databricks.labs.ucx.source_code.graph import (
     Dependency,
     DependencyGraph,

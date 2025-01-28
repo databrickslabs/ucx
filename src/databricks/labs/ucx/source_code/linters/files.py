@@ -1,6 +1,5 @@
 from __future__ import annotations  # for type hints
 
-import dataclasses
 import logging
 from collections.abc import Iterable, Callable
 from pathlib import Path
@@ -11,7 +10,6 @@ from databricks.labs.ucx.source_code.base import (
     CurrentSessionState,
     Failure,
     LocatedAdvice,
-    file_language,
     is_a_notebook,
 )
 from databricks.labs.ucx.source_code.graph import (
@@ -22,62 +20,18 @@ from databricks.labs.ucx.source_code.graph import (
     DependencyLoader,
     DependencyProblem,
     DependencyResolver,
-    InheritedContext,
     MaybeDependency,
     MaybeGraph,
     SourceContainer,
 )
+from databricks.labs.ucx.source_code.files import FileLoader
 from databricks.labs.ucx.source_code.graph_walkers import FixerWalker, LinterWalker
 from databricks.labs.ucx.source_code.known import KnownList
 from databricks.labs.ucx.source_code.linters.context import LinterContext
-from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage, PythonCodeAnalyzer
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 logger = logging.getLogger(__name__)
-
-
-class LocalFile(SourceContainer):
-
-    def __init__(self, path: Path, source: str, language: Language):
-        self._path = path
-        self._original_code = source
-        # using CellLanguage so we can reuse the facilities it provides
-        self._language = CellLanguage.of_language(language)
-
-    @property
-    def path(self) -> Path:
-        return self._path
-
-    def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
-        if self._language is CellLanguage.PYTHON:
-            context = parent.new_dependency_graph_context()
-            analyzer = PythonCodeAnalyzer(context, self._original_code)
-            problems = analyzer.build_graph()
-            for idx, problem in enumerate(problems):
-                if problem.is_path_missing():
-                    problems[idx] = dataclasses.replace(problem, source_path=self._path)
-            return problems
-        # supported language that does not generate dependencies
-        if self._language is CellLanguage.SQL:
-            return []
-        logger.warning(f"Unsupported language: {self._language.language}")
-        return []
-
-    def build_inherited_context(self, graph: DependencyGraph, child_path: Path) -> InheritedContext:
-        if self._language is CellLanguage.PYTHON:
-            context = graph.new_dependency_graph_context()
-            analyzer = PythonCodeAnalyzer(context, self._original_code)
-            inherited = analyzer.build_inherited_context(child_path)
-            problems = list(inherited.problems)
-            for idx, problem in enumerate(problems):
-                if problem.is_path_missing():
-                    problems[idx] = dataclasses.replace(problem, source_path=self._path)
-            return dataclasses.replace(inherited, problems=problems)
-        return InheritedContext(None, False, [])
-
-    def __repr__(self):
-        return f"<LocalFile {self._path}>"
 
 
 class Folder(SourceContainer):
@@ -198,39 +152,6 @@ class LocalCodeLinter:
         if problems:
             return MaybeGraph(None, problems)
         return MaybeGraph(graph)
-
-
-class StubContainer(SourceContainer):
-
-    def __init__(self, path: Path):
-        super().__init__()
-        self._path = path
-
-    def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
-        return []
-
-
-class FileLoader(DependencyLoader):
-    def load_dependency(self, path_lookup: PathLookup, dependency: Dependency) -> SourceContainer | None:
-        absolute_path = path_lookup.resolve(dependency.path)
-        if not absolute_path:
-            return None
-        language = file_language(absolute_path)
-        if not language:
-            return StubContainer(absolute_path)
-        for encoding in ("utf-8", "ascii"):
-            try:
-                code = absolute_path.read_text(encoding)
-                return LocalFile(absolute_path, code, language)
-            except UnicodeDecodeError:
-                pass
-        return None
-
-    def exists(self, path: Path) -> bool:
-        return path.exists()
-
-    def __repr__(self):
-        return "FileLoader()"
 
 
 class FolderLoader(FileLoader):

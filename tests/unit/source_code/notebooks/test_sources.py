@@ -1,21 +1,34 @@
 import codecs
-import locale
 from pathlib import Path
-from unittest.mock import create_autospec
 
 import pytest
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.source_code.base import Deprecation, Failure
+from databricks.labs.ucx.source_code.graph import Dependency
 from databricks.labs.ucx.source_code.linters.context import LinterContext
+from databricks.labs.ucx.source_code.files import FileLoader
+from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader
 from databricks.labs.ucx.source_code.notebooks.sources import FileLinter, Notebook, NotebookLinter
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 
-@pytest.mark.parametrize("path, content", [("xyz.py", "a = 3"), ("xyz.sql", "select * from dual")])
-def test_file_linter_lints_supported_language(path, content, migration_index, mock_path_lookup) -> None:
-    linter = FileLinter(LinterContext(migration_index), mock_path_lookup, Path(path), None, content)
+@pytest.mark.parametrize(
+    "source, language",
+    [
+        ("a = 3", Language.PYTHON),
+        ("select * from dual", Language.SQL),
+    ],
+)
+def test_file_linter_lints_supported_language(
+    tmp_path, migration_index, mock_path_lookup, source: str, language: Language
+) -> None:
+    extension = ".sql" if language == Language.SQL else ".py"
+    path = tmp_path / f"file{extension}"
+    path.write_text(source)
+    dependency = Dependency(FileLoader(), path)
+    linter = FileLinter(dependency, mock_path_lookup, LinterContext(migration_index))
     advices = list(linter.lint())
     assert not advices
 
@@ -35,7 +48,8 @@ def test_file_linter_lints_supported_language_encoded_file_with_bom(
 ) -> None:
     path = tmp_path / "file.py"
     path.write_bytes(bom + "a = 12".encode(encoding))
-    linter = FileLinter(LinterContext(migration_index), mock_path_lookup, path, None)
+    dependency = Dependency(FileLoader(), path)
+    linter = FileLinter(dependency, mock_path_lookup, LinterContext(migration_index))
 
     advices = list(linter.lint())
 
@@ -46,7 +60,8 @@ def test_file_linter_lints_supported_language_encoded_file_with_bom(
 def test_file_linter_lints_not_yet_supported_language(tmp_path, path, migration_index, mock_path_lookup) -> None:
     path = tmp_path / path
     path.touch()
-    linter = FileLinter(LinterContext(migration_index), mock_path_lookup, Path(path), None, "")
+    dependency = Dependency(FileLoader(), path)
+    linter = FileLinter(dependency, mock_path_lookup, LinterContext(migration_index), None)
     advices = list(linter.lint())
     assert [advice.code for advice in advices] == ["unsupported-language"]
 
@@ -73,50 +88,34 @@ def test_file_linter_lints_not_yet_supported_language(tmp_path, path, migration_
 def test_file_linter_lints_ignorable_language(tmp_path, path, migration_index, mock_path_lookup) -> None:
     path = tmp_path / path
     path.touch()
-    linter = FileLinter(LinterContext(migration_index), mock_path_lookup, Path(path), None)
+    dependency = Dependency(FileLoader(), path)
+    linter = FileLinter(dependency, mock_path_lookup, LinterContext(migration_index), None)
     advices = list(linter.lint())
     assert not advices
 
 
 def test_file_linter_lints_non_ascii_encoded_file(migration_index, mock_path_lookup) -> None:
-    preferred_encoding = locale.getpreferredencoding(False)
     non_ascii_encoded_file = Path(__file__).parent.parent / "samples" / "nonascii.py"
-    linter = FileLinter(LinterContext(migration_index), mock_path_lookup, non_ascii_encoded_file)
-
+    dependency = Dependency(FileLoader(), non_ascii_encoded_file)
+    linter = FileLinter(dependency, mock_path_lookup, LinterContext(migration_index))
     advices = list(linter.lint())
-
-    assert len(advices) == 1
-    assert advices[0].code == "unsupported-file-encoding"
-    assert advices[0].message == f"File without {preferred_encoding} encoding is not supported {non_ascii_encoded_file}"
+    assert advices == [Failure("unsupported-file", f"Unsupported file: {non_ascii_encoded_file}", 0, 0, 1, 1)]
 
 
 def test_file_linter_lints_file_with_missing_file(tmp_path, migration_index, mock_path_lookup) -> None:
     path = tmp_path / "non_existing_file.py"
-    linter = FileLinter(LinterContext(migration_index), mock_path_lookup, path)
-
+    dependency = Dependency(FileLoader(), path)
+    linter = FileLinter(dependency, mock_path_lookup, LinterContext(migration_index))
     advices = list(linter.lint())
-
-    assert advices == [Failure("file-not-found", f"File not found: {path}", 0, 0, 1, 1)]
-
-
-def test_file_linter_lints_file_with_missing_read_permission(migration_index, mock_path_lookup) -> None:
-    path_lookup = create_autospec(PathLookup)
-    path = create_autospec(Path)
-    path.suffix = ".py"
-    path.open.side_effect = PermissionError("Permission denied")
-    path_lookup.resolve.return_value = path
-    linter = FileLinter(LinterContext(migration_index), path_lookup, path)
-
-    advices = list(linter.lint())
-
-    assert advices == [Failure("file-permission", f"Missing read permission for {path}", 0, 0, 1, 1)]
+    assert advices == [Failure("unsupported-file", f"Unsupported file: {path}", 0, 0, 1, 1)]
 
 
-def test_file_linter_lints_simple_notebook_from_samples(migration_index, mock_path_lookup) -> None:
-    linter = FileLinter(LinterContext(migration_index), mock_path_lookup, Path("simple_notebook.py"))
+def test_file_linter_lints_leaf1_from_samples(migration_index, mock_path_lookup) -> None:
+    dependency = Dependency(NotebookLoader(), Path("leaf1.py"))
+    linter = FileLinter(dependency, mock_path_lookup, LinterContext(migration_index))
     advices = list(linter.lint())
     assert not advices
-    assert Path("simple_notebook.py") in mock_path_lookup.successfully_resolved_paths
+    assert Path("leaf1.py") in mock_path_lookup.successfully_resolved_paths
 
 
 class _NotebookLinter(NotebookLinter):
@@ -126,10 +125,10 @@ class _NotebookLinter(NotebookLinter):
     def from_source_code(
         cls, index: TableMigrationIndex, path_lookup: PathLookup, source: str, default_language: Language
     ) -> NotebookLinter:
-        ctx = LinterContext(index)
+        context = LinterContext(index)
         notebook = Notebook.parse(Path(""), source, default_language)
         assert notebook is not None
-        return cls(ctx, path_lookup, notebook)
+        return cls(notebook, path_lookup, context)
 
 
 def test_notebook_linter_lints_source_yielding_no_advices(migration_index, mock_path_lookup) -> None:
@@ -200,7 +199,7 @@ def test_notebook_linter_lints_parent_child_context_from_grand_parent(migration_
     """Verify the NotebookLinter can resolve %run"""
     path = Path(__file__).parent.parent / "samples" / "parent-child-context" / "grand_parent.py"
     notebook = Notebook.parse(path, path.read_text(), Language.PYTHON)
-    linter = NotebookLinter(LinterContext(migration_index), mock_path_lookup.change_directory(path.parent), notebook)
+    linter = NotebookLinter(notebook, mock_path_lookup.change_directory(path.parent), LinterContext(migration_index))
 
     advices = list(linter.lint())
 

@@ -14,12 +14,12 @@ from databricks.labs.ucx.source_code.base import (
 from databricks.labs.ucx.source_code.graph import DependencyResolver, SourceContainer
 from databricks.labs.ucx.source_code.known import KnownList
 from databricks.labs.ucx.source_code.linters.files import (
-    FileLoader,
     Folder,
     FolderLoader,
     ImportFileResolver,
     LocalCodeLinter,
 )
+from databricks.labs.ucx.source_code.files import FileLoader
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
@@ -186,8 +186,8 @@ def test_local_code_linter_apply_warns_about_unsupported_extensions(
     advices = list(linter.apply(path))
 
     advisory = Failure(
-        code="unknown-language",
-        message=f"Cannot detect language for {path}",  # TODO: Should this contain the path?
+        code="unsupported-file",
+        message=f"Unsupported file: {path}",  # TODO: Should this contain the path?
         # TODO: Consistent line numbering for failures
         start_line=0,
         start_col=0,

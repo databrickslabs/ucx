@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import dataclasses
-import locale
 import logging
 from collections.abc import Iterable
 from pathlib import Path
@@ -12,19 +11,19 @@ from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.source_code.base import (
     file_language,
-    is_a_notebook,
     safe_read_text,
-    read_text,
     Advice,
     Failure,
 )
 
 from databricks.labs.ucx.source_code.graph import (
-    SourceContainer,
+    Dependency,
     DependencyGraph,
     DependencyProblem,
     InheritedContext,
+    SourceContainer,
 )
+from databricks.labs.ucx.source_code.files import LocalFile
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.linters.imports import (
     SysPathChange,
@@ -125,7 +124,7 @@ class NotebookLinter:
     """
 
     def __init__(
-        self, context: LinterContext, path_lookup: PathLookup, notebook: Notebook, parent_tree: Tree | None = None
+        self, notebook: Notebook, path_lookup: PathLookup, context: LinterContext, parent_tree: Tree | None = None
     ):
         self._context = context
         self._path_lookup = path_lookup
@@ -296,6 +295,13 @@ class NotebookLinter:
 
 
 class FileLinter:
+    """Linter for files.
+
+    Supported files:
+    1. Notebook
+    2. LocalFile
+    """
+
     _NOT_YET_SUPPORTED_SUFFIXES = {
         '.scala',
         '.sh',
@@ -341,80 +347,47 @@ class FileLinter:
 
     def __init__(
         self,
-        ctx: LinterContext,
+        dependency: Dependency,
         path_lookup: PathLookup,
-        path: Path,
+        context: LinterContext,
         inherited_tree: Tree | None = None,
-        content: str | None = None,
     ):
-        self._ctx: LinterContext = ctx
+        self._dependency = dependency
         self._path_lookup = path_lookup
-        self._path = path
+        self._context = context
         self._inherited_tree = inherited_tree
-        self._content = content
 
     def lint(self) -> Iterable[Advice]:
-        encoding = locale.getpreferredencoding(False)
-        if not self._content:
-            try:
-                # Not using `safe_read_text` here to surface read errors
-                path = self._path_lookup.resolve(self._path)
-                if not path:
-                    raise FileNotFoundError(f"File not found: {path}")
-                self._content = read_text(path)
-            except FileNotFoundError:
-                failure_message = f"File not found: {self._path}"
-                yield Failure("file-not-found", failure_message, 0, 0, 1, 1)
-                return
-            except UnicodeDecodeError:
-                failure_message = f"File without {encoding} encoding is not supported {self._path}"
-                yield Failure("unsupported-file-encoding", failure_message, 0, 0, 1, 1)
-                return
-            except PermissionError:
-                failure_message = f"Missing read permission for {self._path}"
-                yield Failure("file-permission", failure_message, 0, 0, 1, 1)
-                return
-
-        if self._is_notebook():
-            yield from self._lint_notebook()
-        else:
-            yield from self._lint_file()
-
-    def _is_notebook(self) -> bool:
-        assert self._content is not None, "Content should be read from path before calling this method"
-        # pre-check to avoid loading unsupported content
-        language = file_language(self._path)
-        if not language:
-            return False
-        return is_a_notebook(self._path, self._content)
-
-    def _lint_file(self) -> Iterable[Advice]:
-        assert self._content is not None, "Content should be read from path before calling this method"
-        language = file_language(self._path)
-        if not language:
-            suffix = self._path.suffix.lower()
-            if suffix in self._IGNORED_SUFFIXES or self._path.name.lower() in self._IGNORED_NAMES:
-                yield from []
-            elif suffix in self._NOT_YET_SUPPORTED_SUFFIXES:
-                yield Failure("unsupported-language", f"Language not supported yet for {self._path}", 0, 0, 1, 1)
-            else:
-                yield Failure("unknown-language", f"Cannot detect language for {self._path}", 0, 0, 1, 1)
-        else:
-            try:
-                linter = self._ctx.linter(language)
-                yield from linter.lint(self._content)
-            except ValueError as err:
-                failure_message = f"Error while parsing content of {self._path.as_posix()}: {err}"
-                yield Failure("unsupported-content", failure_message, 0, 0, 1, 1)
-
-    def _lint_notebook(self) -> Iterable[Advice]:
-        assert self._content is not None, "Content should be read from path before calling this method"
-        language = file_language(self._path)
-        if not language:
-            yield Failure("unknown-language", f"Cannot detect language for {self._path}", 0, 0, 1, 1)
+        """Lint the file"""
+        if self._dependency.path.suffix.lower() in self._IGNORED_SUFFIXES:
             return
-        notebook = Notebook.parse(self._path, self._content, language)
-        notebook_linter = NotebookLinter(self._ctx, self._path_lookup, notebook, self._inherited_tree)
+        if self._dependency.path.name.lower() in self._IGNORED_NAMES:
+            return
+        if self._dependency.path.suffix.lower() in self._NOT_YET_SUPPORTED_SUFFIXES:
+            yield Failure("unsupported-language", f"Language not supported yet for {self._dependency.path}", 0, 0, 1, 1)
+            return
+        source_container = self._dependency.load(self._path_lookup)  # TODO: Yield dependency problem from load
+        if isinstance(source_container, Notebook):
+            yield from self._lint_notebook(source_container)
+        elif isinstance(source_container, LocalFile):
+            yield from self._lint_local_file(source_container)
+        else:
+            yield Failure("unsupported-file", f"Unsupported file: {self._dependency.path}", 0, 0, 1, 1)
+
+    def _lint_local_file(self, local_file: LocalFile) -> Iterable[Advice]:
+        """Lint the local file"""
+        if not local_file.content:
+            return
+        try:
+            linter = self._context.linter(local_file.language)
+            yield from linter.lint(local_file.content)
+        except ValueError as err:
+            failure_message = f"Error while parsing content of {local_file.path.as_posix()}: {err}"
+            yield Failure("unsupported-content", failure_message, 0, 0, 1, 1)
+
+    def _lint_notebook(self, notebook: Notebook) -> Iterable[Advice]:
+        """Lint the notebook"""
+        notebook_linter = NotebookLinter(notebook, self._path_lookup, self._context, self._inherited_tree)
         yield from notebook_linter.lint()
 
     def apply(self) -> Iterable[Advice]:
@@ -423,42 +396,20 @@ class FileLinter:
         Apply the code fixers on the read content of the file. If the fixers yield code changes, write them back to the
         file.
         """
-
-        encoding = locale.getpreferredencoding(False)
-        try:
-            # Not using `safe_read_text` here to surface read errors
-            self._content = self._content or read_text(self._path)
-        except FileNotFoundError:
-            failure_message = f"File not found: {self._path}"
-            yield Failure("file-not-found", failure_message, 0, 0, 1, 1)
-            return
-        except UnicodeDecodeError:
-            failure_message = f"File without {encoding} encoding is not supported {self._path}"
-            yield Failure("unsupported-file-encoding", failure_message, 0, 0, 1, 1)
-            return
-        except PermissionError:
-            failure_message = f"Missing read permission for {self._path}"
-            yield Failure("file-permission", failure_message, 0, 0, 1, 1)
-            return
-
-        yield from self._apply_file()
-
-    def _apply_file(self) -> Iterable[Advice]:
-        assert self._content is not None, "Content should be read from path before calling this method"
-        language = file_language(self._path)
-        if not language:
-            suffix = self._path.suffix.lower()
-            if suffix in self._IGNORED_SUFFIXES or self._path.name.lower() in self._IGNORED_NAMES:
-                yield from []
-            elif suffix in self._NOT_YET_SUPPORTED_SUFFIXES:
-                yield Failure("unsupported-language", f"Language not supported yet for {self._path}", 0, 0, 1, 1)
-            else:
-                yield Failure("unknown-language", f"Cannot detect language for {self._path}", 0, 0, 1, 1)
+        source_container = self._dependency.load(self._path_lookup)
+        if isinstance(source_container, Notebook):
+            pass  # TODO: Apply notebook
+        elif isinstance(source_container, LocalFile):
+            yield from self._apply_local_file(source_container)
         else:
-            try:
-                fixed_content = self._ctx.apply_fixes(language, self._content)
-                if self._content != fixed_content:
-                    self._path.write_text(fixed_content)
-            except ValueError as err:
-                failure_message = f"Error while parsing content of {self._path.as_posix()}: {err}"
-                yield Failure("unsupported-content", failure_message, 0, 0, 1, 1)
+            yield Failure("unsupported-file", f"Unsupported file: {self._dependency.path}", 0, 0, 1, 1)
+
+    def _apply_local_file(self, local_file: LocalFile) -> Iterable[Advice]:
+        if not local_file.content:
+            return
+        try:
+            fixed_content = self._context.apply_fixes(local_file.language, local_file.content)
+            local_file.write_text(fixed_content)
+        except ValueError as err:
+            failure_message = f"Error while parsing content of {local_file.path.as_posix()}: {err}"
+            yield Failure("unsupported-content", failure_message, 0, 0, 1, 1)

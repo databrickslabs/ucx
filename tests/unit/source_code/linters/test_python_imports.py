@@ -6,7 +6,7 @@ import pytest
 
 from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyProblem
-from databricks.labs.ucx.source_code.linters.files import FileLoader
+from databricks.labs.ucx.source_code.files import FileLoader
 
 from databricks.labs.ucx.source_code.linters.imports import DbutilsPyLinter, ImportSource, SysPathChange
 from databricks.labs.ucx.source_code.python.python_analyzer import PythonCodeAnalyzer

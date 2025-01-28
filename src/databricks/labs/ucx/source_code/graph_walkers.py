@@ -101,7 +101,7 @@ class LinterWalker(_LinterWalker):
     ) -> Iterable[LocatedAdvice]:
         # FileLinter determines which file/notebook linter to use
         linter_context = self._context_factory()
-        linter = FileLinter(linter_context, path_lookup, dependency.path, inherited_tree)
+        linter = FileLinter(dependency, path_lookup, linter_context, inherited_tree)
         for advice in linter.lint():
             yield LocatedAdvice(advice, dependency.path)
 
@@ -117,7 +117,7 @@ class FixerWalker(_LinterWalker):
     ) -> Iterable[LocatedAdvice]:
         # FileLinter determines which file/notebook linter to use
         linter_context = self._context_factory()
-        linter = FileLinter(linter_context, path_lookup, dependency.path, inherited_tree)
+        linter = FileLinter(dependency, path_lookup, linter_context, inherited_tree)
         for advice in linter.apply():
             yield LocatedAdvice(advice, dependency.path)
 
