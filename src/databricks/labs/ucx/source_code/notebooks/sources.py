@@ -207,6 +207,7 @@ class NotebookLinter:
 
     def _parse_python_cell(self, python_cell: PythonCell, *, parent_tree: Tree) -> MaybeTree:
         """Parse the Python cell."""
+        failure: Failure | None
         maybe_tree = MaybeTree.from_source_code(python_cell.original_code)
         if maybe_tree.failure:
             failure = dataclasses.replace(
@@ -217,23 +218,22 @@ class NotebookLinter:
             return MaybeTree(None, failure)
         assert maybe_tree.tree is not None
         maybe_tree.tree.extend_globals(parent_tree.node.globals)
-        maybe_child_tree = self._parse_tree(maybe_tree.tree)
-        if maybe_child_tree and maybe_child_tree.failure:
-            return maybe_child_tree
+        failure = self._parse_tree(maybe_tree.tree)
+        if failure:
+            return MaybeTree(None, failure)
         return maybe_tree
 
-    def _parse_tree(self, tree: Tree) -> MaybeTree | None:
+    def _parse_tree(self, tree: Tree) -> Failure | None:
         """Parse tree by looking for referred notebooks and path changes that might affect loading notebooks."""
         code_path_nodes = self._list_magic_lines_with_run_command(tree) + SysPathChange.extract_from_tree(
             self._session_state, tree
         )
-        maybe_tree = None
         # Sys path changes require to load children in order of reading
         for base_node in sorted(code_path_nodes, key=lambda node: (node.node.lineno, node.node.col_offset)):
-            maybe_tree = self._process_code_node(base_node, parent_tree=tree)
-            if maybe_tree and maybe_tree.failure:
-                return maybe_tree
-        return maybe_tree
+            failure = self._process_code_node(base_node, parent_tree=tree)
+            if failure:
+                return failure
+        return None
 
     @staticmethod
     def _list_magic_lines_with_run_command(tree: Tree) -> list[MagicLine]:
@@ -245,16 +245,14 @@ class NotebookLinter:
                 run_commands.append(magic_line)
         return run_commands
 
-    def _process_code_node(self, node: SysPathChange | MagicLine, *, parent_tree: Tree) -> MaybeTree | None:
+    def _process_code_node(self, node: SysPathChange | MagicLine, *, parent_tree: Tree) -> Failure | None:
         """Process a code node.
 
         1. `SysPathChange` mutate the path lookup.
         2. `MagicLine` containing a `RunCommand` run other notebooks that should be parsed.
         """
         if isinstance(node, SysPathChange):
-            failure = self._mutate_path_lookup(node)
-            if failure:
-                return MaybeTree(None, failure)
+            return self._mutate_path_lookup(node)
         if isinstance(node, MagicLine):
             magic = node.as_magic()
             assert isinstance(magic, RunCommand)
@@ -265,12 +263,14 @@ class NotebookLinter:
                     message=f"Can't locate dependency: {magic.notebook_path}",
                     node=node.node,
                 )
-                return MaybeTree(None, failure)
+                return failure
             maybe_tree = self._parse_notebook(notebook, parent_tree=parent_tree)
-            if maybe_tree and maybe_tree.tree:
+            if not maybe_tree:
+                return None
+            if maybe_tree.tree:
                 # From the perspective of this node, a run node pulls the globals from the child notebook in
                 parent_tree.extend_globals(maybe_tree.tree.node.globals)
-            return maybe_tree
+            return maybe_tree.failure
         return None
 
     def _mutate_path_lookup(self, change: SysPathChange) -> Failure | None:
