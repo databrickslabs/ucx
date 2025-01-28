@@ -368,3 +368,11 @@ commands:
 
   - name: assign-owner-group
     description: Assign owner group to the workspace. This group will be assigned as an owner to all migrated tables and views.
+
+  - name: migrate-dlt-pipelines
+    description: Migrate DLT pipelines from HMS to UC using the DLT Migration API
+    flags:
+      - name: include-pipelines-ids
+        description: (Optional) Comma separated list of pipeline IDs to include in the migration
+      - name: exclude-pipelines-ids
+        description: (Optional) Comma separated list of pipeline IDs to exclude from the migration
