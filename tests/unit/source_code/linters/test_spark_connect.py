@@ -4,7 +4,7 @@ import pytest
 
 
 from databricks.labs.ucx.source_code.base import Failure, CurrentSessionState
-from databricks.labs.ucx.source_code.python.python_ast import Tree
+from databricks.labs.ucx.source_code.python.python_ast import MaybeTree
 from databricks.labs.ucx.source_code.linters.spark_connect import LoggingMatcher, SparkConnectPyLinter
 from databricks.sdk.service.compute import DataSecurityMode
 
@@ -208,6 +208,8 @@ sc._jvm.org.apache.log4j.LogManager.getLogger(__name__).info("test")
 
     """
 
+    maybe_tree = MaybeTree.from_source_code(code)
+    assert maybe_tree.tree
     assert [
         Failure(
             code='spark-logging-in-shared-clusters',
@@ -236,7 +238,7 @@ sc._jvm.org.apache.log4j.LogManager.getLogger(__name__).info("test")
             end_line=6,
             end_col=24,
         ),
-    ] == list(chain.from_iterable([logging_matcher.lint(node) for node in Tree.maybe_parse(code).walk()]))
+    ] == list(chain.from_iterable([logging_matcher.lint(node) for node in maybe_tree.tree.walk()]))
 
 
 def test_logging_serverless(session_state) -> None:
@@ -248,7 +250,7 @@ log4jLogger = sc._jvm.org.apache.log4j
 
     """
 
-    maybe_tree = Tree.maybe_parse(code)
+    maybe_tree = MaybeTree.from_source_code(code)
     assert maybe_tree.tree is not None
     tree = maybe_tree.tree
     assert [
