@@ -2,7 +2,7 @@ import astroid  # type: ignore[import-untyped]
 from databricks.labs.blueprint.wheels import ProductInfo
 
 from databricks.labs.ucx.source_code.base import Advice
-from databricks.labs.ucx.source_code.python.python_ast import Tree
+from databricks.labs.ucx.source_code.python.python_ast import MaybeTree
 
 
 def main():
@@ -11,7 +11,7 @@ def main():
     product_info = ProductInfo.from_class(Advice)
     source_code = product_info.version_file().parent
     for file in source_code.glob("**/*.py"):
-        maybe_tree = Tree.maybe_parse(file.read_text())
+        maybe_tree = MaybeTree.from_source_code(file.read_text())
         if not maybe_tree.tree:
             continue
         tree = maybe_tree.tree

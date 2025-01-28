@@ -50,52 +50,63 @@ T = TypeVar("T", bound=NodeNG)
 
 @dataclass(frozen=True)
 class MaybeTree:
+    """A :class:`Tree` or a :class:`Failure`.
+
+    The `MaybeTree` is designed to either contain a `Tree` OR a `Failure`,
+    never both or neither. Typically, a `Tree` is constructed using the
+    `MaybeTree` class method(s) that yields a `Failure` if the `Tree` could
+    NOT be constructed, otherwise it yields the `Tree`, resulting in code that
+    looks like:
+
+    ``` python
+    maybe_tree = Tree.from_source_code("print(1)")
+    if maybe_tree.failure:
+        # Handle failure and return early
+    assert maybe_tree.tree, "Tree should be not-None when Failure is None."
+    # Use tree
+    ```
+    """
+
     tree: Tree | None
+    """The UCX Python abstract syntax tree object"""
+
     failure: Failure | None
+    """The failure during constructing the tree"""
 
-    def walk(self) -> Iterable[NodeNG]:
-        # mainly a helper method for unit testing
-        if self.tree is None:  # no cov
-            assert self.failure is not None
-            logger.warning(self.failure.message)
-            return []
-        return self.tree.walk()
-
-    def first_statement(self) -> NodeNG | None:
-        # mainly a helper method for unit testing
-        if self.tree is None:  # no cov
-            assert self.failure is not None
-            logger.warning(self.failure.message)
-            return None
-        return self.tree.first_statement()
-
-
-class Tree:  # pylint: disable=too-many-public-methods
+    def __post_init__(self):
+        if self.tree is None and self.failure is None:
+            raise ValueError(f"Tree and failure should not be both `None`: {self}")
+        if self.tree is not None and self.failure is not None:
+            raise ValueError(f"Tree and failure should not be both given: {self}")
 
     @classmethod
-    def maybe_parse(cls, code: str) -> MaybeTree:
+    def from_source_code(cls, code: str) -> MaybeTree:
+        """Normalize and parse the source code to get a `Tree` or parse `Failure`."""
+        code = cls._normalize(code)
+        return cls._maybe_parse(code)
+
+    @classmethod
+    def _maybe_parse(cls, code: str) -> MaybeTree:
         try:
             root = parse(code)
             tree = Tree(root)
-            return MaybeTree(tree, None)
+            return cls(tree, None)
         except Exception as e:  # pylint: disable=broad-exception-caught
             # see https://github.com/databrickslabs/ucx/issues/2976
-            return cls._definitely_failure(code, e)
+            failure = cls._failure_from_exception(code, e)
+            return cls(None, failure)
 
     @staticmethod
-    def _definitely_failure(source_code: str, e: Exception) -> MaybeTree:
+    def _failure_from_exception(source_code: str, e: Exception) -> Failure:
         if isinstance(e, AstroidSyntaxError) and isinstance(e.error, SyntaxError):
-            return MaybeTree(
-                None,
-                Failure(
-                    code="python-parse-error",
-                    message=f"Failed to parse code due to invalid syntax: {source_code}",
-                    # Lines and columns are both 0-based: the first line is line 0.
-                    start_line=(e.error.lineno or 1) - 1,
-                    start_col=(e.error.offset or 1) - 1,
-                    end_line=(e.error.end_lineno or 2) - 1,
-                    end_col=(e.error.end_offset or 2) - 1,
-                ),
+            return Failure(
+                code="python-parse-error",
+                message=f"Failed to parse code due to invalid syntax: {source_code}",
+                # Lines and columns are both 0-based: the first line is line 0.
+                start_line=(e.error.lineno or 1) - 1,
+                start_col=(e.error.offset or 1) - 1,
+                end_line=(e.error.end_lineno or 2) - 1,
+                end_col=(e.error.end_offset or 2) - 1,
             )
         new_issue_url = (
             "https://github.com/databrickslabs/ucx/issues/new?title=[BUG]:+Python+parse+error"
@@ -103,35 +114,27 @@ class Tree:  # pylint: disable=too-many-public-methods
             "&body=%23+Current+behaviour%0A%0ACannot+parse+the+following+Python+code"
             f"%0A%0A%60%60%60+python%0A{urllib.parse.quote_plus(source_code)}%0A%60%60%60"
         )
-        return MaybeTree(
-            None,
-            Failure(
-                code="python-parse-error",
-                message=(
-                    f"Please report the following error as an issue on UCX GitHub: {new_issue_url}\n"
-                    f"Caught error `{type(e)} : {e}` while parsing code: {source_code}"
-                ),
-                # Lines and columns are both 0-based: the first line is line 0.
-                start_line=0,
-                start_col=0,
-                end_line=1,
-                end_col=1,
+        return Failure(
+            code="python-parse-error",
+            message=(
+                f"Please report the following error as an issue on UCX GitHub: {new_issue_url}\n"
+                f"Caught error `{type(e)} : {e}` while parsing code: {source_code}"
             ),
+            # Lines and columns are both 0-based: the first line is line 0.
+            start_line=0,
+            start_col=0,
+            end_line=1,
+            end_col=1,
         )
 
     @classmethod
-    def maybe_normalized_parse(cls, code: str) -> MaybeTree:
-        code = cls.normalize(code)
-        return cls.maybe_parse(code)
-
-    @classmethod
-    def normalize(cls, code: str) -> str:
+    def _normalize(cls, code: str) -> str:
         code = cls._normalize_indents(code)
         code = cls._convert_magic_lines_to_magic_commands(code)
         return code
 
-    @classmethod
-    def _normalize_indents(cls, python_code: str) -> str:
+    @staticmethod
+    def _normalize_indents(python_code: str) -> str:
         lines = python_code.split("\n")
         for line in lines:
             # skip leading ws and comments
@@ -149,8 +152,8 @@ class Tree:  # pylint: disable=too-many-public-methods
             return "\n".join(lines)
         return python_code
 
-    @classmethod
-    def _convert_magic_lines_to_magic_commands(cls, python_code: str) -> str:
+    @staticmethod
+    def _convert_magic_lines_to_magic_commands(python_code: str) -> str:
         lines = python_code.split("\n")
         magic_markers = {"%", "!"}
         in_multi_line_comment = False
@@ -166,10 +169,14 @@ class Tree:  # pylint: disable=too-many-public-methods
                 in_multi_line_comment = not in_multi_line_comment
         return "\n".join(lines)
 
+
+class Tree:
+    """The UCX Python abstract syntax tree object"""
+
     @classmethod
     def new_module(cls) -> Tree:
         node = Module("root")
-        return Tree(node)
+        return cls(node)
 
     def __init__(self, node: NodeNG):
         self._node: NodeNG = node
@@ -188,11 +195,10 @@ class Tree:  # pylint: disable=too-many-public-methods
     def walk(self) -> Iterable[NodeNG]:
         yield from self._walk(self._node)
 
-    @classmethod
-    def _walk(cls, node: NodeNG) -> Iterable[NodeNG]:
+    def _walk(self, node: NodeNG) -> Iterable[NodeNG]:
         yield node
         for child in node.get_children():
-            yield from cls._walk(child)
+            yield from self._walk(child)
 
     def locate(self, node_type: type[T], match_nodes: list[tuple[str, type]]) -> list[T]:
         visitor = MatchingVisitor(node_type, match_nodes)
@@ -634,7 +640,7 @@ class NodeBase(ABC):
 class PythonLinter(Linter):
 
     def lint(self, code: str) -> Iterable[Advice]:
-        maybe_tree = Tree.maybe_normalized_parse(code)
+        maybe_tree = MaybeTree.from_source_code(code)
         if maybe_tree.failure:
             yield maybe_tree.failure
             return
@@ -648,7 +654,7 @@ class PythonLinter(Linter):
 class TablePyCollector(TableCollector, ABC):
 
     def collect_tables(self, source_code: str) -> Iterable[UsedTable]:
-        maybe_tree = Tree.maybe_normalized_parse(source_code)
+        maybe_tree = MaybeTree.from_source_code(source_code)
         if maybe_tree.failure:
             logger.warning(maybe_tree.failure.message)
             return
@@ -663,7 +669,7 @@ class TablePyCollector(TableCollector, ABC):
 class DfsaPyCollector(DfsaCollector, ABC):
 
     def collect_dfsas(self, source_code: str) -> Iterable[DirectFsAccess]:
-        maybe_tree = Tree.maybe_normalized_parse(source_code)
+        maybe_tree = MaybeTree.from_source_code(source_code)
         if maybe_tree.failure:
             logger.warning(maybe_tree.failure.message)
             return

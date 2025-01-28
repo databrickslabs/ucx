@@ -8,7 +8,7 @@ from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.source_code.base import Deprecation, CurrentSessionState, SqlLinter
 from databricks.labs.ucx.source_code.linters.context import LinterContext
-from databricks.labs.ucx.source_code.python.python_ast import Tree, TreeHelper
+from databricks.labs.ucx.source_code.python.python_ast import MaybeTree, TreeHelper
 from databricks.labs.ucx.source_code.linters.pyspark import SparkSqlPyLinter
 from databricks.labs.ucx.source_code.linters.from_table import FromTableSqlLinter
 from databricks.labs.ucx.source_code.linters.pyspark import SparkCallMatcher, SparkTableNamePyLinter
@@ -576,45 +576,45 @@ def test_direct_cloud_access_to_volumes_reports_nothing(empty_index, fs_function
 
 
 def test_get_full_function_name_for_member_function() -> None:
-    tree = Tree.maybe_parse("value.attr()")
-    assert tree.tree is not None
-    node = tree.tree.first_statement()
+    maybe_tree = MaybeTree.from_source_code("value.attr()")
+    assert maybe_tree.tree is not None
+    node = maybe_tree.tree.first_statement()
     assert isinstance(node, Expr)
     assert isinstance(node.value, Call)
     assert TreeHelper.get_full_function_name(node.value) == 'value.attr'
 
 
 def test_get_full_function_name_for_member_member_function() -> None:
-    tree = Tree.maybe_parse("value1.value2.attr()")
-    assert tree.tree is not None
-    node = tree.tree.first_statement()
+    maybe_tree = MaybeTree.from_source_code("value1.value2.attr()")
+    assert maybe_tree.tree is not None
+    node = maybe_tree.tree.first_statement()
     assert isinstance(node, Expr)
     assert isinstance(node.value, Call)
     assert TreeHelper.get_full_function_name(node.value) == 'value1.value2.attr'
 
 
 def test_get_full_function_name_for_chained_function() -> None:
-    tree = Tree.maybe_parse("value.attr1().attr2()")
-    assert tree.tree is not None
-    node = tree.tree.first_statement()
+    maybe_tree = MaybeTree.from_source_code("value.attr1().attr2()")
+    assert maybe_tree.tree is not None
+    node = maybe_tree.tree.first_statement()
     assert isinstance(node, Expr)
     assert isinstance(node.value, Call)
     assert TreeHelper.get_full_function_name(node.value) == 'value.attr1.attr2'
 
 
 def test_get_full_function_name_for_global_function() -> None:
-    tree = Tree.maybe_parse("name()")
-    assert tree.tree is not None
-    node = tree.tree.first_statement()
+    maybe_tree = MaybeTree.from_source_code("name()")
+    assert maybe_tree.tree is not None
+    node = maybe_tree.tree.first_statement()
     assert isinstance(node, Expr)
     assert isinstance(node.value, Call)
     assert TreeHelper.get_full_function_name(node.value) == 'name'
 
 
 def test_get_full_function_name_for_non_method() -> None:
-    tree = Tree.maybe_parse("not_a_function")
-    assert tree.tree is not None
-    node = tree.tree.first_statement()
+    maybe_tree = MaybeTree.from_source_code("not_a_function")
+    assert maybe_tree.tree is not None
+    node = maybe_tree.tree.first_statement()
     assert isinstance(node, Expr)
     assert TreeHelper.get_full_function_name(node.value) is None
 
@@ -622,9 +622,9 @@ def test_get_full_function_name_for_non_method() -> None:
 def test_apply_table_name_matcher_with_missing_constant(migration_index) -> None:
     from_table = FromTableSqlLinter(migration_index, CurrentSessionState('old'))
     matcher = SparkCallMatcher('things', 1, 1, 0)
-    tree = Tree.maybe_parse("call('some.things')")
-    assert tree.tree is not None
-    node = tree.tree.first_statement()
+    maybe_tree = MaybeTree.from_source_code("call('some.things')")
+    assert maybe_tree.tree is not None
+    node = maybe_tree.tree.first_statement()
     assert isinstance(node, Expr)
     assert isinstance(node.value, Call)
     matcher.apply(from_table, migration_index, node.value)
@@ -636,9 +636,9 @@ def test_apply_table_name_matcher_with_missing_constant(migration_index) -> None
 def test_apply_table_name_matcher_with_existing_constant(migration_index) -> None:
     from_table = FromTableSqlLinter(migration_index, CurrentSessionState('old'))
     matcher = SparkCallMatcher('things', 1, 1, 0)
-    tree = Tree.maybe_parse("call('old.things')")
-    assert tree.tree is not None
-    node = tree.tree.first_statement()
+    maybe_tree = MaybeTree.from_source_code("call('old.things')")
+    assert maybe_tree.tree is not None
+    node = maybe_tree.tree.first_statement()
     assert isinstance(node, Expr)
     assert isinstance(node.value, Call)
     matcher.apply(from_table, migration_index, node.value)

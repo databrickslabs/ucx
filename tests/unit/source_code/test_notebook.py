@@ -4,12 +4,12 @@ import re
 import pytest
 from databricks.sdk.service.workspace import Language, ObjectType, ObjectInfo
 
-from databricks.labs.ucx.source_code.base import CurrentSessionState, Failure
+from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.graph import DependencyGraph, DependencyResolver
 from databricks.labs.ucx.source_code.known import KnownList
 from databricks.labs.ucx.source_code.linters.files import ImportFileResolver, FileLoader
 from databricks.labs.ucx.source_code.linters.imports import DbutilsPyLinter
-from databricks.labs.ucx.source_code.python.python_ast import Tree
+from databricks.labs.ucx.source_code.python.python_ast import MaybeTree
 from databricks.labs.ucx.source_code.notebooks.sources import Notebook
 from databricks.labs.ucx.source_code.notebooks.loaders import (
     NotebookResolver,
@@ -262,9 +262,9 @@ stuff2 = dbutils.notebook.run("where is notebook 1?")
 stuff3 = dbutils.notebook.run("where is notebook 2?")
 """
     linter = DbutilsPyLinter(CurrentSessionState())
-    tree = Tree.maybe_parse(source)
-    assert tree.tree is not None
-    nodes = linter.list_dbutils_notebook_run_calls(tree.tree)
+    maybe_tree = MaybeTree.from_source_code(source)
+    assert maybe_tree.tree is not None
+    nodes = linter.list_dbutils_notebook_run_calls(maybe_tree.tree)
     assert len(nodes) == 2
 
 
@@ -275,9 +275,9 @@ do_something_with_stuff(stuff)
 stuff2 = notebook.run("where is notebook 1?")
 """
     linter = DbutilsPyLinter(CurrentSessionState())
-    tree = Tree.maybe_parse(source)
-    assert tree.tree is not None
-    nodes = linter.list_dbutils_notebook_run_calls(tree.tree)
+    maybe_tree = MaybeTree.from_source_code(source)
+    assert maybe_tree.tree is not None
+    nodes = linter.list_dbutils_notebook_run_calls(maybe_tree.tree)
     assert len(nodes) == 0
 
 
@@ -290,16 +290,3 @@ dbutils.notebook.run(f"Hey {name2}")
     linter = DbutilsPyLinter(CurrentSessionState())
     advices = list(linter.lint(source))
     assert not advices
-
-
-def test_tree_maybe_parse_fails_on_jupyter_magic() -> None:
-    source = "%tb"
-    tree = Tree.maybe_parse(source)
-    assert tree.failure == Failure(
-        "python-parse-error",
-        f"Failed to parse code due to invalid syntax: {source}",
-        start_line=0,
-        start_col=0,
-        end_line=0,
-        end_col=1,
-    )

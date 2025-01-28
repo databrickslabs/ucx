@@ -15,6 +15,7 @@ from databricks.labs.ucx.source_code.base import (
 )
 from databricks.labs.ucx.source_code.python.python_ast import (
     DfsaPyCollector,
+    MaybeTree,
     PythonLinter,
     PythonSequentialLinter,
     TablePyCollector,
@@ -25,7 +26,7 @@ from databricks.labs.ucx.source_code.python.python_infer import InferredValue
 
 
 def test_extracts_root() -> None:
-    maybe_tree = Tree.maybe_parse("o.m1().m2().m3()")
+    maybe_tree = MaybeTree.from_source_code("o.m1().m2().m3()")
     assert maybe_tree.tree is not None, maybe_tree.failure
     tree = maybe_tree.tree
     stmt = tree.first_statement()
@@ -35,14 +36,15 @@ def test_extracts_root() -> None:
 
 
 def test_no_first_statement() -> None:
-    maybe_tree = Tree.maybe_parse("")
+    maybe_tree = MaybeTree.from_source_code("")
     assert maybe_tree.tree is not None
     assert maybe_tree.tree.first_statement() is None
 
 
-def test_extract_call_by_name() -> None:
-    tree = Tree.maybe_parse("o.m1().m2().m3()")
-    stmt = tree.first_statement()
+def test_tree_helper_extract_call_by_name() -> None:
+    maybe_tree = MaybeTree.from_source_code("o.m1().m2().m3()")
+    assert maybe_tree.tree
+    stmt = maybe_tree.tree.first_statement()
     assert isinstance(stmt, Expr)
     assert isinstance(stmt.value, Call)
     act = TreeHelper.extract_call_by_name(stmt.value, "m2")
@@ -51,9 +53,10 @@ def test_extract_call_by_name() -> None:
     assert act.func.attrname == "m2"
 
 
-def test_extract_call_by_name_none() -> None:
-    tree = Tree.maybe_parse("o.m1().m2().m3()")
-    stmt = tree.first_statement()
+def test_tree_helper_extract_call_by_name_none() -> None:
+    maybe_tree = MaybeTree.from_source_code("o.m1().m2().m3()")
+    assert maybe_tree.tree
+    stmt = maybe_tree.tree.first_statement()
     assert isinstance(stmt, Expr)
     assert isinstance(stmt.value, Call)
     act = TreeHelper.extract_call_by_name(stmt.value, "m5000")
@@ -77,9 +80,10 @@ def test_extract_call_by_name_none() -> None:
         ("o.m1(4, 3, 2)", 1, "second", 3),
     ],
 )
-def test_linter_gets_arg(code, arg_index, arg_name, expected) -> None:
-    tree = Tree.maybe_parse(code)
-    stmt = tree.first_statement()
+def test_tree_helper_gets_arg(code, arg_index, arg_name, expected) -> None:
+    maybe_tree = MaybeTree.from_source_code(code)
+    assert maybe_tree.tree
+    stmt = maybe_tree.tree.first_statement()
     assert isinstance(stmt, Expr)
     assert isinstance(stmt.value, Call)
     act = TreeHelper.get_arg(stmt.value, arg_index, arg_name)
@@ -102,67 +106,49 @@ def test_linter_gets_arg(code, arg_index, arg_name, expected) -> None:
         ("o.m1(3, *b, **c, second=3)", 4),
     ],
 )
-def test_args_count(code, expected) -> None:
-    tree = Tree.maybe_parse(code)
-    stmt = tree.first_statement()
+def test_tree_helper_args_count(code, expected) -> None:
+    maybe_tree = MaybeTree.from_source_code(code)
+    assert maybe_tree.tree
+    stmt = maybe_tree.tree.first_statement()
     assert isinstance(stmt, Expr)
     assert isinstance(stmt.value, Call)
     act = TreeHelper.args_count(stmt.value)
     assert act == expected
 
 
+def test_maybe_tree_parses_string_formatting() -> None:
+    source = '''
+message_unformatted = """
+%s is only supported in Python %s and above.
+""" % ("name", "version")
+'''
+    maybe_tree = MaybeTree.from_source_code(source)
+    assert maybe_tree.failure is None
+
+
+@pytest.mark.parametrize("magic_command", ["%tb", "%matplotlib inline"])
+def test_tree_maybe_parses_magic_command(magic_command: str) -> None:
+    maybe_tree = MaybeTree.from_source_code(magic_command)
+    assert maybe_tree.failure is None
+
+
 def test_tree_walks_nodes_once() -> None:
     nodes = set()
     count = 0
-    tree = Tree.maybe_parse("o.m1().m2().m3()")
-    for node in tree.walk():
+    maybe_tree = MaybeTree.from_source_code("o.m1().m2().m3()")
+    assert maybe_tree.tree
+    for node in maybe_tree.tree.walk():
         nodes.add(node)
         count += 1
     assert len(nodes) == count
 
 
-def test_parses_incorrectly_indented_code() -> None:
-    source = """# DBTITLE 1,Get Sales Data for Analysis
- sales = (
-   spark
-      .table('retail_sales')
-      .join( # limit data to CY 2021 and 2022
-        spark.table('date').select('dateKey','date','year').filter('year between 2021 and 2022'),
-        on='dateKey'
-        )
-      .join( # get product fields needed for analysis
-        spark.table('product').select('productKey','brandValue','packSizeValueUS'),
-        on='productKey'
-        )
-      .join( # get brand fields needed for analysis
-        spark.table('brand_name_mapping').select('brandValue','brandName'),
-        on='brandValue'
-        )
-  )
-"""
-    # ensure it would fail if not normalized
-    maybe_tree = Tree.maybe_parse(source)
-    assert maybe_tree.failure is not None
-    maybe_tree = Tree.maybe_normalized_parse(source)
-    assert maybe_tree.failure is None
-
-
-def test_ignores_magic_marker_in_multiline_comment() -> None:
-    source = """message_unformatted = u\"""
-%s is only supported in Python %s and above.\"""
-name="name"
-version="version"
-formatted=message_unformatted % (name, version)
-"""
-    Tree.maybe_normalized_parse(source)
-    assert True
-
-
-def test_tree_extend_globals_child_tree_infers_value() -> None:
+def test_tree_attach_child_tree_infers_value() -> None:
+    """Attaching trees allows traversing from both parent and child."""
     inferred_string = "Hello John!"
     parent_source, child_source = "a = 'John'", 'b = f"Hello {a}!"'
-    parent_maybe_tree = Tree.maybe_normalized_parse(parent_source)
-    child_maybe_tree = Tree.maybe_normalized_parse(child_source)
+    parent_maybe_tree = MaybeTree.from_source_code(parent_source)
+    child_maybe_tree = MaybeTree.from_source_code(child_source)
 
     assert parent_maybe_tree.tree is not None, parent_maybe_tree.failure
     assert child_maybe_tree.tree is not None, child_maybe_tree.failure
@@ -178,9 +164,9 @@ def test_tree_extend_globals_child_tree_infers_value() -> None:
 def test_tree_extend_globals_infers_value_from_grand_parent() -> None:
     inferred_string = "Hello John!"
     grand_parent_source, parent_source, child_source = "name = 'John'", "greeting = 'Hello'", 'say = f"Hello {name}!"'
-    grand_parent_maybe_tree = Tree.maybe_normalized_parse(grand_parent_source)
-    parent_maybe_tree = Tree.maybe_normalized_parse(parent_source)
-    child_maybe_tree = Tree.maybe_normalized_parse(child_source)
+    grand_parent_maybe_tree = MaybeTree.from_source_code(grand_parent_source)
+    parent_maybe_tree = MaybeTree.from_source_code(parent_source)
+    child_maybe_tree = MaybeTree.from_source_code(child_source)
 
     assert grand_parent_maybe_tree.tree is not None, grand_parent_maybe_tree.failure
     assert parent_maybe_tree.tree is not None, parent_maybe_tree.failure
@@ -199,9 +185,9 @@ def test_tree_extend_globals_for_parent_with_children_cannot_infer_value() -> No
     """A tree cannot infer the value from its parent's child (aka sibling tree)."""
     inferred_string = ""  # Nothing inferred
     parent_source, child_a_source, child_b_source = "name = 'John'", "greeting = 'Hello'", 'say = f"{greeting} {name}!"'
-    parent_maybe_tree = Tree.maybe_normalized_parse(parent_source)
-    child_a_maybe_tree = Tree.maybe_normalized_parse(child_a_source)
-    child_b_maybe_tree = Tree.maybe_normalized_parse(child_b_source)
+    parent_maybe_tree = MaybeTree.from_source_code(parent_source)
+    child_a_maybe_tree = MaybeTree.from_source_code(child_a_source)
+    child_b_maybe_tree = MaybeTree.from_source_code(child_b_source)
 
     assert parent_maybe_tree.tree is not None, parent_maybe_tree.failure
     assert child_a_maybe_tree.tree is not None, child_a_maybe_tree.failure
@@ -226,9 +212,9 @@ def test_tree_extend_globals_for_unresolvable_parent_cannot_infer_value() -> Non
     grand_parent_source = "name = 'John'"
     parent_source = "print(unknown)\ngreeting = 'Hello'"  # Unresolvable variable `unknown`
     child_source = "say = f'{greeting} {name}!'"
-    grand_parent_maybe_tree = Tree.maybe_normalized_parse(grand_parent_source)
-    parent_maybe_tree = Tree.maybe_normalized_parse(parent_source)
-    child_maybe_tree = Tree.maybe_normalized_parse(child_source)
+    grand_parent_maybe_tree = MaybeTree.from_source_code(grand_parent_source)
+    parent_maybe_tree = MaybeTree.from_source_code(parent_source)
+    child_maybe_tree = MaybeTree.from_source_code(child_source)
 
     assert grand_parent_maybe_tree.tree is not None, grand_parent_maybe_tree.failure
     assert parent_maybe_tree.tree is not None, parent_maybe_tree.failure
@@ -249,9 +235,9 @@ def test_tree_extend_globals_with_notebook_using_variable_from_other_notebook() 
     child_source = "table_name = 'schema.table'"
     parent_cell_1_source = "%run ./child"
     parent_cell_2_source = "spark.table(f'catalog.{table_name}')"
-    child_maybe_tree = Tree.maybe_normalized_parse(child_source)
-    parent_cell_1_maybe_tree = Tree.maybe_normalized_parse(parent_cell_1_source)
-    parent_cell_2_maybe_tree = Tree.maybe_normalized_parse(parent_cell_2_source)
+    child_maybe_tree = MaybeTree.from_source_code(child_source)
+    parent_cell_1_maybe_tree = MaybeTree.from_source_code(parent_cell_1_source)
+    parent_cell_2_maybe_tree = MaybeTree.from_source_code(parent_cell_2_source)
 
     assert child_maybe_tree.tree is not None, child_maybe_tree.failure
     assert parent_cell_1_maybe_tree.tree is not None, parent_cell_1_maybe_tree.failure
@@ -272,9 +258,9 @@ def test_tree_extend_globals_with_notebook_using_variable_from_parent_notebook()
     child_source = "spark.table(f'catalog.{table_name}')"
     parent_cell_1_source = "table_name = 'schema.table'"
     parent_cell_2_source = "%run ./child"
-    child_maybe_tree = Tree.maybe_normalized_parse(child_source)
-    parent_cell_1_maybe_tree = Tree.maybe_normalized_parse(parent_cell_1_source)
-    parent_cell_2_maybe_tree = Tree.maybe_normalized_parse(parent_cell_2_source)
+    child_maybe_tree = MaybeTree.from_source_code(child_source)
+    parent_cell_1_maybe_tree = MaybeTree.from_source_code(parent_cell_1_source)
+    parent_cell_2_maybe_tree = MaybeTree.from_source_code(parent_cell_2_source)
 
     assert child_maybe_tree.tree is not None, child_maybe_tree.failure
     assert parent_cell_1_maybe_tree.tree is not None, parent_cell_1_maybe_tree.failure
@@ -293,7 +279,7 @@ def test_is_from_module() -> None:
 df = spark.read.csv("hi")
 df.write.format("delta").saveAsTable("old.things")
 """
-    maybe_tree = Tree.maybe_normalized_parse(source)
+    maybe_tree = MaybeTree.from_source_code(source)
     assert maybe_tree.tree is not None, maybe_tree.failure
     tree = maybe_tree.tree
     save_call = tree.locate(
@@ -307,7 +293,7 @@ def test_locates_member_import() -> None:
 from importlib import import_module
 module = import_module("xyz")
 """
-    maybe_tree = Tree.maybe_normalized_parse(source)
+    maybe_tree = MaybeTree.from_source_code(source)
     assert maybe_tree.tree is not None, maybe_tree.failure
     tree = maybe_tree.tree
     import_calls = tree.locate(Call, [("import_module", Attribute), ("importlib", Name)])
@@ -316,7 +302,7 @@ module = import_module("xyz")
 
 @pytest.mark.parametrize("source, name, class_name", [("a = 123", "a", "int")])
 def test_is_instance_of(source, name, class_name) -> None:
-    maybe_tree = Tree.maybe_normalized_parse(source)
+    maybe_tree = MaybeTree.from_source_code(source)
     assert maybe_tree.tree is not None, maybe_tree.failure
     tree = maybe_tree.tree
     assert isinstance(tree.node, Module)
@@ -331,9 +317,9 @@ def test_tree_extend_globals_propagates_module_reference() -> None:
     source_1 = "df = spark.read.csv('hi')"
     source_2 = "df = df.withColumn(stuff)"
     source_3 = "df = df.withColumn(stuff2)"
-    first_line_maybe_tree = Tree.maybe_normalized_parse(source_1)
-    second_line_maybe_tree = Tree.maybe_normalized_parse(source_2)
-    third_line_maybe_tree = Tree.maybe_normalized_parse(source_3)
+    first_line_maybe_tree = MaybeTree.from_source_code(source_1)
+    second_line_maybe_tree = MaybeTree.from_source_code(source_2)
+    third_line_maybe_tree = MaybeTree.from_source_code(source_3)
 
     assert first_line_maybe_tree.tree, first_line_maybe_tree.failure
     assert second_line_maybe_tree.tree, second_line_maybe_tree.failure
@@ -350,7 +336,7 @@ def test_renumbers_positively() -> None:
     source = """df = spark.read.csv("hi")
 df.write.format("delta").saveAsTable("old.things")
 """
-    maybe_tree = Tree.maybe_normalized_parse(source)
+    maybe_tree = MaybeTree.from_source_code(source)
     assert maybe_tree.tree is not None, maybe_tree.failure
     tree = maybe_tree.tree
     nodes = list(tree.node.get_children())
@@ -368,7 +354,7 @@ def test_renumbers_negatively() -> None:
     source = """df = spark.read.csv("hi")
 df.write.format("delta").saveAsTable("old.things")
 """
-    maybe_tree = Tree.maybe_normalized_parse(source)
+    maybe_tree = MaybeTree.from_source_code(source)
     assert maybe_tree.tree is not None, maybe_tree.failure
     tree = maybe_tree.tree
     nodes = list(tree.node.get_children())
@@ -392,7 +378,7 @@ df.write.format("delta").saveAsTable("old.things")
     ],
 )
 def test_counts_lines(source: str, line_count: int) -> None:
-    maybe_tree = Tree.maybe_normalized_parse(source)
+    maybe_tree = MaybeTree.from_source_code(source)
     assert maybe_tree.tree is not None, maybe_tree.failure
     tree = maybe_tree.tree
     assert tree.line_count() == line_count
@@ -414,7 +400,7 @@ x = stuff()""",
     ],
 )
 def test_is_builtin(source, name, is_builtin) -> None:
-    maybe_tree = Tree.maybe_normalized_parse(source)
+    maybe_tree = MaybeTree.from_source_code(source)
     assert maybe_tree.tree is not None, maybe_tree.failure
     tree = maybe_tree.tree
     nodes = list(tree.node.get_children())
@@ -431,7 +417,7 @@ def test_is_builtin(source, name, is_builtin) -> None:
 
 def test_tree_attach_child_nodes_sets_parent() -> None:
     node = astroid.extract_node("b = a + 2")
-    maybe_tree = Tree.maybe_normalized_parse("a = 1")
+    maybe_tree = MaybeTree.from_source_code("a = 1")
     assert maybe_tree.tree, maybe_tree.failure
 
     maybe_tree.tree.attach_child_nodes([node])
@@ -440,7 +426,7 @@ def test_tree_attach_child_nodes_sets_parent() -> None:
 
 
 def test_tree_extend_globals_adds_assign_name_to_tree() -> None:
-    maybe_tree = Tree.maybe_normalized_parse("a = 1")
+    maybe_tree = MaybeTree.from_source_code("a = 1")
     assert maybe_tree.tree, maybe_tree.failure
 
     node = astroid.extract_node("b = a + 2")
@@ -454,16 +440,16 @@ def test_tree_extend_globals_adds_assign_name_to_tree() -> None:
 
 
 def test_tree_attach_child_tree_appends_globals_to_parent_tree() -> None:
-    parent_tree = Tree.maybe_normalized_parse("a = 1")
-    child_tree = Tree.maybe_normalized_parse("b = a + 2")
+    parent_maybe_tree = MaybeTree.from_source_code("a = 1")
+    child_maybe_tree = MaybeTree.from_source_code("b = a + 2")
 
-    assert parent_tree.tree, parent_tree.failure
-    assert child_tree.tree, child_tree.failure
+    assert parent_maybe_tree.tree, parent_maybe_tree.failure
+    assert child_maybe_tree.tree, child_maybe_tree.failure
 
-    parent_tree.tree.attach_child_tree(child_tree.tree)
+    parent_maybe_tree.tree.attach_child_tree(child_maybe_tree.tree)
 
-    assert set(parent_tree.tree.node.globals.keys()) == {"a", "b"}
-    assert set(child_tree.tree.node.globals.keys()) == {"b"}
+    assert set(parent_maybe_tree.tree.node.globals.keys()) == {"a", "b"}
+    assert set(child_maybe_tree.tree.node.globals.keys()) == {"b"}
 
 
 def test_first_statement_is_none() -> None:

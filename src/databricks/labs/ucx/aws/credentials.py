@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors.platform import InvalidParameterValue
+from databricks.sdk.errors.platform import InvalidParameterValue, NotFound
 from databricks.sdk.service.catalog import (
     AwsIamRoleRequest,
     Privilege,
@@ -12,7 +12,12 @@ from databricks.sdk.service.catalog import (
     ValidationResultResult,
 )
 
-from databricks.labs.ucx.assessment.aws import AWSRoleAction, AWSUCRoleCandidate, AWSCredentialCandidate
+from databricks.labs.ucx.assessment.aws import (
+    AWSRoleAction,
+    AWSUCRoleCandidate,
+    AWSCredentialCandidate,
+    AWSResourceType,
+)
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
 
 logger = logging.getLogger(__name__)
@@ -52,6 +57,30 @@ class CredentialManager:
         logger.info(f"Found {len(iam_roles)} distinct IAM roles already used in UC storage credentials")
         return iam_roles
 
+    def list_glue(self) -> dict[str, str]:
+        # list existed service credentials that are using iam roles, capturing the arns and names
+        # TODO: replace with SDK call when available
+        try:
+            credential_response = self._ws.api_client.do('GET', '/api/2.1/unity-catalog/credentials')
+        except NotFound:
+            logger.info('Could not retrieve credentials for Glue access. ')
+            return {}
+        if not credential_response or not isinstance(credential_response, dict):
+            logger.info('Could not retrieve credentials for Glue access. ')
+            return {}
+        credential_list = credential_response.get("credentials")
+        if not credential_list or not isinstance(credential_list, list):
+            logger.info('Could not retrieve credentials for Glue access. ')
+            return {}
+        credentials = {
+            credential.get("name"): credential.get("aws_iam_role").get("role_arn")
+            for credential in credential_list
+            if credential.get("purpose") == "SERVICE"
+        }
+
+        logger.info(f"Found {len(credentials)} distinct IAM roles used in UC service credentials")
+        return credentials
+
     def create(self, name: str, role_arn: str, read_only: bool) -> StorageCredentialInfo:
         return self._ws.storage_credentials.create(
             name,
@@ -60,12 +89,33 @@ class CredentialManager:
             read_only=read_only,
         )
 
+    def create_service_credential(self, name: str, role_arn: str) -> str | None:
+        response = self._ws.api_client.do(
+            'POST',
+            '/api/2.1/unity-catalog/credentials',
+            body={
+                "name": name,
+                "aws_iam_role": {
+                    "role_arn": role_arn,
+                },
+                "comment": "Glue service credential created by UCX during migration to UC using AWS IAM Role",
+                "purpose": "SERVICE",
+                "skip_validation": True,
+            },
+        )
+        if not response or not isinstance(response, dict):
+            return None
+        iam_role = response.get("aws_iam_role")
+        if not iam_role or not isinstance(iam_role, dict):
+            return None
+        return iam_role.get("external_id")
+
     def validate(self, role_action: AWSRoleAction) -> CredentialValidationResult:
         try:
             validation = self._ws.storage_credentials.validate(
                 storage_credential_name=role_action.role_name,
                 url=role_action.resource_path,
-                read_only=role_action.privilege == Privilege.READ_FILES.value,
+                read_only=role_action.privilege == Privilege.READ_FILES,
             )
         except InvalidParameterValue:
             logger.warning(
@@ -77,7 +127,7 @@ class CredentialManager:
                 role_action.role_name,
                 role_action.role_arn,
                 role_action.resource_path,
-                role_action.privilege == Privilege.READ_FILES.value,
+                role_action.privilege == Privilege.READ_FILES,
                 [
                     "The validation is skipped because an existing external location overlaps "
                     "with the location used for validation."
@@ -89,7 +139,7 @@ class CredentialManager:
                 role_action.role_name,
                 role_action.role_arn,
                 role_action.resource_path,
-                role_action.privilege == Privilege.READ_FILES.value,
+                role_action.privilege == Privilege.READ_FILES,
                 ["Validation returned no results."],
             )
 
@@ -103,7 +153,7 @@ class CredentialManager:
             role_action.role_name,
             role_action.role_arn,
             role_action.resource_path,
-            role_action.privilege == Privilege.READ_FILES.value,
+            role_action.privilege == Privilege.READ_FILES,
             None if not failures else failures,
         )
 
@@ -122,7 +172,7 @@ class IamRoleMigration:
         self._storage_credential_manager = storage_credential_manager
 
     @staticmethod
-    def _print_action_plan(iam_list: list[AWSCredentialCandidate]):
+    def print_action_plan(iam_list: list[AWSCredentialCandidate]):
         # print action plan to console for customer to review.
         for iam in iam_list:
             logger.info(f"Credential {iam.role_name} --> {iam.role_arn}: {iam.privilege}")
@@ -140,9 +190,34 @@ class IamRoleMigration:
         filtered_iam_list = [iam for iam in iam_list if iam.role_arn not in sc_set]
 
         # output the action plan for customer to confirm
-        self._print_action_plan(filtered_iam_list)
+        self.print_action_plan(filtered_iam_list)
 
         return filtered_iam_list
+
+    def _generate_glue_migration_list(
+        self,
+    ) -> list[AWSCredentialCandidate]:
+        """
+        Create the list of IAM roles that need to be migrated, output an action plan as a csv file for users to confirm.
+        It returns a list of ARNs
+        """
+        # load IAM role list
+        iam_list = self._resource_permissions.load_uc_compatible_roles(resource_type=AWSResourceType.GLUE)
+        # list existing storage credentials
+        credential_list = self._storage_credential_manager.list_glue().values()
+        # check if the iam is already used in UC storage credential
+        filtered_iam_list = [iam for iam in iam_list if iam.role_arn not in credential_list]
+        credential_candidates = []
+        for iam in filtered_iam_list:
+            credential_candidates.append(
+                AWSCredentialCandidate(
+                    role_arn=iam.role_arn,
+                    privilege=Privilege.USAGE,
+                    paths={"*"},
+                )
+            )
+
+        return credential_candidates
 
     def save(self, migration_results: list[CredentialValidationResult]) -> str:
         return self._installation.save(migration_results, filename=self._output_file)
@@ -154,10 +229,12 @@ class IamRoleMigration:
             logger.info("No IAM Role to migrate")
             return []
 
+        self.print_action_plan(iam_list)
+
         plan_confirmed = prompts.confirm(
             "Above IAM roles will be migrated to UC storage credentials, please review and confirm."
         )
-        if plan_confirmed is not True:
+        if not plan_confirmed:
             return []
 
         execution_result = []
@@ -165,7 +242,7 @@ class IamRoleMigration:
             storage_credential = self._storage_credential_manager.create(
                 name=iam.role_name,
                 role_arn=iam.role_arn,
-                read_only=iam.privilege == Privilege.READ_FILES.value,
+                read_only=iam.privilege == Privilege.READ_FILES,
             )
             if storage_credential.aws_iam_role is None:
                 logger.error(f"Failed to create storage credential for IAM role: {iam.role_arn}")
@@ -174,7 +251,7 @@ class IamRoleMigration:
                 iam.role_name, iam.role_arn, storage_credential.aws_iam_role.external_id
             )
             for path in iam.paths:
-                role_action = AWSRoleAction(iam.role_arn, "s3", path, iam.privilege)
+                role_action = AWSRoleAction(iam.role_arn, AWSResourceType.S3, iam.privilege, path)
                 execution_result.append(self._storage_credential_manager.validate(role_action))
 
         if execution_result:
@@ -186,6 +263,28 @@ class IamRoleMigration:
         else:
             logger.info("No IAM Role migrated to UC Storage credentials")
         return execution_result
+
+    def migrate_glue(self, prompts: Prompts):
+        iam_list = self._generate_glue_migration_list()
+        if len(iam_list) == 0:
+            logger.info("No Glue IAM Role to migrate")
+            return []
+
+        self.print_action_plan(iam_list)
+
+        plan_confirmed = prompts.confirm(
+            "Above IAM roles will be migrated to UC service credentials for Glue Access, please review and confirm."
+        )
+        if plan_confirmed is not True:
+            return []
+
+        for iam in iam_list:
+            external_id = self._storage_credential_manager.create_service_credential(
+                name=iam.role_name,
+                role_arn=iam.role_arn,
+            )
+            self._resource_permissions.update_uc_role(iam.role_name, iam.role_arn, external_id)
+        return None
 
 
 class IamRoleCreation:

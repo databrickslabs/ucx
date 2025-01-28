@@ -1,6 +1,8 @@
 import dataclasses
 import json
 import logging
+import subprocess
+import sys
 from datetime import timedelta
 from typing import NoReturn
 
@@ -392,14 +394,29 @@ def test_check_inventory_database_exists(ws, installation_ctx):
         installation_ctx.workspace_installer.configure()
 
 
+def is_on_release_branch(checkout_root: str) -> bool:
+    """Check if running on a release branch"""
+    release_branches = {"prepare/"}
+    try:
+        current_branch = subprocess.check_output(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=checkout_root, encoding=sys.getdefaultencoding()
+        )
+        return any(current_branch.startswith(release_branch) for release_branch in release_branches)
+    except subprocess.CalledProcessError:
+        return False
+
+
 def test_compare_remote_local_install_versions(installation_ctx) -> None:
+    """This test is known to fail on a branch with a major or minor version bump.
+
+    The databricks.labs.ucx.__about__.__version__ is bumped on the release branch BEFORE the git tag is created. (The
+    git tag is created during release AFTER merging the release branch.) Therefore, this test is expected to fail on a
+    release branch that introduces a major or minor version bump, because the local `__version__` has been updated in
+    anticipation of the tag that will shortly be created.
+    """
+    if is_on_release_branch(installation_ctx.product_info.checkout_root()):
+        pytest.skip("Version compare is never equal on a release branch.")
     installation_ctx.workspace_installation.run()
-
-    @retried(on=[NotFound], timeout=timedelta(minutes=2))
-    def wait_for_installation_to_finish():
-        installation_ctx.installation.load(WorkspaceConfig)
-
-    wait_for_installation_to_finish()
 
     error_message = "UCX workspace remote and local install versions are same and no override is requested. Exiting..."
     with pytest.raises(RuntimeWarning, match=error_message):

@@ -1,22 +1,8 @@
-Workspace Group Migration
-===
+# Workspace Group Migration
 
-<!-- TOC -->
-* [Workspace Group Migration](#workspace-group-migration)
-* [Design](#design)
-  * [Group Manager](#group-manager)
-  * [Permission Manager](#permission-manager)
-  * [ACL Support](#acl-support)
-    * [Generic Permissions](#generic-permissions)
-    * [Dashboard Permissions](#dashboard-permissions)
-    * [Entitlements and Roles](#entitlements-and-roles)
-    * [Secret Scope Permissions](#secret-scope-permissions)
-    * [Legacy Table Access Controls](#legacy-table-access-controls)
-* [Troubleshooting](#troubleshooting)
-<!-- TOC -->
 
 This feature introduces the ability to migrate groups from workspace level to account level in
-the [group migration workflow](../README.md#group-migration-workflow). It helps you to upgrade all Databricks workspace assets:
+the [group migration workflow](/docs/reference/workflows#group-migration-workflow). It helps you to upgrade all Databricks workspace assets:
 Legacy Table ACLs, Entitlements, AWS instance profiles, Clusters, Cluster policies, Instance Pools,
 Databricks SQL warehouses, Delta Live Tables, Jobs, MLflow experiments, MLflow registry, SQL Dashboards & Queries,
 SQL Alerts, Token and Password usage permissions that are set on the workspace level, Secret scopes, Notebooks,
@@ -35,7 +21,7 @@ The group migration workflow can be executed multiple times to ensure that all t
 5. `validate_groups_permissions`: This task validates that all the crawled permissions are applied correctly to the destination groups.
 6. `delete_backup_groups`: This task removes all workspace-level backup groups, along with their permissions. This should only be executed after confirming that the workspace-local migration worked successfully for all the groups involved. This step is necessary to clean up the workspace and remove any unnecessary groups and permissions.
 
-[[back to top](#workspace-group-migration)]
+
 
 # Design
 
@@ -44,7 +30,7 @@ the original and new names, as well as the group's members, external ID, and rol
 the state of the migration process and provides methods for getting the target principal and temporary name for a given
 group name.
 
-[[back to top](#workspace-group-migration)]
+
 
 ## Group Manager
 
@@ -56,14 +42,14 @@ deleting groups.
 The `GroupMigrationStrategy` abstract base class defines the interface for a strategy that generates a list
 of `MigratedGroup` objects based on a mapping between workspace and account groups.
 The `MatchingNamesStrategy`, `MatchByExternalIdStrategy`, `RegexSubStrategy`, and `RegexMatchStrategy` classes are
-concrete implementations of this interface. See [group name conflicts](group_name_conflict.md) for more details.
+concrete implementations of this interface. See [group name conflicts](/docs/reference/group_name_conflict) for more details.
 
-The `ConfigureGroups` class provides a command-line interface for configuring the group migration process during [installation](../README.md#installation).
+The `ConfigureGroups` class provides a command-line interface for configuring the group migration process during [installation](/docs/installation).
 It prompts the user to enter information about the group migration strategy, such as the renamed group prefix, regular expressions
 for matching and substitution, and a list of groups to migrate. The class also provides methods for validating user input
 and setting class variables based on the user's responses.
 
-[[back to top](#workspace-group-migration)]
+
 
 ## Permission Manager
 
@@ -77,9 +63,9 @@ is created, you can call the `inventorize_permissions` method to crawl and save 
 the inventory database in the `permissions` table.
 
 The `apply_group_permissions` method allows you to apply the permissions to a list of account groups, while
-the [`verify_group_permissions` method](../README.md#validate-groups-membership-command) verifies that the permissions are valid.
+the [`verify_group_permissions` method](/docs/reference/commands#validate-groups-membership) verifies that the permissions are valid.
 
-[[back to top](#workspace-group-migration)]
+
 
 ## ACL Support
 
@@ -93,7 +79,7 @@ The `AclSupport` objects define how to crawl, save, and apply permissions for sp
 The `Permissions` dataclass is used to represent the permissions for a specific object type and ID. The dataclass includes a `raw` attribute
 that contains the raw permission data as a string, providing a convenient way to work with the underlying permission data.
 
-[[back to top](#workspace-group-migration)]
+
 
 ### Generic Permissions
 
@@ -130,13 +116,13 @@ he `_safe_get_permissions` and `_safe_updatepermissions` methods are used to saf
 a given object type and ID, respectively. These methods handle exceptions that may occur during the API calls and log
 appropriate warning messages.
 
-[[back to top](#workspace-group-migration)]
+
 
 ### Dashboard Permissions
 
-Reflected in [RedashPermissionsSupport](../src/databricks/labs/ucx/workspace_access/redash.py). See [examples](../tests/integration/workspace_access/test_redash.py) for more details on how to use it as a library.
+Reflected in [RedashPermissionsSupport](https://github.com/databrickslabs/ucx/blob/main/src/databricks/labs/ucx/workspace_access/redash.py). See [examples](https://github.com/databrickslabs/ucx/blob/main/tests/integration/workspace_access/test_redash.py) for more details on how to use it as a library.
 
-[[back to top](#workspace-group-migration)]
+
 
 ### Entitlements and Roles
 
@@ -144,9 +130,9 @@ The `ScimSupport` is [`AclSupport`](#acl-support) that creates a snapshot of all
 The `_is_item_relevant` method checks if a permission item is relevant to the current migration state. The `get_crawler_tasks` method returns an iterator of partial functions
 for crawling the permissions of each group in the snapshot. It checks if the group has any roles or entitlements and returns a partial function to crawl the corresponding property.
 
-See [examples](../tests/integration/workspace_access/test_scim.py) for more details on how to use it as a library.
+See [examples](https://github.com/databrickslabs/ucx/blob/main/tests/integration/workspace_access/test_scim.py) for more details on how to use it as a library.
 
-[[back to top](#workspace-group-migration)]
+
 
 ### Secret Scope Permissions
 
@@ -155,7 +141,7 @@ all secret scopes, applying and verifying ACLs, and checking if a `Permissions` 
 migration state. It simplifies the process of managing permissions on secret scopes by checking if the ACLs have been
 applied correctly, and if not, automatically reapplying them.
 
-[[back to top](#workspace-group-migration)]
+
 
 ### Legacy Table Access Controls
 
@@ -167,11 +153,11 @@ Furthermore, the `_apply_grant` method applies the ACL permission to the target 
 the `Grant` object matches the ACL permission for that object and principal in the database. The `get_verify_task` method calls the `_verify` method with the object type,
 object ID, and `Grant` object from the `Permissions` object.
 
-[[back to top](#workspace-group-migration)]
+
 
 # Troubleshooting
 
-Use [`DEBUG` notebook](../README.md#debug-notebook) to troubleshoot anything.
+Use [`DEBUG` notebook](/docs/installation#debug-notebook) to troubleshoot anything.
 
 Below are some useful code snippets that can be useful for troubleshooting.
 Make sure to install [databricks-sdk](https://docs.databricks.com/en/dev-tools/sdk-python.html) on the cluster to run
@@ -179,7 +165,7 @@ it.
 
 1. Find workspace-local groups that are eligible for migration to the account:
 
-```
+```python
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import iam
 
@@ -291,4 +277,4 @@ finally:
     file_handler.close()
 ```
 
-[[back to top](#workspace-group-migration)]
+

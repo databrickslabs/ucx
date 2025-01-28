@@ -172,7 +172,7 @@ class TableMapping:
         # Marks a schema to be skipped in the migration process by applying a table property
         try:
             self._sql_backend.execute(
-                f"ALTER SCHEMA {escape_sql_identifier(schema)} SET DBPROPERTIES('{self.UCX_SKIP_PROPERTY}' = true)"
+                f"ALTER SCHEMA hive_metastore.{escape_sql_identifier(schema)} SET DBPROPERTIES('{self.UCX_SKIP_PROPERTY}' = true)"
             )
         except NotFound as err:
             if "[SCHEMA_NOT_FOUND]" in str(err):
@@ -190,7 +190,7 @@ class TableMapping:
         """
         try:
             self._sql_backend.execute(
-                f"ALTER SCHEMA hive_metastore.{escape_sql_identifier(schema)} UNSET DBPROPERTIES IF EXISTS('{self.UCX_SKIP_PROPERTY}');"
+                f"ALTER SCHEMA hive_metastore.{escape_sql_identifier(schema)} SET DBPROPERTIES('{self.UCX_SKIP_PROPERTY}' = false);"
             )
         except (NotFound, BadRequest) as e:
             logger.error(f"Failed to remove skip marker from schema: {schema}.", exc_info=e)
@@ -251,7 +251,8 @@ class TableMapping:
         properties = describe.get("Properties", "")
         if not properties:
             return database
-        if self.UCX_SKIP_PROPERTY in TablesCrawler.parse_database_props(properties.lower()):
+        tbl_props = TablesCrawler.parse_database_props(properties.lower())
+        if tbl_props.get(self.UCX_SKIP_PROPERTY, "false") == "true":
             logger.info(f"Database {database} is marked to be skipped")
             return None
         return database
@@ -268,7 +269,7 @@ class TableMapping:
             return None
 
         for value in properties:
-            if value["key"] == self.UCX_SKIP_PROPERTY:
+            if value["key"] == self.UCX_SKIP_PROPERTY and value["value"] == "true":
                 logger.info(f"{table.key} is marked to be skipped")
                 return None
             if value["key"] == "upgraded_to":

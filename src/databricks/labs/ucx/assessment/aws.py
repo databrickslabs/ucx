@@ -2,18 +2,31 @@ import json
 import logging
 import re
 import shutil
-import typing
+from typing import Any, ClassVar
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import timedelta
+from enum import Enum
 
+from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service.catalog import Privilege
 
+from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.utils import run_command
 
 logger = logging.getLogger(__name__)
+
+
+class AWSResourceType(Enum):
+    """
+    Enum for the resource types supported by the AWS IAM policies.
+    We will add values as we support more resource types.
+    """
+
+    S3 = "s3"
+    GLUE = "glue"
 
 
 @dataclass
@@ -26,8 +39,8 @@ class AWSRole:
 
 @dataclass
 class AWSPolicyAction:
-    resource_type: str
-    privilege: str
+    resource_type: AWSResourceType
+    privilege: Privilege
     resource_path: str
 
 
@@ -38,13 +51,14 @@ class AWSUCRoleCandidate:
     role_name: str
     policy_name: str
     resource_paths: list[str]
+    resource_type: AWSResourceType = AWSResourceType.S3
 
 
 @dataclass
 class AWSRoleAction:
     role_arn: str
-    resource_type: str
-    privilege: str
+    resource_type: AWSResourceType
+    privilege: Privilege
     resource_path: str
 
     @property
@@ -74,7 +88,7 @@ class AWSInstanceProfile:
 @dataclass()
 class AWSCredentialCandidate:
     role_arn: str
-    privilege: str
+    privilege: Privilege
     paths: set[str] = field(default_factory=set)
 
     @property
@@ -84,13 +98,38 @@ class AWSCredentialCandidate:
 
 
 class AWSResources:
-    S3_ACTIONS: typing.ClassVar[set[str]] = {"s3:PutObject", "s3:GetObject", "s3:DeleteObject", "s3:PutObjectAcl"}
-    S3_READONLY: typing.ClassVar[str] = "s3:GetObject"
-    S3_REGEX: typing.ClassVar[str] = r"arn:aws:s3:::([a-zA-Z0-9\/+=,.@_-]*)\/\*$"
-    S3_BUCKET: typing.ClassVar[str] = r"((s3:\/\/|s3a:\/\/)([a-zA-Z0-9+=,.@_-]*))(\/.*$)?"
-    S3_PREFIX: typing.ClassVar[str] = "arn:aws:s3:::"
-    S3_PATH_REGEX: typing.ClassVar[str] = r"((s3:\/\/)|(s3a:\/\/))(.*)"
-    UC_MASTER_ROLES_ARN: typing.ClassVar[list[str]] = [
+    S3_ACTIONS: ClassVar[set[str]] = {"s3:PutObject", "s3:GetObject", "s3:DeleteObject", "s3:PutObjectAcl"}
+    S3_READONLY: ClassVar[str] = "s3:GetObject"
+    S3_REGEX: ClassVar[re.Pattern] = re.compile(r"arn:aws:s3:::([a-zA-Z0-9\/+=,.@_-]*)\/\*$")
+    S3_BUCKET: ClassVar[re.Pattern] = re.compile(r"((s3:\/\/|s3a:\/\/)([a-zA-Z0-9+=,.@_-]*))(\/.*$)?")
+    S3_PREFIX: ClassVar[str] = "arn:aws:s3:::"
+    S3_PATH_REGEX: ClassVar[re.Pattern] = re.compile(r"((s3:\/\/)|(s3a:\/\/))(.*)")
+    GLUE_REQUIRED_ACTIONS: ClassVar[set[str]] = {
+        "glue:BatchCreatePartition",
+        "glue:BatchDeletePartition",
+        "glue:BatchGetPartition",
+        "glue:CreateDatabase",
+        "glue:CreateTable",
+        "glue:CreateUserDefinedFunction",
+        "glue:DeleteDatabase",
+        "glue:DeletePartition",
+        "glue:DeleteTable",
+        "glue:DeleteUserDefinedFunction",
+        "glue:GetDatabase",
+        "glue:GetDatabases",
+        "glue:GetPartition",
+        "glue:GetPartitions",
+        "glue:GetTable",
+        "glue:GetTables",
+        "glue:GetUserDefinedFunction",
+        "glue:GetUserDefinedFunctions",
+        "glue:UpdateDatabase",
+        "glue:UpdatePartition",
+        "glue:UpdateTable",
+        "glue:UpdateUserDefinedFunction",
+    }
+    # Following the documentation in https://docs.databricks.com/en/archive/external-metastores/aws-glue-metastore.html
+    UC_MASTER_ROLES_ARN: ClassVar[list[str]] = [
         "arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL",
         "arn:aws:iam::707343435239:role/unity-catalog-dev-UCMasterRole-G3MMN8SP21FO",
     ]
@@ -197,34 +236,68 @@ class AWSResources:
         for action in actions:
             if action.get("Effect", "Deny") != "Allow":
                 continue
-            actions = action.get("Action")
-            if not actions:
-                continue
-            s3_actions = self._s3_actions(actions)
-            if not s3_actions or self.S3_READONLY not in s3_actions:
-                continue
-            privilege = Privilege.WRITE_FILES.value
-            for s3_action_type in self.S3_ACTIONS:
-                if s3_action_type not in s3_actions:
-                    privilege = Privilege.READ_FILES.value
-                    continue
-            for resource in action.get("Resource", []):
-                match = re.match(self.S3_REGEX, resource)
-                if match:
-                    policy_actions.append(AWSPolicyAction("s3", privilege, f"s3://{match.group(1)}"))
-                    policy_actions.append(AWSPolicyAction("s3", privilege, f"s3a://{match.group(1)}"))
+            policy_actions.extend(self._s3_policy_actions(action))
+            policy_actions.extend(self._glue_policy_actions(action))
         return policy_actions
 
-    def _s3_actions(self, actions):
-        s3_actions = []
+    def _s3_policy_actions(self, action: dict[str, Any]) -> list[AWSPolicyAction]:
+        """
+        Parse action extracted from an AWS IAM policy.
+        It returns the S3 paths it refers to and whether it allows read only or read/write access.
+        Args:
+            action: dictionary with the action part of the policy document.
+
+        Returns:
+            list[AWSPolicyAction]: list of S3 policy actions
+
+        """
+        s3_policy_actions = []
+        actions = action.get("Action")
+        if not actions:
+            return []
         if isinstance(actions, list):
-            for single_action in actions:
-                if single_action in self.S3_ACTIONS:
-                    s3_actions.append(single_action)
-                    continue
-        elif actions in self.S3_ACTIONS:
-            s3_actions = [actions]
-        return s3_actions
+            if self.S3_READONLY not in actions:
+                return []
+            privilege = None
+            for s3_action_type in self.S3_ACTIONS:
+                if s3_action_type not in actions:
+                    privilege = Privilege.READ_FILES
+                    break
+            privilege = privilege or Privilege.WRITE_FILES
+        elif actions == self.S3_READONLY:
+            privilege = Privilege.READ_FILES
+        else:
+            return []
+        for resource in action.get("Resource", []):
+            match = self.S3_REGEX.match(resource)
+            if match:
+                s3_policy_actions.append(AWSPolicyAction(AWSResourceType.S3, privilege, f"s3://{match.group(1)}"))
+                s3_policy_actions.append(AWSPolicyAction(AWSResourceType.S3, privilege, f"s3a://{match.group(1)}"))
+        return s3_policy_actions
+
+    def _glue_policy_actions(self, action: dict[str, Any]) -> list[AWSPolicyAction]:
+        """
+        Parse action extracted from an AWS IAM policy.
+        Args:
+            action: dictionary with the action part of the policy document.
+
+        Returns:
+            list[AWSPolicyAction]: list of Glue policy actions
+        """
+        actions = action.get("Action")
+        if not actions:
+            return []
+        if not isinstance(actions, list):
+            actions = [actions]
+        if "glue:*" not in actions:
+            # Check if all the required glue action are present in the role
+            for required_action in self.GLUE_REQUIRED_ACTIONS:
+                if required_action not in actions:
+                    return []
+
+        if "*" not in action.get("Resource", []):
+            return []
+        return [AWSPolicyAction(AWSResourceType.GLUE, Privilege.USAGE, "*")]
 
     def _aws_role_trust_doc(self, self_assume_arn: str | None = None, external_id="0000"):
         return self._get_json_for_cli(
@@ -256,7 +329,7 @@ class AWSResources:
         """
         s3_prefixes_strip = set()
         for path in s3_prefixes:
-            match = re.match(AWSResources.S3_PATH_REGEX, path)
+            match = AWSResources.S3_PATH_REGEX.match(path)
             if match:
                 s3_prefixes_strip.add(match.group(4))
 
@@ -288,6 +361,38 @@ class AWSResources:
                     "Effect": "Allow",
                 }
             )
+        return self._get_json_for_cli(
+            {
+                "Version": "2012-10-17",
+                "Statement": statement,
+            }
+        )
+
+    def _aws_glue_policy(self, resources: set[str], account_id: str, role_name: str) -> str:
+        """
+        Create the UC IAM policy for the given S3 prefixes, account ID, role name, and KMS key.
+        Args:
+            resources: the glue resources to allow access to
+            account_id: the AWS account ID
+            role_name: the name of the role
+        Returns:
+            str: the JSON string for the IAM policy
+        """
+
+        statement = [
+            {
+                "Action": [
+                    "glue:*",
+                ],
+                "Resource": list(resources),
+                "Effect": "Allow",
+            },
+            {
+                "Action": ["sts:AssumeRole"],
+                "Resource": [f"arn:aws:iam::{account_id}:role/{role_name}"],
+                "Effect": "Allow",
+            },
+        ]
         return self._get_json_for_cli(
             {
                 "Version": "2012-10-17",
@@ -340,7 +445,8 @@ class AWSResources:
         self,
         role_name: str,
         policy_name: str,
-        s3_prefixes: set[str],
+        resource_type: AWSResourceType,
+        resources: set[str],
         account_id: str,
         kms_key: str | None = None,
     ) -> bool:
@@ -349,13 +455,21 @@ class AWSResources:
         Args:
             role_name: the name of the role
             policy_name: the name of the policy
-            s3_prefixes: s3 prefixes to allow access to
+            resource_type: the type of the resource (s3 or glue)
+            resources: s3 prefixes to allow access to
             account_id: AWS account ID
             kms_key: (optional) KMS key to be used
         """
+        if resource_type == AWSResourceType.S3:
+            policy_document = self._aws_s3_policy(resources, account_id, role_name, kms_key)
+        elif resource_type == AWSResourceType.GLUE:
+            policy_document = self._aws_glue_policy(resources, account_id, role_name)
+        else:
+            logger.error(f"Resource type {resource_type.value} not supported")
+            return False
         if not self._run_command(
             f"iam put-role-policy --role-name {role_name} --policy-name {policy_name} "
-            f"--policy-document {self._aws_s3_policy(s3_prefixes, account_id, role_name, kms_key)}"
+            f"--policy-document {policy_document}"
         ):
             return False
         return True
@@ -455,3 +569,92 @@ class AWSResources:
     @staticmethod
     def _get_json_for_cli(input_json: dict) -> str:
         return json.dumps(input_json).replace('\n', '').replace(" ", "")
+
+
+@dataclass
+class AWSGlue:
+    """
+    AWS Glue connection information
+    :param aws_region: The AWS region where the Glue Metastore is located. It defaults to the AWS_Region of the metastore.
+    :type aws_region: str
+    :param aws_account_id: The AWS account ID of the Glue Metastore. It defaults to the AWS account ID of the instance profile.
+    :type aws_account_id: str
+    """
+
+    aws_region: str
+    aws_account_id: str
+
+    @classmethod
+    def get_glue_connection_info(
+        cls,
+        workspace: WorkspaceClient,
+        config: WorkspaceConfig,
+    ):
+        """
+        Retrieve the AWS Glue connection information from the workspace configuration.
+        Args:
+            workspace: the workspace client for the given workspace
+            config: the UCX configuration for the workspace
+        Returns:
+            AWSGlue: the AWS Glue connection information
+        """
+        if not config.spark_conf:
+            logger.info('Spark config not found')
+            return None
+        spark_config = config.spark_conf
+        glue_metastore = spark_config.get('spark.databricks.hive.metastore.glueCatalog.enabled')
+        if not glue_metastore or glue_metastore.lower() != 'true':
+            logger.info('Glue Metastore not enabled')
+            return None
+        aws_region = spark_config.get('spark.hadoop.aws.region')
+        instance_profile_arn = config.instance_profile
+        if not instance_profile_arn:
+            logger.info('Instance Profile not found')
+            return None
+
+        account_id_match = re.match(r"arn:aws:iam::(\d+):instance-profile/.*", instance_profile_arn)
+        if not account_id_match:
+            logger.error(f"Instance profile ARN is mismatched {instance_profile_arn}")
+            return None
+        aws_account_id = account_id_match.group(1)
+        if not aws_region:
+            try:
+                metastore = workspace.metastores.current().metastore_id
+                aws_region = workspace.metastores.get(metastore).region
+                if not aws_region:
+                    logger.warning("Can't retrieve glue aws region")
+                    return None
+            except NotFound:
+                # workspace information cannot be found
+                logger.warning("Can't retrieve aws region")
+                return None
+
+        return cls(aws_region, aws_account_id)
+
+    def as_dict(self):
+        return {
+            "aws_region": self.aws_region,
+            "aws_account_id": self.aws_account_id,
+        }
+
+    @staticmethod
+    def is_glue_in_config(
+        config: WorkspaceConfig,
+    ) -> bool:
+        """
+        Check if the Glue Metastore is enabled in the Spark configuration.
+        It searches for the property spark.databricks.hive.metastore.glueCatalog.enabled.
+        Args:
+            config: workspace configuration to scan
+        Returns:
+            bool: True if the Glue Metastore is enabled, False otherwise
+        """
+        if not config.spark_conf:
+            logger.info('Spark config not found')
+            return False
+        spark_config = config.spark_conf
+        glue_metastore = spark_config.get('spark.databricks.hive.metastore.glueCatalog.enabled')
+        if not glue_metastore or glue_metastore.lower() != 'true':
+            logger.info('Glue Metastore not enabled')
+            return False
+        return True
