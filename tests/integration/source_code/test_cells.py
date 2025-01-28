@@ -4,7 +4,7 @@ from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph
-from databricks.labs.ucx.source_code.linters.files import FileLoader
+from databricks.labs.ucx.source_code.files import FileLoader
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader
 from databricks.labs.ucx.source_code.notebooks.sources import Notebook
 

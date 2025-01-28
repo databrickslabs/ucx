@@ -3,14 +3,16 @@ from pathlib import Path
 
 import pytest
 
-from databricks.labs.ucx.source_code.base import CurrentSessionState
-from databricks.labs.ucx.source_code.linters.files import FileLoader, FolderLoader
+from databricks.labs.ucx.source_code.base import Advice, CurrentSessionState, Failure, LocatedAdvice
+from databricks.labs.ucx.source_code.linters.files import FolderLoader
+from databricks.labs.ucx.source_code.files import FileLoader
 from databricks.labs.ucx.source_code.graph import (
     Dependency,
     DependencyGraph,
+    DependencyProblem,
     InheritedContext,
-    DependencyGraphWalker,
 )
+from databricks.labs.ucx.source_code.graph_walkers import DependencyGraphWalker
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.python.python_ast import Tree
@@ -215,5 +217,25 @@ def test_graph_walker_captures_lineage(mock_path_lookup, simple_dependency_resol
                 assert len(self._lineage) == 3  # there's a parent between grand_parent and child
             return []
 
-    walker = _TestWalker(root_graph, set(), mock_path_lookup)
-    _ = list(_ for _ in walker)
+    walker = _TestWalker(root_graph, mock_path_lookup)
+    list(walker)
+
+
+def test_dependency_problem_as_located_advice() -> None:
+    dependency_problem = DependencyProblem("test", "test")
+    located_advice = dependency_problem.as_located_advice()
+    advice = Advice("test", "test", -1, -1, -1, -1)
+    assert located_advice == LocatedAdvice(advice, Path("<MISSING_SOURCE_PATH>"))
+
+
+def test_dependency_problem_as_located_advice_with_failure_class() -> None:
+    dependency_problem = DependencyProblem("test", "test")
+    located_advice = dependency_problem.as_located_advice(Failure)
+    advice = Failure("test", "test", -1, -1, -1, -1)
+    assert located_advice == LocatedAdvice(advice, Path("<MISSING_SOURCE_PATH>"))
+
+
+def test_dependency_problem_as_located_advice_has_unknown_path_by_default() -> None:
+    dependency_problem = DependencyProblem("test", "test")
+    located_advice = dependency_problem.as_located_advice()
+    assert located_advice.has_unknown_path()

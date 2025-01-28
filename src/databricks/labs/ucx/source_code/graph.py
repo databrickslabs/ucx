@@ -4,17 +4,24 @@ import abc
 import dataclasses
 import itertools
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from collections.abc import Callable, Iterable, Iterator
-from typing import TypeVar, Generic
+from collections.abc import Callable, Iterable
 
 from astroid import (  # type: ignore
     NodeNG,
 )
-from databricks.labs.ucx.source_code.base import Advisory, CurrentSessionState, is_a_notebook, LineageAtom
+
+from databricks.labs.ucx.source_code.base import (
+    Advice,
+    CurrentSessionState,
+    LocatedAdvice,
+    is_a_notebook,
+    LineageAtom,
+)
 from databricks.labs.ucx.source_code.python.python_ast import Tree
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
+
 
 logger = logging.Logger(__name__)
 
@@ -494,8 +501,10 @@ class DependencyProblem:
     def is_path_missing(self) -> bool:
         return self.source_path == _MISSING_SOURCE_PATH
 
-    def as_advisory(self) -> 'Advisory':
-        return Advisory(
+    def _as_advice(self, klass: type[Advice] = Advice) -> Advice:
+        if not issubclass(klass, Advice):
+            raise ValueError("Class should be instance of advice")
+        return klass(
             code=self.code,
             message=self.message,
             start_line=self.start_line,
@@ -503,6 +512,9 @@ class DependencyProblem:
             end_line=self.end_line,
             end_col=self.end_col,
         )
+
+    def as_located_advice(self, klass: type[Advice] = Advice) -> LocatedAdvice:
+        return LocatedAdvice(self._as_advice(klass), self.source_path)
 
     @staticmethod
     def from_node(code: str, message: str, node: NodeNG) -> DependencyProblem:
@@ -519,8 +531,10 @@ class DependencyProblem:
 
 @dataclass
 class MaybeGraph:
+    # TODO: Add docstring like for MaybeTree
     graph: DependencyGraph | None
-    problems: list[DependencyProblem]
+
+    problems: list[DependencyProblem] = field(default_factory=list)
 
     @property
     def failed(self) -> bool:
@@ -573,56 +587,3 @@ class InheritedContext:
             return self
         tree = self.tree.renumber(-1)
         return InheritedContext(tree, self.found, [])
-
-
-T = TypeVar("T")
-
-
-class DependencyGraphWalker(abc.ABC, Generic[T]):
-
-    def __init__(self, graph: DependencyGraph, walked_paths: set[Path], path_lookup: PathLookup):
-        self._graph = graph
-        self._walked_paths = walked_paths
-        self._path_lookup = path_lookup
-        self._lineage: list[Dependency] = []
-
-    def __iter__(self) -> Iterator[T]:
-        for dependency in self._graph.root_dependencies:
-            # the dependency is a root, so its path is the one to use
-            # for computing lineage and building python global context
-            root_path = dependency.path
-            yield from self._iter_one(dependency, self._graph, root_path)
-
-    def _iter_one(self, dependency: Dependency, graph: DependencyGraph, root_path: Path) -> Iterable[T]:
-        if dependency.path in self._walked_paths:
-            return
-        self._lineage.append(dependency)
-        self._walked_paths.add(dependency.path)
-        self._log_walk_one(dependency)
-        if dependency.path.is_file() or is_a_notebook(dependency.path):
-            inherited_tree = graph.root.build_inherited_tree(root_path, dependency.path)
-            path_lookup = self._path_lookup.change_directory(dependency.path.parent)
-            yield from self._process_dependency(dependency, path_lookup, inherited_tree)
-            maybe_graph = graph.locate_dependency(dependency.path)
-            # missing graph problems have already been reported while building the graph
-            if maybe_graph.graph:
-                child_graph = maybe_graph.graph
-                for child_dependency in child_graph.local_dependencies:
-                    yield from self._iter_one(child_dependency, child_graph, root_path)
-        self._lineage.pop()
-
-    def _log_walk_one(self, dependency: Dependency) -> None:
-        logger.debug(f'Analyzing dependency: {dependency}')
-
-    @abc.abstractmethod
-    def _process_dependency(
-        self,
-        dependency: Dependency,
-        path_lookup: PathLookup,
-        inherited_tree: Tree | None,
-    ) -> Iterable[T]: ...
-
-    @property
-    def lineage(self) -> list[LineageAtom]:
-        lists: list[list[LineageAtom]] = [dependency.lineage for dependency in self._lineage]
-        return list(itertools.chain(*lists))

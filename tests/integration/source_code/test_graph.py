@@ -5,7 +5,8 @@ from pathlib import Path
 from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.graph import DependencyResolver, DependencyGraph, DependencyProblem
 from databricks.labs.ucx.source_code.known import KnownList, Compatibility, UNKNOWN
-from databricks.labs.ucx.source_code.linters.files import FileLoader, ImportFileResolver
+from databricks.labs.ucx.source_code.linters.files import ImportFileResolver
+from databricks.labs.ucx.source_code.files import FileLoader
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader, NotebookResolver
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver

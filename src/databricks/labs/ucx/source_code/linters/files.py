@@ -1,23 +1,17 @@
 from __future__ import annotations  # for type hints
 
-import dataclasses
 import logging
 from collections.abc import Iterable, Callable
 from pathlib import Path
-import sys
-from typing import TextIO
 
-from databricks.labs.ucx.source_code.base import LocatedAdvice, CurrentSessionState, file_language, is_a_notebook
-from databricks.labs.ucx.source_code.python.python_ast import Tree
-from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader
-from databricks.labs.ucx.source_code.notebooks.sources import FileLinter
-from databricks.labs.ucx.source_code.path_lookup import PathLookup
-from databricks.labs.ucx.source_code.known import KnownList
 from databricks.sdk.service.workspace import Language
-from databricks.labs.blueprint.tui import Prompts
 
-from databricks.labs.ucx.source_code.linters.context import LinterContext
-from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage, PythonCodeAnalyzer
+from databricks.labs.ucx.source_code.base import (
+    CurrentSessionState,
+    Failure,
+    LocatedAdvice,
+    is_a_notebook,
+)
 from databricks.labs.ucx.source_code.graph import (
     BaseImportResolver,
     BaseFileResolver,
@@ -25,57 +19,19 @@ from databricks.labs.ucx.source_code.graph import (
     DependencyGraph,
     DependencyLoader,
     DependencyProblem,
-    MaybeDependency,
-    SourceContainer,
     DependencyResolver,
-    InheritedContext,
-    DependencyGraphWalker,
+    MaybeDependency,
+    MaybeGraph,
+    SourceContainer,
 )
+from databricks.labs.ucx.source_code.files import FileLoader
+from databricks.labs.ucx.source_code.graph_walkers import FixerWalker, LinterWalker
+from databricks.labs.ucx.source_code.known import KnownList
+from databricks.labs.ucx.source_code.linters.context import LinterContext
+from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader
+from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 logger = logging.getLogger(__name__)
-
-
-class LocalFile(SourceContainer):
-
-    def __init__(self, path: Path, source: str, language: Language):
-        self._path = path
-        self._original_code = source
-        # using CellLanguage so we can reuse the facilities it provides
-        self._language = CellLanguage.of_language(language)
-
-    @property
-    def path(self) -> Path:
-        return self._path
-
-    def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
-        if self._language is CellLanguage.PYTHON:
-            context = parent.new_dependency_graph_context()
-            analyzer = PythonCodeAnalyzer(context, self._original_code)
-            problems = analyzer.build_graph()
-            for idx, problem in enumerate(problems):
-                if problem.is_path_missing():
-                    problems[idx] = dataclasses.replace(problem, source_path=self._path)
-            return problems
-        # supported language that does not generate dependencies
-        if self._language is CellLanguage.SQL:
-            return []
-        logger.warning(f"Unsupported language: {self._language.language}")
-        return []
-
-    def build_inherited_context(self, graph: DependencyGraph, child_path: Path) -> InheritedContext:
-        if self._language is CellLanguage.PYTHON:
-            context = graph.new_dependency_graph_context()
-            analyzer = PythonCodeAnalyzer(context, self._original_code)
-            inherited = analyzer.build_inherited_context(child_path)
-            problems = list(inherited.problems)
-            for idx, problem in enumerate(problems):
-                if problem.is_path_missing():
-                    problems[idx] = dataclasses.replace(problem, source_path=self._path)
-            return dataclasses.replace(inherited, problems=problems)
-        return InheritedContext(None, False, [])
-
-    def __repr__(self):
-        return f"<LocalFile {self._path}>"
 
 
 class Folder(SourceContainer):
@@ -135,27 +91,47 @@ class LocalCodeLinter:
         self._extensions = {".py": Language.PYTHON, ".sql": Language.SQL}
         self._context_factory = context_factory
 
-    def lint(
-        self,
-        prompts: Prompts,
-        path: Path | None,
-        stdout: TextIO = sys.stdout,
-    ) -> list[LocatedAdvice]:
-        """Lint local code files looking for problems in notebooks and python files."""
-        if path is None:
-            response = prompts.question(
-                "Which file or directory do you want to lint?",
-                default=Path.cwd().as_posix(),
-                validate=lambda p_: Path(p_).exists(),
-            )
-            path = Path(response)
-        located_advices = list(self.lint_path(path))
-        for located in located_advices:
-            message = located.message_relative_to(path)
-            stdout.write(f"{message}\n")
-        return located_advices
+    def lint(self, path: Path) -> Iterable[LocatedAdvice]:
+        """Lint local code generating advices on becoming Unity Catalog compatible.
 
-    def lint_path(self, path: Path, linted_paths: set[Path] | None = None) -> Iterable[LocatedAdvice]:
+        Parameters :
+            path (Path) : The path to the resource(s) to lint. If the path is a directory, then all files within the
+                directory and subdirectories are linted.
+        """
+        maybe_graph = self._build_dependency_graph_from_path(path)
+        if maybe_graph.problems:
+            for problem in maybe_graph.problems:
+                yield problem.as_located_advice(Failure)
+            return
+        assert maybe_graph.graph
+        walker = LinterWalker(maybe_graph.graph, self._path_lookup, self._context_factory)
+        yield from walker
+
+    def apply(self, path: Path) -> Iterable[LocatedAdvice]:
+        """Apply local code fixes to become Unity Catalog compatible.
+
+        Parameters :
+            path (Path) : The path to the resource(s) to lint. If the path is a directory, then all files within the
+                directory and subdirectories are linted.
+        """
+        maybe_graph = self._build_dependency_graph_from_path(path)
+        if maybe_graph.problems:
+            for problem in maybe_graph.problems:
+                yield problem.as_located_advice(Failure)
+            return
+        assert maybe_graph.graph
+        walker = FixerWalker(maybe_graph.graph, self._path_lookup, self._context_factory)
+        yield from walker
+
+    def _build_dependency_graph_from_path(self, path: Path) -> MaybeGraph:
+        """Build a dependency graph from the path.
+
+        It tries to load the path as a directory, file or notebook.
+
+        Returns :
+            MaybeGraph : If the loading fails, the returned maybe graph contains a problem. Otherwise, returned maybe
+            graph contains the graph.
+        """
         is_dir = path.is_dir()
         loader: DependencyLoader
         if is_a_notebook(path):
@@ -164,122 +140,18 @@ class LocalCodeLinter:
             loader = self._folder_loader
         else:
             loader = self._file_loader
-        path_lookup = self._path_lookup.change_directory(path if is_dir else path.parent)
         root_dependency = Dependency(loader, path, not is_dir)  # don't inherit context when traversing folders
-        graph = DependencyGraph(root_dependency, None, self._dependency_resolver, path_lookup, self._session_state)
-        container = root_dependency.load(path_lookup)
-        assert container is not None  # because we just created it
-        problems = container.build_dependency_graph(graph)
-        for problem in problems:
-            problem_path = Path('UNKNOWN') if problem.is_path_missing() else problem.source_path.absolute()
-            yield problem.as_advisory().for_path(problem_path)
-        context_factory = self._context_factory
-        session_state = self._session_state
-
-        class LintingWalker(DependencyGraphWalker[LocatedAdvice]):
-
-            def _process_dependency(
-                self, dependency: Dependency, path_lookup: PathLookup, inherited_tree: Tree | None
-            ) -> Iterable[LocatedAdvice]:
-                ctx = context_factory()
-                # FileLinter will determine which file/notebook linter to use
-                linter = FileLinter(ctx, path_lookup, session_state, dependency.path, inherited_tree)
-                for advice in linter.lint():
-                    yield LocatedAdvice(advice, dependency.path)
-
-        if linted_paths is None:
-            linted_paths = set()
-        walker = LintingWalker(graph, linted_paths, self._path_lookup)
-        yield from walker
-
-
-class LocalFileMigrator:
-    """The LocalFileMigrator class is responsible for fixing code files based on their language."""
-
-    def __init__(self, context_factory: Callable[[], LinterContext]):
-        self._extensions = {".py": Language.PYTHON, ".sql": Language.SQL}
-        self._context_factory = context_factory
-
-    def apply(self, path: Path) -> bool:
-        if path.is_dir():
-            for child_path in path.iterdir():
-                self.apply(child_path)
-            return True
-        return self._apply_file_fix(path)
-
-    def _apply_file_fix(self, path: Path):
-        """
-        The fix method reads a file, lints it, applies fixes, and writes the fixed code back to the file.
-        """
-        # Check if the file extension is in the list of supported extensions
-        if path.suffix not in self._extensions:
-            return False
-        # Get the language corresponding to the file extension
-        language = self._extensions[path.suffix]
-        # If the language is not supported, return
-        if not language:
-            return False
-        logger.info(f"Analysing {path}")
-        # Get the linter for the language
-        context = self._context_factory()
-        linter = context.linter(language)
-        # Open the file and read the code
-        with path.open("r") as f:
-            try:
-                code = f.read()
-            except UnicodeDecodeError as e:
-                logger.warning(f"Could not decode file {path}: {e}")
-                return False
-            applied = False
-            # Lint the code and apply fixes
-            for advice in linter.lint(code):
-                logger.info(f"Found: {advice}")
-                fixer = context.fixer(language, advice.code)
-                if not fixer:
-                    continue
-                logger.info(f"Applying fix for {advice}")
-                code = fixer.apply(code)
-                applied = True
-            if not applied:
-                return False
-            # Write the fixed code back to the file
-            with path.open("w") as f:
-                logger.info(f"Overwriting {path}")
-                f.write(code)
-                return True
-
-
-class StubContainer(SourceContainer):
-
-    def __init__(self, path: Path):
-        super().__init__()
-        self._path = path
-
-    def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
-        return []
-
-
-class FileLoader(DependencyLoader):
-    def load_dependency(self, path_lookup: PathLookup, dependency: Dependency) -> SourceContainer | None:
-        absolute_path = path_lookup.resolve(dependency.path)
-        if not absolute_path:
-            return None
-        language = file_language(absolute_path)
-        if not language:
-            return StubContainer(absolute_path)
-        for encoding in ("utf-8", "ascii"):
-            try:
-                code = absolute_path.read_text(encoding)
-                return LocalFile(absolute_path, code, language)
-            except UnicodeDecodeError:
-                pass
-        return None
-
-    def exists(self, path: Path) -> bool:
-        return path.exists()
-
-    def __repr__(self):
-        return "FileLoader()"
+        container = root_dependency.load(self._path_lookup)
+        if container is None:
+            problem = DependencyProblem("dependency-not-found", "Dependency not found", source_path=path)
+            return MaybeGraph(None, [problem])
+        graph = DependencyGraph(
+            root_dependency, None, self._dependency_resolver, self._path_lookup, self._session_state
+        )
+        problems = list(container.build_dependency_graph(graph))
+        if problems:
+            return MaybeGraph(None, problems)
+        return MaybeGraph(graph)
 
 
 class FolderLoader(FileLoader):

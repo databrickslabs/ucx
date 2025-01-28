@@ -21,7 +21,6 @@ from databricks.sdk.service.workspace import Language
 
 from databricks.labs.blueprint.paths import WorkspacePath
 
-
 if sys.version_info >= (3, 11):
     from typing import Self
 else:
@@ -96,14 +95,18 @@ class LocatedAdvice:
     advice: Advice
     path: Path
 
+    def has_unknown_path(self) -> bool:
+        """Flag if the path is unknown, or not."""
+        return self.path == Path("<MISSING_SOURCE_PATH>")  # Reusing marker from DependencyProblem
+
     @property
-    def is_unknown(self) -> bool:
-        return self.path == Path('UNKNOWN')
+    def message(self) -> str:
+        return f"{self.path.as_posix()}:{self.advice.start_line+1}:{self.advice.start_col}: [{self.advice.code}] {self.advice.message}"
 
     def message_relative_to(self, base: Path, *, default: Path | None = None) -> str:
         advice = self.advice
         path = self.path
-        if self.is_unknown:
+        if self.has_unknown_path():
             logger.debug(f'THIS IS A BUG! {advice.code}:{advice.message} has unknown path')
         if default is not None:
             path = default
@@ -170,7 +173,12 @@ class Fixer(ABC):
 
     @property
     @abstractmethod
-    def name(self) -> str: ...
+    def diagnostic_code(self) -> str | None:
+        """The diagnostic code that this fixer fixes."""
+
+    def is_supported(self, diagnostic_code: str) -> bool:
+        """Indicate if the diagnostic code is supported by this fixer."""
+        return self.diagnostic_code is not None and diagnostic_code == self.diagnostic_code
 
     @abstractmethod
     def apply(self, code: str) -> str: ...

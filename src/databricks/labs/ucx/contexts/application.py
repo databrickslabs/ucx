@@ -67,7 +67,8 @@ from databricks.labs.ucx.progress.install import VerifyProgressTracking
 from databricks.labs.ucx.source_code.graph import DependencyResolver
 from databricks.labs.ucx.source_code.jobs import WorkflowLinter
 from databricks.labs.ucx.source_code.known import KnownList
-from databricks.labs.ucx.source_code.linters.files import FileLoader, FolderLoader, ImportFileResolver
+from databricks.labs.ucx.source_code.linters.files import FolderLoader, ImportFileResolver
+from databricks.labs.ucx.source_code.files import FileLoader
 from databricks.labs.ucx.source_code.notebooks.loaders import (
     NotebookResolver,
     NotebookLoader,

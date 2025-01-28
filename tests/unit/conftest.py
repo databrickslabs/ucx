@@ -12,7 +12,8 @@ from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.tables import FasterTableScanCrawler
 from databricks.labs.ucx.source_code.graph import BaseNotebookResolver, DependencyResolver
 from databricks.labs.ucx.source_code.known import KnownList
-from databricks.labs.ucx.source_code.linters.files import ImportFileResolver, FileLoader
+from databricks.labs.ucx.source_code.linters.files import ImportFileResolver
+from databricks.labs.ucx.source_code.files import FileLoader
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.sdk import AccountClient
@@ -189,11 +190,29 @@ def acc_client():
 
 
 class MockPathLookup(PathLookup):
-    def __init__(self, cwd='source_code/samples', sys_paths: list[Path] | None = None):
+    """A path look up for the testing code samples."""
+
+    def __init__(
+        self,
+        cwd='source_code/samples',
+        sys_paths: list[Path] | None = None,
+    ):
         super().__init__(Path(__file__).parent / cwd, sys_paths or [])
 
+        self.successfully_resolved_paths = set[Path]()  # The paths that were successfully resolved
+
+    def resolve(self, path: Path) -> Path | None:
+        """Resolve a path from the context of the lookup."""
+        resolved_path = super().resolve(path)
+        if resolved_path:
+            self.successfully_resolved_paths.add(path)
+        return resolved_path
+
     def change_directory(self, new_working_directory: Path) -> 'MockPathLookup':
-        return MockPathLookup(new_working_directory, self._sys_paths)
+        path_lookup = MockPathLookup(new_working_directory, self._sys_paths)
+        # For testing, we want to keep of the successfully resolved paths after directory changes
+        path_lookup.successfully_resolved_paths = self.successfully_resolved_paths
+        return path_lookup
 
     def __repr__(self):
         return f"<MockPathLookup {self._cwd}, sys.path: {self._sys_paths}>"
