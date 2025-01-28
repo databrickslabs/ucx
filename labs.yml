@@ -372,7 +372,7 @@ commands:
   - name: migrate-dlt-pipelines
     description: Migrate DLT pipelines from HMS to UC using the DLT Migration API
     flags:
-      - name: include-pipelines-ids
+      - name: include-pipeline-ids
         description: (Optional) Comma separated list of pipeline IDs to include in the migration
-      - name: exclude-pipelines-ids
+      - name: exclude-pipeline-ids
         description: (Optional) Comma separated list of pipeline IDs to exclude from the migration
