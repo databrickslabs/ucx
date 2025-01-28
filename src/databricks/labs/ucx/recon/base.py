@@ -82,7 +82,7 @@ class DataComparisonResult:
 
 class TableMetadataRetriever(ABC):
     @abstractmethod
-    def get_metadata(self, entity: TableIdentifier) -> TableMetadata:
+    def get_metadata(self, entity: TableIdentifier, /, case_sensitive: bool = False) -> TableMetadata:
         """
         Get metadata for a given table
         """

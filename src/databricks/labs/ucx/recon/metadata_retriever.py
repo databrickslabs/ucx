@@ -10,7 +10,7 @@ class DatabricksTableMetadataRetriever(TableMetadataRetriever):
     def __init__(self, sql_backend: SqlBackend):
         self._sql_backend = sql_backend
 
-    def get_metadata(self, entity: TableIdentifier) -> TableMetadata:
+    def get_metadata(self, entity: TableIdentifier, /, case_sensitive: bool = False) -> TableMetadata:
         """
         This method retrieves the metadata for a given table. It takes a TableIdentifier object as input,
         which represents the table for which the metadata is to be retrieved.
@@ -25,7 +25,9 @@ class DatabricksTableMetadataRetriever(TableMetadataRetriever):
         # so any column name starting with # is excluded from the final set of column metadata.
         # The column metadata objects are sorted by column name to ensure a consistent order.
         columns = {
-            ColumnMetadata(str(row["col_name"]), str(row["data_type"]))
+            ColumnMetadata(
+                str(row["col_name"] if case_sensitive else str(row["col_name"]).lower()), str(row["data_type"])
+            )
             for row in query_result
             if not str(row["col_name"]).startswith("#")
         }
@@ -38,7 +40,7 @@ class DatabricksTableMetadataRetriever(TableMetadataRetriever):
 
         query = f"""
             SELECT
-                LOWER(column_name) AS col_name,
+                column_name AS col_name,
                 full_data_type AS data_type
             FROM
                 {entity.catalog_escaped}.information_schema.columns
