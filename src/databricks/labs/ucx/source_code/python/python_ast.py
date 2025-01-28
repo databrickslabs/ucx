@@ -71,6 +71,12 @@ class MaybeTree:
     failure: Failure | None
     """The failure during constructing the tree"""
 
+    def __post_init__(self):
+        if self.tree is None and self.failure is None:
+            raise ValueError(f"Tree and failure should not be both `None`: {self}")
+        if self.tree is not None and self.failure is not None:
+            raise ValueError(f"Tree and failure should not be both given: {self}")
+
     @classmethod
     def from_source_code(cls, code: str) -> MaybeTree:
         """Normalize and parse the source code to get a `Tree` or parse `Failure`."""
