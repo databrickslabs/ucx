@@ -73,7 +73,7 @@ class PythonCodeAnalyzer:
             # append nodes
             node_line = base_node.node.lineno
             nodes = tree.nodes_between(last_line + 1, node_line - 1)
-            context.tree.attach_nodes(nodes)
+            context.tree.attach_child_nodes(nodes)
             globs = tree.globals_between(last_line + 1, node_line - 1)
             context.tree.extend_globals(globs)
             last_line = node_line
@@ -86,7 +86,7 @@ class PythonCodeAnalyzer:
         assert context.tree is not None, "Tree should be initialized"
         if last_line < line_count:
             nodes = tree.nodes_between(last_line + 1, line_count)
-            context.tree.attach_nodes(nodes)
+            context.tree.attach_child_nodes(nodes)
             globs = tree.globals_between(last_line + 1, line_count)
             context.tree.extend_globals(globs)
         return context

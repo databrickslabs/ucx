@@ -59,3 +59,7 @@ print(sys.version)
 # COMMAND ----------
 
 # MAGIC %lsmagic
+
+# COMMAND ----------
+
+# MAGIC %run ./test
