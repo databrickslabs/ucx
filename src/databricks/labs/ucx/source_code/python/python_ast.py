@@ -57,7 +57,7 @@ class MaybeTree:
     looks like:
 
     ``` python
-    maybe_tree = Tree.from_<class method>(<arguments>)
+    maybe_tree = Tree.from_source_code("print(1)")
     if maybe_tree.failure:
         # Handle failure and return early
     assert maybe_tree.tree, "Tree should be not-None when Failure is None."
