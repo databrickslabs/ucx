@@ -358,14 +358,14 @@ class FileLinter:
 
     def __init__(
         self,
-        ctx: LinterContext,
-        path_lookup: PathLookup,
-        session_state: CurrentSessionState,
         path: Path,
+        path_lookup: PathLookup,
+        context: LinterContext,
+        session_state: CurrentSessionState,
         inherited_tree: Tree | None = None,
         content: str | None = None,
     ):
-        self._ctx: LinterContext = ctx
+        self._ctx: LinterContext = context
         self._path_lookup = path_lookup
         self._session_state = session_state
         self._path = path

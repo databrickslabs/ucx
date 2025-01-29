@@ -181,7 +181,7 @@ class LocalCodeLinter:
             ) -> Iterable[LocatedAdvice]:
                 ctx = context_factory()
                 # FileLinter will determine which file/notebook linter to use
-                linter = FileLinter(ctx, path_lookup, session_state, dependency.path, inherited_tree)
+                linter = FileLinter(dependency.path, path_lookup, ctx, session_state, inherited_tree)
                 for advice in linter.lint():
                     yield LocatedAdvice(advice, dependency.path)
 
