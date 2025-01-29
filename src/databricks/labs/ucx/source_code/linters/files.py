@@ -53,7 +53,7 @@ class LocalFile(SourceContainer):
             analyzer = PythonCodeAnalyzer(context, self._original_code)
             problems = analyzer.build_graph()
             for idx, problem in enumerate(problems):
-                if problem.is_path_missing():
+                if problem.has_path_missing():
                     problems[idx] = dataclasses.replace(problem, source_path=self._path)
             return problems
         # supported language that does not generate dependencies

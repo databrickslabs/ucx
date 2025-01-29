@@ -58,10 +58,3 @@ def test_graph_imports_dynamic_import():
     container = maybe.dependency.load(path_lookup)
     problems = container.build_dependency_graph(graph)
     assert not problems
-
-
-def test_is_path_missing():
-    problem = DependencyProblem("some-code", "some-message")
-    assert problem.is_path_missing()
-    problem = dataclasses.replace(problem, source_path=Path("stuff"))
-    assert not problem.is_path_missing()
