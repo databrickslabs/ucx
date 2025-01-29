@@ -911,7 +911,7 @@ def migrate_dlt_pipelines(
     ctx: WorkspaceContext | None = None,
     run_as_collection: bool = False,
     a: AccountClient | None = None,
-    **named_parameters
+    **named_parameters,
 ) -> None:
     """Migrate DLT pipelines to UC"""
     if ctx:

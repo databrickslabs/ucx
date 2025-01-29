@@ -377,7 +377,10 @@ class GlobalContext(abc.ABC):
         include_pipeline_ids = self.named_parameters.get('include_pipeline_ids', '').split(',') or None
         exclude_pipeline_ids = self.named_parameters.get('exclude_pipeline_ids', '').split(',') or None
         return PipelinesMigrator(
-            self.workspace_client, self.pipelines_crawler, self.jobs_crawler, self.config.ucx_catalog,
+            self.workspace_client,
+            self.pipelines_crawler,
+            self.jobs_crawler,
+            self.config.ucx_catalog,
             include_pipeline_ids=include_pipeline_ids,
             exclude_pipeline_ids=exclude_pipeline_ids,
         )
