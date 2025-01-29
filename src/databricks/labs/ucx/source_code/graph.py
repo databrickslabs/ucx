@@ -500,8 +500,11 @@ class DependencyProblem:
     def is_path_missing(self) -> bool:
         return self.source_path == _MISSING_SOURCE_PATH
 
-    def as_advisory(self) -> 'Advisory':
-        return Advisory(
+    def as_located_advice(self) -> LocatedAdvice:
+        """Converts the dependency problem in a located advice for linting."""
+        # Advisory level is chosen to treat a dependency problem as a WARNING. It is the most server while not being
+        # CRITICAL (yet).
+        advisory = Advisory(
             code=self.code,
             message=self.message,
             start_line=self.start_line,
@@ -509,9 +512,7 @@ class DependencyProblem:
             end_line=self.end_line,
             end_col=self.end_col,
         )
-
-    def as_located_advice(self) -> LocatedAdvice:
-        return LocatedAdvice(self.as_advisory(), self.source_path)
+        return LocatedAdvice(advisory, self.source_path)
 
     @staticmethod
     def from_node(code: str, message: str, node: NodeNG) -> DependencyProblem:
