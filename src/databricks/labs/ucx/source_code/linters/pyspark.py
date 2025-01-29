@@ -1,3 +1,4 @@
+import dataclasses
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Iterator
@@ -462,14 +463,33 @@ class _SparkSqlAnalyzer:
 
 
 class SparkSqlPyLinter(_SparkSqlAnalyzer, PythonLinter, Fixer):
+    """Linter for SparkSQL used within PySpark.
+
+    Examples:
+    1. Find table name reference in SparkSQL:
+       ``` python
+       spark.sql("SELECT * FROM hive_metastore.schema.table").collect()
+       ```
+    """
 
     def __init__(self, sql_linter: SqlLinter, sql_fixer: Fixer | None):
         self._sql_linter = sql_linter
         self._sql_fixer = sql_fixer
 
+        # This fixer is a wrapper around the SQL fixer for when SQL is used within Python. To uniquely identify this
+        # case, the codes are mapping according to this mapping
+        self._fixer_diagnostic_code_mapping = {
+            "table-migrated-to-uc-sql": "table-migrated-to-uc-python-sql",
+        }
+        if self._sql_fixer and self._sql_fixer.diagnostic_code not in self._fixer_diagnostic_code_mapping:
+            raise ValueError(f"Missing mapping for SQL fixer diagnostic code: {self._sql_fixer}")
+
     @property
-    def diagnostic_code(self) -> str:
-        return "<none>" if self._sql_fixer is None else self._sql_fixer.diagnostic_code
+    def diagnostic_code(self) -> str | None:
+        """The diagnostic codes that this fixer fixes."""
+        if not (self._sql_fixer and self._sql_fixer.diagnostic_code):
+            return None
+        return self._fixer_diagnostic_code_mapping.get(self._sql_fixer.diagnostic_code)
 
     def lint_tree(self, tree: Tree) -> Iterable[Advice]:
         for call_node, query in self._visit_call_nodes(tree):
@@ -482,7 +502,10 @@ class SparkSqlPyLinter(_SparkSqlAnalyzer, PythonLinter, Fixer):
                     )
                     continue
                 for advice in self._sql_linter.lint(value.as_string()):
-                    yield advice.replace_from_node(call_node)
+                    yield dataclasses.replace(
+                        advice.replace_from_node(call_node),
+                        code=self._fixer_diagnostic_code_mapping.get(advice.code, advice.code),
+                    )
 
     def apply(self, code: str) -> str:
         if not self._sql_fixer:
