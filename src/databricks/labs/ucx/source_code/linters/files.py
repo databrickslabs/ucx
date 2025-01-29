@@ -28,7 +28,7 @@ from databricks.labs.ucx.source_code.graph import (
     DependencyResolver,
     InheritedContext,
 )
-from databricks.labs.ucx.source_code.graph_walkers import LintingWalker
+from databricks.labs.ucx.source_code.linters.graph_walkers import LintingWalker
 
 logger = logging.getLogger(__name__)
 

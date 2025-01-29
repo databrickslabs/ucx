@@ -41,7 +41,11 @@ from databricks.labs.ucx.source_code.graph import (
     SourceContainer,
     WrappingLoader,
 )
-from databricks.labs.ucx.source_code.graph_walkers import LintingWalker, DfsaCollectorWalker, TablesCollectorWalker
+from databricks.labs.ucx.source_code.linters.graph_walkers import (
+    LintingWalker,
+    DfsaCollectorWalker,
+    TablesCollectorWalker,
+)
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
