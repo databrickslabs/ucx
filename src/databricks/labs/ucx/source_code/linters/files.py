@@ -201,13 +201,13 @@ class LocalFileMigrator:
                 return True
 
 
-class FolderLoader(FileLoader):
+class FolderLoader(DependencyLoader):
 
     def __init__(self, notebook_loader: NotebookLoader, file_loader: FileLoader):
         self._notebook_loader = notebook_loader
         self._file_loader = file_loader
 
-    def load_dependency(self, path_lookup: PathLookup, dependency: Dependency) -> SourceContainer | None:
+    def load_dependency(self, path_lookup: PathLookup, dependency: Dependency) -> Folder | None:
         absolute_path = path_lookup.resolve(dependency.path)
         if not absolute_path:
             return None
