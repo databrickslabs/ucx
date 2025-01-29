@@ -98,13 +98,12 @@ class LocatedAdvice:
     path: Path
     """The path location"""
 
+    def __str__(self) -> str:
+        return f"{self.path.as_posix()}:{self.advice.start_line + 1}:{self.advice.start_col}: [{self.advice.code}] {self.advice.message}"
+
     def has_missing_path(self) -> bool:
         """Flag if the path is missing, or not."""
         return self.path == Path("<MISSING_SOURCE_PATH>")  # Reusing flag from DependencyProblem
-
-    @property
-    def message(self) -> str:
-        return f"{self.path.as_posix()}:{self.advice.start_line + 1}:{self.advice.start_col}: [{self.advice.code}] {self.advice.message}"
 
     def message_relative_to(self, base: Path, *, default: Path | None = None) -> str:
         advice = self.advice

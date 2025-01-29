@@ -69,4 +69,4 @@ def test_located_advice_message() -> None:
     )
     located_advice = LocatedAdvice(advice, Path("test.py"))
 
-    assert located_advice.message == "test.py:1:0: [code] message"
+    assert str(located_advice) == "test.py:1:0: [code] message"
