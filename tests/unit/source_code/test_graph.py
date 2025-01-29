@@ -222,12 +222,12 @@ def test_graph_walker_captures_lineage(mock_path_lookup, simple_dependency_resol
 
 def test_dependency_problem_has_path_missing_by_default() -> None:
     problem = DependencyProblem("code", "message")
-    assert problem.has_path_missing()
+    assert problem.has_missing_path()
 
 
 def test_dependency_problem_has_path_when_given() -> None:
     problem = DependencyProblem("code", "message", source_path=Path("location"))
-    assert not problem.has_path_missing()
+    assert not problem.has_missing_path()
 
 
 def test_dependency_problem_as_located_advice() -> None:
@@ -239,4 +239,4 @@ def test_dependency_problem_as_located_advice() -> None:
 def test_dependency_problem_as_located_advice_has_path_missing_by_default() -> None:
     problem = DependencyProblem("code", "message")
     located_advice = problem.as_located_advice()
-    assert located_advice.has_path_missing()
+    assert located_advice.has_missing_path()

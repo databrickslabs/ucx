@@ -99,7 +99,7 @@ class DependencyGraph:
             return MaybeGraph(child_graph, [problem])
         problems = []
         for problem in container.build_dependency_graph(child_graph):
-            if problem.has_path_missing():
+            if problem.has_missing_path():
                 problem = dataclasses.replace(problem, source_path=dependency.path)
             problems.append(problem)
         return MaybeGraph(child_graph, problems)
@@ -473,7 +473,7 @@ class DependencyResolver:
     def _make_relative_paths(self, problems: list[DependencyProblem], path: Path) -> list[DependencyProblem]:
         adjusted_problems = []
         for problem in problems:
-            out_path = path if problem.has_path_missing() else problem.source_path
+            out_path = path if problem.has_missing_path() else problem.source_path
             if out_path.is_absolute() and out_path.is_relative_to(self._path_lookup.cwd):
                 out_path = out_path.relative_to(self._path_lookup.cwd)
             adjusted_problems.append(dataclasses.replace(problem, source_path=out_path))
@@ -514,7 +514,7 @@ class DependencyProblem:
     end_col: int = -1
     """The column where the problem ends when reading source code."""
 
-    def has_path_missing(self) -> bool:
+    def has_missing_path(self) -> bool:
         """Flag if the path is missing, or not."""
         return self.source_path == _MISSING_SOURCE_PATH
 

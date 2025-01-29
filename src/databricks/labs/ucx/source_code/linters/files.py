@@ -53,7 +53,7 @@ class LocalFile(SourceContainer):
             analyzer = PythonCodeAnalyzer(context, self._original_code)
             problems = analyzer.build_graph()
             for idx, problem in enumerate(problems):
-                if problem.has_path_missing():
+                if problem.has_missing_path():
                     problems[idx] = dataclasses.replace(problem, source_path=self._path)
             return problems
         # supported language that does not generate dependencies
@@ -69,7 +69,7 @@ class LocalFile(SourceContainer):
             inherited = analyzer.build_inherited_context(child_path)
             problems = list(inherited.problems)
             for idx, problem in enumerate(problems):
-                if problem.has_path_missing():
+                if problem.has_missing_path():
                     problems[idx] = dataclasses.replace(problem, source_path=self._path)
             return dataclasses.replace(inherited, problems=problems)
         return InheritedContext(None, False, [])
