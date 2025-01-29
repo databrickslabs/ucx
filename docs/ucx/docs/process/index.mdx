@@ -11,7 +11,8 @@ On a high level, the steps in migration process are:
 4. [data reconciliation](/docs/reference/workflows#post-migration-data-reconciliation-workflow)
 5. [code migration](#code-migration)
 6. [final details](#final-details)
-
+5. [code migration](/docs/reference/commands#code-migration-commands)
+6. [pipeline migration](/docs/process#pipeline-migration-process)
 The migration process can be schematic visualized as:
 
 ```mermaid
@@ -288,6 +289,7 @@ databricks labs ucx revert-migrated-tables --schema X --table Y [--delete-manage
 The [`revert-migrated-tables` command](/docs/reference/commands#revert-migrated-tables) drops the Unity Catalog table or view and reset
 the `upgraded_to` property on the source object. Use this command to allow for migrating a table or view again.
 
+
 ## Code Migration
 
 After you're done with the [table migration](#table-migration-process) and
@@ -311,3 +313,27 @@ After investigating the code linter advices, code can be migrated. We recommend 
 
 Once you're done with the [code migration](#code-migration), you can run the:
 - [`cluster-remap` command](/docs/reference/commands#cluster-remap) to remap the clusters to be UC compatible.
+
+
+## Pipeline Migration Process
+
+The pipeline migration process is an automated process that migrates Hive Metastore Delta Live Table (DLT) pipelines to the Unity Catalog.
+One pre-requisite for the pipeline migration process is to have the DLT clone API to be enabled for the workspace.
+
+Known issues and Limitations:
+- Only clones from HMS to UC are supported.
+- Pipelines may only be cloned into the same workspace.
+- HMS pipelines must currently be publishing tables to some target schema.
+- Only the following streaming sources are supported:
+    - Delta
+    - Autoloader
+        - If your pipeline uses Autoloader with file notification events, do not run the original HMS pipeline after cloning as this will cause some file notification events to be dropped from the UC clone. If the HMS original was started accidentally, missed files can be backfilled by using the `cloudFiles.backfillInterval` option in Autoloader.
+    - Kafka where "kafka.group.id" is not set
+    - Kinesis where "consumerMode" is not "efo"
+- Maintenance is automatically paused (for both pipelines) while migration is in progress
+- If an Autoloader source specifies an explicit cloudFiles.schemaLocation, mergeSchema needs to be set to true for the HMS original and UC clone to operate concurrently.
+- Pipelines that publish tables to custom schemas are not supported.
+- On tables cloned to UC, time travel queries are undefined when querying by timestamp to versions originally written on HMS. Time travel queries by version will work correctly, as will time travel queries by timestamp to versions written on UC.
+- All existing limitations of using DLT on UC.
+- Existing UC limitations.
+    - If tables in the HMS pipeline specify storage locations (using the "path" parameter in Python or the LOCATION clause in SQL), the configuration "pipelines.migration.ignoreExplicitPath" can be set to "true" to ignore the parameter in the cloned pipeline.
