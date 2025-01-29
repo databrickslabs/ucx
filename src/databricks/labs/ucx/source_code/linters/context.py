@@ -112,10 +112,16 @@ class LinterContext:
         raise ValueError(f"Unsupported language: {language}")
 
     def fixer(self, language: Language, diagnostic_code: str) -> Fixer | None:
-        if language not in self._fixers:
-            return None
-        for fixer in self._fixers[language]:
-            if fixer.diagnostic_code == diagnostic_code:
+        """Get the fixer for a language that matches the code.
+
+        The first fixer which name matches with the diagnostic code is returned. This logic assumes the fixers have
+        unique names.
+
+        Returns :
+            Fixer | None : The fixer if a match is found, otherwise None.
+        """
+        for fixer in self._fixers.get(language, []):
+            if fixer.is_supported(diagnostic_code):
                 return fixer
         return None
 
