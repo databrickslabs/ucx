@@ -12,7 +12,7 @@ from typing import TypeVar, Generic
 from astroid import (  # type: ignore
     NodeNG,
 )
-from databricks.labs.ucx.source_code.base import Advisory, CurrentSessionState, is_a_notebook, LineageAtom
+from databricks.labs.ucx.source_code.base import Advice, Advisory, CurrentSessionState, LineageAtom, LocatedAdvice, is_a_notebook
 from databricks.labs.ucx.source_code.python.python_ast import Tree
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
@@ -503,6 +503,9 @@ class DependencyProblem:
             end_line=self.end_line,
             end_col=self.end_col,
         )
+
+    def as_located_advice(self) -> LocatedAdvice:
+        return LocatedAdvice(self.as_advisory(), self.source_path)
 
     @staticmethod
     def from_node(code: str, message: str, node: NodeNG) -> DependencyProblem:
