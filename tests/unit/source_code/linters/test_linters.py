@@ -34,7 +34,7 @@ def test_fixer_returns_none_fixer_for_python() -> None:
 
 def test_fixer_returns_correct_fixer_for_python() -> None:
     languages = LinterContext(index)
-    fixer = languages.fixer(Language.PYTHON, "table-migrated-to-uc-sql")
+    fixer = languages.fixer(Language.PYTHON, "table-migrated-to-uc-python")
     assert isinstance(fixer, Fixer)
 
 

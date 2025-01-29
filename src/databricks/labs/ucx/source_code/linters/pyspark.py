@@ -156,7 +156,7 @@ class SparkCallMatcher(_TableNameMatcher):
             if dst is None:
                 continue
             yield Deprecation.from_node(
-                code='table-migrated-to-uc',
+                code='table-migrated-to-uc-python',
                 message=f"Table {used_table[0]} is migrated to {dst.destination()} in Unity Catalog",
                 # SQLGlot does not propagate tokens yet. See https://github.com/tobymao/sqlglot/issues/3159
                 node=node,
@@ -388,6 +388,14 @@ class SparkTableNameMatchers:
 
 
 class SparkTableNamePyLinter(PythonLinter, Fixer, TablePyCollector):
+    """Linter for table name references in PySpark
+
+    Examples:
+    1. Find table name referenceS
+       ``` python
+       spark.read.table("hive_metastore.schema.table")
+       ```
+    """
 
     def __init__(
         self,
@@ -401,9 +409,9 @@ class SparkTableNamePyLinter(PythonLinter, Fixer, TablePyCollector):
         self._spark_matchers = SparkTableNameMatchers(False).matchers
 
     @property
-    def diagnostic_code(self) -> str:
-        # this is the same fixer, just in a different language context
-        return self._from_table.diagnostic_code
+    def diagnostic_code(self) -> str | None:
+        """The diagnostic codes that this fixer fixes."""
+        return "table-migrated-to-uc-python"
 
     def lint_tree(self, tree: Tree) -> Iterable[Advice]:
         for node in tree.walk():
