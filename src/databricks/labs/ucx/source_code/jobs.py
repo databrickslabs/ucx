@@ -42,6 +42,7 @@ from databricks.labs.ucx.source_code.graph import (
     WrappingLoader,
 )
 from databricks.labs.ucx.source_code.graph_walkers import LintingWalker, DfsaCollectorWalker, TablesCollectorWalker
+from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
 
@@ -521,7 +522,12 @@ class WorkflowLinter:
         linted_paths: set[Path],
     ) -> Iterable[LocatedAdvice]:
         walker = LintingWalker(
-            graph, linted_paths, self._path_lookup, task.task_key, session_state, self._migration_index
+            graph,
+            linted_paths,
+            self._path_lookup,
+            task.task_key,
+            session_state,
+            lambda: LinterContext(self._migration_index, session_state),
         )
         yield from walker
 

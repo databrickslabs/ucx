@@ -20,6 +20,7 @@ from databricks.sdk.errors import NotFound
 from databricks.sdk.service import compute, jobs, pipelines
 from databricks.sdk.service.workspace import ExportFormat, ObjectInfo, Language
 
+from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.linters.files import FileLoader, ImportFileResolver
 from databricks.labs.ucx.source_code.graph import (
     Dependency,
@@ -520,7 +521,10 @@ def test_linting_walker_populates_paths(dependency_resolver, mock_path_lookup, m
     path = mock_path_lookup.resolve(Path("functional/values_across_notebooks_dbutils_notebook_run.py"))
     root = Dependency(NotebookLoader(), path)
     xgraph = DependencyGraph(root, None, dependency_resolver, mock_path_lookup, CurrentSessionState())
-    walker = LintingWalker(xgraph, set(), mock_path_lookup, "key", CurrentSessionState(), migration_index)
+    current_session = CurrentSessionState()
+    walker = LintingWalker(
+        xgraph, set(), mock_path_lookup, "key", current_session, lambda: LinterContext(migration_index, current_session)
+    )
     advices = 0
     for advice in walker:
         advices += 1

@@ -8,9 +8,7 @@ import sys
 from typing import TextIO
 
 from databricks.labs.ucx.source_code.base import LocatedAdvice, CurrentSessionState, file_language, is_a_notebook
-from databricks.labs.ucx.source_code.python.python_ast import Tree
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader
-from databricks.labs.ucx.source_code.notebooks.sources import FileLinter
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.known import KnownList
 from databricks.sdk.service.workspace import Language
@@ -30,7 +28,7 @@ from databricks.labs.ucx.source_code.graph import (
     DependencyResolver,
     InheritedContext,
 )
-from databricks.labs.ucx.source_code.graph_walkers import DependencyGraphWalker
+from databricks.labs.ucx.source_code.graph_walkers import LintingWalker
 
 logger = logging.getLogger(__name__)
 
@@ -171,23 +169,11 @@ class LocalCodeLinter:
         problems = container.build_dependency_graph(graph)
         for problem in problems:
             yield problem.as_located_advice()
-        context_factory = self._context_factory
-        session_state = self._session_state
-
-        class LintingWalker(DependencyGraphWalker[LocatedAdvice]):
-
-            def _process_dependency(
-                self, dependency: Dependency, path_lookup: PathLookup, inherited_tree: Tree | None
-            ) -> Iterable[LocatedAdvice]:
-                ctx = context_factory()
-                # FileLinter will determine which file/notebook linter to use
-                linter = FileLinter(ctx, path_lookup, session_state, dependency.path, inherited_tree)
-                for advice in linter.lint():
-                    yield LocatedAdvice(advice, dependency.path)
-
         if linted_paths is None:
             linted_paths = set()
-        walker = LintingWalker(graph, linted_paths, self._path_lookup)
+        walker = LintingWalker(
+            graph, linted_paths, self._path_lookup, path.name, self._session_state, self._context_factory
+        )
         yield from walker
 
 
