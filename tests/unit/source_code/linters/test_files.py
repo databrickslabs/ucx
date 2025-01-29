@@ -16,12 +16,12 @@ from databricks.sdk.service.workspace import Language
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.source_code.linters.files import (
     LocalFileMigrator,
-    FileLoader,
     LocalCodeLinter,
     FolderLoader,
     ImportFileResolver,
     Folder,
 )
+from databricks.labs.ucx.source_code.files import FileLoader
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from tests.unit import locate_site_packages, _samples_path

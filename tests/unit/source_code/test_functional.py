@@ -15,7 +15,7 @@ from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigra
 from databricks.labs.ucx.source_code.base import Advice, CurrentSessionState, is_a_notebook
 from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyResolver
 from databricks.labs.ucx.source_code.linters.context import LinterContext
-from databricks.labs.ucx.source_code.linters.files import FileLoader
+from databricks.labs.ucx.source_code.files import FileLoader
 from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader
 from databricks.labs.ucx.source_code.notebooks.sources import FileLinter

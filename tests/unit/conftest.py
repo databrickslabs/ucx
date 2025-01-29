@@ -12,7 +12,8 @@ from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.tables import FasterTableScanCrawler
 from databricks.labs.ucx.source_code.graph import BaseNotebookResolver, DependencyResolver
 from databricks.labs.ucx.source_code.known import KnownList
-from databricks.labs.ucx.source_code.linters.files import ImportFileResolver, FileLoader
+from databricks.labs.ucx.source_code.linters.files import ImportFileResolver
+from databricks.labs.ucx.source_code.files import FileLoader
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.sdk import AccountClient
