@@ -30,7 +30,7 @@ def test_file_loader_loads_non_ascii_file(mock_path_lookup) -> None:
     assert Path("nonascii.py") in mock_path_lookup.successfully_resolved_paths
 
 
-def test_file_loader_loads_non_existing_file(migration_index) -> None:
+def test_file_loader_loads_non_existing_file() -> None:
     path = create_autospec(Path)
     path.suffix = ".py"
     path.open.side_effect = FileNotFoundError("No such file or directory: 'test.py'")
@@ -46,7 +46,7 @@ def test_file_loader_loads_non_existing_file(migration_index) -> None:
     path_lookup.resolve.assert_called_once_with(path)
 
 
-def test_file_loader_loads_file_without_permission(migration_index, mock_path_lookup) -> None:
+def test_file_loader_loads_file_without_permission() -> None:
     path = create_autospec(Path)
     path.suffix = ".py"
     path.open.side_effect = PermissionError("Permission denied")
@@ -84,4 +84,18 @@ def test_file_loader_loads_file_with_bom(tmp_path, bom, encoding) -> None:
     # TODO: Test specific error while loading: https://github.com/databrickslabs/ucx/issues/3584
     assert isinstance(local_file, LocalFile)
     assert local_file.content == "a = 12"
+    path_lookup.resolve.assert_called_once_with(path)
+
+
+def test_file_loader_loads_empty_file(tmp_path) -> None:
+    path = tmp_path / "empty.py"
+    path.write_text("")
+    dependency = Dependency(FileLoader(), path)
+    path_lookup = create_autospec(PathLookup)
+    path_lookup.resolve.return_value = path
+
+    local_file = dependency.load(path_lookup)
+
+    # TODO: Test specific error while loading: https://github.com/databrickslabs/ucx/issues/3584
+    assert local_file
     path_lookup.resolve.assert_called_once_with(path)

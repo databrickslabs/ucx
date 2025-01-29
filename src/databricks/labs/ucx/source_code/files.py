@@ -87,7 +87,7 @@ class FileLoader(DependencyLoader):
         if not language:
             return StubContainer(resolved_path)
         content = safe_read_text(resolved_path)
-        if not content:
+        if content is None:
             return None
         return LocalFile(resolved_path, content, language)
 
