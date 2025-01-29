@@ -45,7 +45,7 @@ class FromTableSqlLinter(SqlLinter, Fixer, TableSqlCollector):
         self._session_state: CurrentSessionState = session_state
 
     @property
-    def name(self) -> str:
+    def diagnostic_code(self) -> str:
         return 'table-migrate'
 
     @property

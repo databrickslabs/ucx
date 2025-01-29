@@ -161,7 +161,8 @@ class Fixer(ABC):
 
     @property
     @abstractmethod
-    def name(self) -> str: ...
+    def diagnostic_code(self) -> str:
+        """The diagnostic code that this fixer fixes."""
 
     @abstractmethod
     def apply(self, code: str) -> str: ...

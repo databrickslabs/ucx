@@ -400,9 +400,9 @@ class SparkTableNamePyLinter(PythonLinter, Fixer, TablePyCollector):
         self._spark_matchers = SparkTableNameMatchers(False).matchers
 
     @property
-    def name(self) -> str:
+    def diagnostic_code(self) -> str:
         # this is the same fixer, just in a different language context
-        return self._from_table.name
+        return self._from_table.diagnostic_code
 
     def lint_tree(self, tree: Tree) -> Iterable[Advice]:
         for node in tree.walk():
@@ -468,8 +468,8 @@ class SparkSqlPyLinter(_SparkSqlAnalyzer, PythonLinter, Fixer):
         self._sql_fixer = sql_fixer
 
     @property
-    def name(self) -> str:
-        return "<none>" if self._sql_fixer is None else self._sql_fixer.name
+    def diagnostic_code(self) -> str:
+        return "<none>" if self._sql_fixer is None else self._sql_fixer.diagnostic_code
 
     def lint_tree(self, tree: Tree) -> Iterable[Advice]:
         for call_node, query in self._visit_call_nodes(tree):

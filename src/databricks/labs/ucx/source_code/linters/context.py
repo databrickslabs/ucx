@@ -115,7 +115,7 @@ class LinterContext:
         if language not in self._fixers:
             return None
         for fixer in self._fixers[language]:
-            if fixer.name == diagnostic_code:
+            if fixer.diagnostic_code == diagnostic_code:
                 return fixer
         return None
 
