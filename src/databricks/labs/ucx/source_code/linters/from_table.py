@@ -46,7 +46,8 @@ class FromTableSqlLinter(SqlLinter, Fixer, TableSqlCollector):
 
     @property
     def diagnostic_code(self) -> str:
-        return 'table-migrate'
+        """The diagnostic codes that this fixer fixes."""
+        return "table-migrated-to-uc-sql"
 
     @property
     def schema(self) -> str:
@@ -58,7 +59,7 @@ class FromTableSqlLinter(SqlLinter, Fixer, TableSqlCollector):
             if not dst:
                 return
             yield Deprecation(
-                code='table-migrated-to-uc',
+                code="table-migrated-to-uc-sql",
                 message=f"Table {info.schema_name}.{info.table_name} is migrated to {dst.destination()} in Unity Catalog",
                 # SQLGlot does not propagate tokens yet. See https://github.com/tobymao/sqlglot/issues/3159
                 start_line=0,

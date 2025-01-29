@@ -19,7 +19,7 @@ def test_migrated_tables_trigger_messages(migration_index) -> None:
 
     assert [
         Deprecation(
-            code='table-migrated-to-uc',
+            code='table-migrated-to-uc-sql',
             message='Table old.things is migrated to brand.new.stuff in Unity Catalog',
             start_line=0,
             start_col=0,
@@ -27,7 +27,7 @@ def test_migrated_tables_trigger_messages(migration_index) -> None:
             end_col=1024,
         ),
         Deprecation(
-            code='table-migrated-to-uc',
+            code='table-migrated-to-uc-sql',
             message='Table other.matters is migrated to some.certain.issues in Unity Catalog',
             start_line=0,
             start_col=0,
