@@ -11,7 +11,6 @@ from astroid import Module, NodeNG  # type: ignore
 
 from databricks.sdk.service.workspace import Language
 
-from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.source_code.base import (
     file_language,
     is_a_notebook,
@@ -19,7 +18,6 @@ from databricks.labs.ucx.source_code.base import (
     read_text,
     Advice,
     Advisory,
-    CurrentSessionState,
     Failure,
     Linter,
 )
@@ -337,13 +335,11 @@ class FileLinter:
         path: Path,
         path_lookup: PathLookup,
         context: LinterContext,
-        session_state: CurrentSessionState,
         inherited_tree: Tree | None = None,
         content: str | None = None,
     ):
         self._context = context
         self._path_lookup = path_lookup
-        self._session_state = session_state
         self._path = path
         self._inherited_tree = inherited_tree
         self._content = content

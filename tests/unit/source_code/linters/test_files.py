@@ -128,7 +128,7 @@ def local_code_linter(mock_path_lookup, migration_index):
         mock_path_lookup,
         session_state,
         resolver,
-        lambda: LinterContext(migration_index),
+        lambda: LinterContext(migration_index, session_state),
     )
 
 

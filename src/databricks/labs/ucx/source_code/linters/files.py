@@ -172,7 +172,6 @@ class LocalCodeLinter:
         for problem in problems:
             yield problem.as_located_advice()
         context_factory = self._context_factory
-        session_state = self._session_state
 
         class LintingWalker(DependencyGraphWalker[LocatedAdvice]):
 
@@ -181,7 +180,7 @@ class LocalCodeLinter:
             ) -> Iterable[LocatedAdvice]:
                 ctx = context_factory()
                 # FileLinter will determine which file/notebook linter to use
-                linter = FileLinter(dependency.path, path_lookup, ctx, session_state, inherited_tree)
+                linter = FileLinter(dependency.path, path_lookup, ctx, inherited_tree)
                 for advice in linter.lint():
                     yield LocatedAdvice(advice, dependency.path)
 

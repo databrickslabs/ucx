@@ -182,7 +182,7 @@ class KnownList:
         logger.info(f"Processing module: {module_ref}")
         session_state = CurrentSessionState()
         ctx = LinterContext(empty_index, session_state)
-        linter = FileLinter(module_path, PathLookup.from_sys_path(module_path.parent), ctx, session_state)
+        linter = FileLinter(module_path, PathLookup.from_sys_path(module_path.parent), ctx)
         known_problems = set()
         for problem in linter.lint():
             known_problems.add(KnownProblem(problem.code, problem.message))
