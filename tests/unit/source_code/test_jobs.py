@@ -26,7 +26,8 @@ from databricks.labs.ucx.source_code.graph import (
     DependencyGraph,
     DependencyResolver,
 )
-from databricks.labs.ucx.source_code.jobs import JobProblem, WorkflowLinter, WorkflowTaskContainer, LintingWalker
+from databricks.labs.ucx.source_code.jobs import JobProblem, WorkflowLinter, WorkflowTaskContainer
+from databricks.labs.ucx.source_code.graph_walkers import LintingWalker
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
 from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
 

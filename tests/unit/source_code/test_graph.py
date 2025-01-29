@@ -10,8 +10,8 @@ from databricks.labs.ucx.source_code.graph import (
     DependencyGraph,
     DependencyProblem,
     InheritedContext,
-    DependencyGraphWalker,
 )
+from databricks.labs.ucx.source_code.graph_walkers import DependencyGraphWalker
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.python.python_ast import Tree

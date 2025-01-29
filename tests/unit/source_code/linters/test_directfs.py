@@ -6,7 +6,7 @@ import pytest
 
 from databricks.labs.ucx.source_code.base import Deprecation, Advice, CurrentSessionState, Failure, DirectFsAccess
 from databricks.labs.ucx.source_code.graph import DependencyGraph
-from databricks.labs.ucx.source_code.jobs import DfsaCollectorWalker
+from databricks.labs.ucx.source_code.graph_walkers import DfsaCollectorWalker
 from databricks.labs.ucx.source_code.linters.directfs import (
     DIRECT_FS_ACCESS_PATTERNS,
     DirectFsAccessPyLinter,

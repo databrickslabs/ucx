@@ -29,8 +29,8 @@ from databricks.labs.ucx.source_code.graph import (
     SourceContainer,
     DependencyResolver,
     InheritedContext,
-    DependencyGraphWalker,
 )
+from databricks.labs.ucx.source_code.graph_walkers import DependencyGraphWalker
 
 logger = logging.getLogger(__name__)
 
