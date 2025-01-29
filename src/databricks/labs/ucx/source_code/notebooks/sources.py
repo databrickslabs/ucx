@@ -138,17 +138,17 @@ class NotebookLinter:
         source: str,
         default_language: Language,
     ) -> NotebookLinter:
-        ctx = LinterContext(index)
+        context = LinterContext(index)
         notebook = Notebook.parse(Path(""), source, default_language)
         assert notebook is not None
-        return cls(ctx, path_lookup, session_state, notebook)
+        return cls(notebook, path_lookup, context, session_state)
 
     def __init__(
         self,
-        context: LinterContext,
-        path_lookup: PathLookup,
-        session_state: CurrentSessionState,
         notebook: Notebook,
+        path_lookup: PathLookup,
+        context: LinterContext,
+        session_state: CurrentSessionState,
         inherited_tree: Tree | None = None,
     ):
         self._context: LinterContext = context
@@ -432,10 +432,6 @@ class FileLinter:
             return
         notebook = Notebook.parse(self._path, self._content, language)
         notebook_linter = NotebookLinter(
-            self._context,
-            self._path_lookup,
-            self._session_state,
-            notebook,
-            self._inherited_tree,
+            notebook, self._path_lookup, self._context, self._session_state, self._inherited_tree
         )
         yield from notebook_linter.lint()
