@@ -488,14 +488,31 @@ _MISSING_SOURCE_PATH = Path("<MISSING_SOURCE_PATH>")
 
 @dataclass
 class DependencyProblem:
+    """A problem found with the dependency.
+
+    The line and column indexing is 0-based.
+    """
+
     code: str
+    """Unique code to identify the problem type."""
+
     message: str
+    """A message detailing the problem."""
+
     source_path: Path = _MISSING_SOURCE_PATH
-    # Lines and columns are both 0-based: the first line is line 0.
+    """The path to the problem"""
+
     start_line: int = -1
+    """The line where the problem starts when reading source code."""
+
     start_col: int = -1
+    """The column where the problem starts when reading source code."""
+
     end_line: int = -1
+    """The line where the problem ends when reading source code."""
+
     end_col: int = -1
+    """The column where the problem ends when reading source code."""
 
     def has_path_missing(self) -> bool:
         """Flag if the path is missing, or not."""
