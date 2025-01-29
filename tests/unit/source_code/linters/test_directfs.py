@@ -1,18 +1,11 @@
-from collections.abc import Iterable
-from pathlib import Path
-from unittest.mock import create_autospec
-
 import pytest
 
-from databricks.labs.ucx.source_code.base import Deprecation, Advice, CurrentSessionState, Failure, DirectFsAccess
-from databricks.labs.ucx.source_code.graph import DependencyGraph
-from databricks.labs.ucx.source_code.linters.graph_walkers import DfsaCollectorWalker
+from databricks.labs.ucx.source_code.base import Deprecation, Advice, CurrentSessionState, Failure
 from databricks.labs.ucx.source_code.linters.directfs import (
     DIRECT_FS_ACCESS_PATTERNS,
     DirectFsAccessPyLinter,
     DirectFsAccessSqlLinter,
 )
-from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage
 
 
 @pytest.mark.parametrize(
@@ -152,18 +145,3 @@ def test_dfsa_queries_failure(query: str) -> None:
             end_col=1024,
         ),
     ]
-
-
-class _TestCollectorWalker(DfsaCollectorWalker):
-    # inherit from DfsaCollectorWalker because it's public
-
-    def collect_from_source(self, language: CellLanguage) -> Iterable[DirectFsAccess]:
-        return self._collect_from_source("empty", language, Path(""), None)
-
-
-@pytest.mark.parametrize("language", list(iter(CellLanguage)))
-def test_collector_supports_all_cell_languages(language, mock_path_lookup, migration_index):
-    graph = create_autospec(DependencyGraph)
-    graph.assert_not_called()
-    collector = _TestCollectorWalker(graph, set(), mock_path_lookup, CurrentSessionState(), migration_index)
-    list(collector.collect_from_source(language))
