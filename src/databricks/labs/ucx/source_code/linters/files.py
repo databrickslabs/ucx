@@ -150,9 +150,8 @@ class LocalCodeLinter:
             )
             path = Path(response)
         located_advices = list(self.lint_path(path))
-        for located in located_advices:
-            message = located.message_relative_to(path)
-            stdout.write(f"{message}\n")
+        for located_advice in located_advices:
+            stdout.write(f"{located_advice}\n")
         return located_advices
 
     def lint_path(self, path: Path, linted_paths: set[Path] | None = None) -> Iterable[LocatedAdvice]:

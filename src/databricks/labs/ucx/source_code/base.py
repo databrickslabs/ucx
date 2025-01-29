@@ -105,20 +105,6 @@ class LocatedAdvice:
         """Flag if the path is missing, or not."""
         return self.path == Path("<MISSING_SOURCE_PATH>")  # Reusing flag from DependencyProblem
 
-    def message_relative_to(self, base: Path, *, default: Path | None = None) -> str:
-        advice = self.advice
-        path = self.path
-        if self.has_missing_path():
-            logger.debug(f'THIS IS A BUG! {advice.code}:{advice.message} has unknown path')
-        if default is not None:
-            path = default
-        try:
-            path = path.relative_to(base)
-        except ValueError:
-            logger.debug(f'Not a relative path: {path} to base: {base}')
-        # increment start_line because it is 0-based whereas IDEs are usually 1-based
-        return f"./{path.as_posix()}:{advice.start_line+1}:{advice.start_col}: [{advice.code}] {advice.message}"
-
 
 class Advisory(Advice):
     """A warning that does not prevent the code from running."""
