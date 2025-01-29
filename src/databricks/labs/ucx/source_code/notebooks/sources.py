@@ -129,15 +129,6 @@ class NotebookLinter:
     to the code cells according to the language of the cell.
     """
 
-    @classmethod
-    def from_source(
-        cls, index: TableMigrationIndex, path_lookup: PathLookup, source: str, default_language: Language
-    ) -> NotebookLinter:
-        context = LinterContext(index)
-        notebook = Notebook.parse(Path(""), source, default_language)
-        assert notebook is not None
-        return cls(notebook, path_lookup, context)
-
     def __init__(
         self, notebook: Notebook, path_lookup: PathLookup, context: LinterContext, inherited_tree: Tree | None = None
     ):
@@ -295,10 +286,6 @@ class NotebookLinter:
         if language is Language.PYTHON:
             return self._python_linter
         return self._context.linter(language)
-
-    @staticmethod
-    def name() -> str:
-        return "notebook-linter"
 
 
 class FileLinter:
