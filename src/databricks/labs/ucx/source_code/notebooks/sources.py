@@ -365,7 +365,7 @@ class FileLinter:
         inherited_tree: Tree | None = None,
         content: str | None = None,
     ):
-        self._ctx: LinterContext = context
+        self._context = context
         self._path_lookup = path_lookup
         self._session_state = session_state
         self._path = path
@@ -416,7 +416,7 @@ class FileLinter:
                 yield Failure("unknown-language", f"Cannot detect language for {self._path}", 0, 0, 1, 1)
         else:
             try:
-                linter = self._ctx.linter(language)
+                linter = self._context.linter(language)
                 if self._inherited_tree is not None and isinstance(linter, PythonSequentialLinter):
                     linter.append_tree(self._inherited_tree)
                 yield from linter.lint(self._content)
@@ -432,7 +432,7 @@ class FileLinter:
             return
         notebook = Notebook.parse(self._path, self._content, language)
         notebook_linter = NotebookLinter(
-            self._ctx,
+            self._context,
             self._path_lookup,
             self._session_state,
             notebook,
