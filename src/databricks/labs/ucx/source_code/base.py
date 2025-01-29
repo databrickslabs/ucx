@@ -90,8 +90,13 @@ class Advice:
 
 @dataclass
 class LocatedAdvice:
+    """The advice with a path location."""
+
     advice: Advice
+    """The advice"""
+
     path: Path
+    """The path location"""
 
     @property
     def is_unknown(self) -> bool:
