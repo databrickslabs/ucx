@@ -1,7 +1,7 @@
 import dataclasses
+from pathlib import Path
 
 import pytest
-from pathlib import Path
 
 from databricks.labs.ucx.source_code.base import (
     Advice,

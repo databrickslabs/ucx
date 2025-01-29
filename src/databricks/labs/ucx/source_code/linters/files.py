@@ -171,8 +171,7 @@ class LocalCodeLinter:
         assert container is not None  # because we just created it
         problems = container.build_dependency_graph(graph)
         for problem in problems:
-            problem_path = Path('UNKNOWN') if problem.is_path_missing() else problem.source_path.absolute()
-            yield problem.as_advisory().for_path(problem_path)
+            yield problem.as_located_advice()
         context_factory = self._context_factory
         session_state = self._session_state
 

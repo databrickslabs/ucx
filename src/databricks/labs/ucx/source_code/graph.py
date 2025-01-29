@@ -12,7 +12,13 @@ from typing import TypeVar, Generic
 from astroid import (  # type: ignore
     NodeNG,
 )
-from databricks.labs.ucx.source_code.base import Advice, Advisory, CurrentSessionState, LineageAtom, LocatedAdvice, is_a_notebook
+from databricks.labs.ucx.source_code.base import (
+    Advisory,
+    CurrentSessionState,
+    LineageAtom,
+    LocatedAdvice,
+    is_a_notebook,
+)
 from databricks.labs.ucx.source_code.python.python_ast import Tree
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
