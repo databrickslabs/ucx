@@ -913,7 +913,12 @@ def migrate_dlt_pipelines(
     a: AccountClient | None = None,
     **named_parameters,
 ) -> None:
-    """Migrate DLT pipelines to UC"""
+    """
+        Migrate DLT pipelines to UC that were crawled in the assessment workflow
+        Flags
+        -- include-pipeline-ids: Comma separated list of pipeline ids to migrate
+        -- exclude-pipeline-ids: Comma separated list of pipeline ids to exclude from migration
+    """
     if ctx:
         workspace_contexts = [ctx]
     else:
