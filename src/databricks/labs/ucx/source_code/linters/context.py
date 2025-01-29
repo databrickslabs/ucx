@@ -34,6 +34,8 @@ from databricks.labs.ucx.source_code.linters.from_table import FromTableSqlLinte
 
 
 class LinterContext:
+    """The context for accessing linter resources."""
+
     def __init__(
         self,
         index: TableMigrationIndex | None = None,
