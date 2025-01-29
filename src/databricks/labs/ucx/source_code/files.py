@@ -6,7 +6,7 @@ from pathlib import Path
 
 from databricks.sdk.service.workspace import Language
 
-from databricks.labs.ucx.source_code.base import file_language
+from databricks.labs.ucx.source_code.base import file_language, safe_read_text
 from databricks.labs.ucx.source_code.graph import (
     SourceContainer,
     DependencyGraph,
@@ -29,10 +29,6 @@ class LocalFile(SourceContainer):
         self._path = path
         self._original_code = source
         self.language = language
-
-    @property
-    def path(self) -> Path:
-        return self._path
 
     @property
     def content(self) -> str:
@@ -80,20 +76,20 @@ class StubContainer(SourceContainer):
 
 
 class FileLoader(DependencyLoader):
-    def load_dependency(self, path_lookup: PathLookup, dependency: Dependency) -> SourceContainer | None:
-        absolute_path = path_lookup.resolve(dependency.path)
-        if not absolute_path:
+    """Loader for a file dependency."""
+
+    def load_dependency(self, path_lookup: PathLookup, dependency: Dependency) -> LocalFile | StubContainer | None:
+        """Load the dependency."""
+        resolved_path = path_lookup.resolve(dependency.path)
+        if not resolved_path:
             return None
-        language = file_language(absolute_path)
+        language = file_language(resolved_path)
         if not language:
-            return StubContainer(absolute_path)
-        for encoding in ("utf-8", "ascii"):
-            try:
-                code = absolute_path.read_text(encoding)
-                return LocalFile(absolute_path, code, language)
-            except UnicodeDecodeError:
-                pass
-        return None
+            return StubContainer(resolved_path)
+        content = safe_read_text(resolved_path)
+        if not content:
+            return None
+        return LocalFile(resolved_path, content, language)
 
     def exists(self, path: Path) -> bool:
         return path.exists()
