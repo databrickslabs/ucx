@@ -911,12 +911,13 @@ def migrate_dlt_pipelines(
     ctx: WorkspaceContext | None = None,
     run_as_collection: bool = False,
     a: AccountClient | None = None,
+    **named_parameters
 ) -> None:
     """Migrate DLT pipelines to UC"""
     if ctx:
         workspace_contexts = [ctx]
     else:
-        workspace_contexts = _get_workspace_contexts(w, a, run_as_collection)
+        workspace_contexts = _get_workspace_contexts(w, a, run_as_collection, **named_parameters)
 
     for workspace_context in workspace_contexts:
         workspace_context.pipelines_migrator.migrate_pipelines()
