@@ -28,15 +28,14 @@ class LocalFile(SourceContainer):
     def __init__(self, path: Path, source: str, language: Language):
         self._path = path
         self._original_code = source
-        # using CellLanguage so we can reuse the facilities it provides
-        self._language = CellLanguage.of_language(language)
+        self.language = language
 
     @property
     def path(self) -> Path:
         return self._path
 
     def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
-        if self._language is CellLanguage.PYTHON:
+        if self.language == Language.PYTHON:
             context = parent.new_dependency_graph_context()
             analyzer = PythonCodeAnalyzer(context, self._original_code)
             problems = analyzer.build_graph()
@@ -45,13 +44,13 @@ class LocalFile(SourceContainer):
                     problems[idx] = dataclasses.replace(problem, source_path=self._path)
             return problems
         # supported language that does not generate dependencies
-        if self._language is CellLanguage.SQL:
+        if self.language == Language.SQL:
             return []
-        logger.warning(f"Unsupported language: {self._language.language}")
+        logger.warning(f"Unsupported language: {self.language}")
         return []
 
     def build_inherited_context(self, graph: DependencyGraph, child_path: Path) -> InheritedContext:
-        if self._language is CellLanguage.PYTHON:
+        if self.language == CellLanguage.PYTHON:
             context = graph.new_dependency_graph_context()
             analyzer = PythonCodeAnalyzer(context, self._original_code)
             inherited = analyzer.build_inherited_context(child_path)
