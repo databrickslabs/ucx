@@ -234,3 +234,9 @@ def test_dependency_problem_as_located_advice() -> None:
     problem = DependencyProblem("code", "message")
     located_advice = problem.as_located_advice()
     assert located_advice == LocatedAdvice(Advisory("code", "message", -1, -1, -1, -1), problem.source_path)
+
+
+def test_dependency_problem_as_located_advice_has_path_missing_by_default() -> None:
+    problem = DependencyProblem("code", "message")
+    located_advice = problem.as_located_advice()
+    assert located_advice.has_path_missing()

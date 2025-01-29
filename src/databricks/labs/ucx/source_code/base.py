@@ -98,9 +98,9 @@ class LocatedAdvice:
     path: Path
     """The path location"""
 
-    @property
-    def is_unknown(self) -> bool:
-        return self.path == Path('UNKNOWN')
+    def has_path_missing(self) -> bool:
+        """Flag if the path is missing, or not."""
+        return self.path == Path("<MISSING_SOURCE_PATH>")  # Reusing flag from DependencyProblem
 
     @property
     def message(self) -> str:
@@ -109,7 +109,7 @@ class LocatedAdvice:
     def message_relative_to(self, base: Path, *, default: Path | None = None) -> str:
         advice = self.advice
         path = self.path
-        if self.is_unknown:
+        if self.has_path_missing():
             logger.debug(f'THIS IS A BUG! {advice.code}:{advice.message} has unknown path')
         if default is not None:
             path = default

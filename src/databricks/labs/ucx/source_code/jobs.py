@@ -474,7 +474,7 @@ class WorkflowLinter:
             if not advices:
                 advices = self._lint_task(task, graph, session_state, linted_paths)
             for advice in advices:
-                absolute_path = advice.path.absolute().as_posix() if advice.path != self._UNKNOWN else 'UNKNOWN'
+                absolute_path = "UNKNOWN" if advice.has_path_missing() else advice.path.absolute().as_posix()
                 job_problem = JobProblem(
                     job_id=job.job_id,
                     job_name=job.settings.name,

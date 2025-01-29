@@ -69,7 +69,7 @@ class LocalFile(SourceContainer):
             inherited = analyzer.build_inherited_context(child_path)
             problems = list(inherited.problems)
             for idx, problem in enumerate(problems):
-                if problem.is_path_missing():
+                if problem.has_path_missing():
                     problems[idx] = dataclasses.replace(problem, source_path=self._path)
             return dataclasses.replace(inherited, problems=problems)
         return InheritedContext(None, False, [])
