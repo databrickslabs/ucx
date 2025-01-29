@@ -131,29 +131,18 @@ class NotebookLinter:
 
     @classmethod
     def from_source(
-        cls,
-        index: TableMigrationIndex,
-        path_lookup: PathLookup,
-        session_state: CurrentSessionState,
-        source: str,
-        default_language: Language,
+        cls, index: TableMigrationIndex, path_lookup: PathLookup, source: str, default_language: Language
     ) -> NotebookLinter:
         context = LinterContext(index)
         notebook = Notebook.parse(Path(""), source, default_language)
         assert notebook is not None
-        return cls(notebook, path_lookup, context, session_state)
+        return cls(notebook, path_lookup, context)
 
     def __init__(
-        self,
-        notebook: Notebook,
-        path_lookup: PathLookup,
-        context: LinterContext,
-        session_state: CurrentSessionState,
-        inherited_tree: Tree | None = None,
+        self, notebook: Notebook, path_lookup: PathLookup, context: LinterContext, inherited_tree: Tree | None = None
     ):
         self._context: LinterContext = context
         self._path_lookup = path_lookup
-        self._session_state = session_state
         self._notebook: Notebook = notebook
         # reuse Python linter across related files and notebook cells
         # this is required in order to accumulate statements for improved inference
@@ -212,7 +201,7 @@ class NotebookLinter:
         # look for child notebooks (and sys.path changes that might affect their loading)
         base_nodes: list[NodeBase] = []
         base_nodes.extend(self._list_run_magic_lines(tree))
-        base_nodes.extend(SysPathChange.extract_from_tree(self._session_state, tree))
+        base_nodes.extend(SysPathChange.extract_from_tree(self._context.session_state, tree))
         if len(base_nodes) == 0:
             self._python_linter.append_tree(tree)
             return
@@ -431,7 +420,5 @@ class FileLinter:
             yield Failure("unknown-language", f"Cannot detect language for {self._path}", 0, 0, 1, 1)
             return
         notebook = Notebook.parse(self._path, self._content, language)
-        notebook_linter = NotebookLinter(
-            notebook, self._path_lookup, self._context, self._session_state, self._inherited_tree
-        )
+        notebook_linter = NotebookLinter(notebook, self._path_lookup, self._context, self._inherited_tree)
         yield from notebook_linter.lint()
