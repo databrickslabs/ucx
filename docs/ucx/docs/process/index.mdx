@@ -336,7 +336,7 @@ Upon the first update, the cloned pipeline will copy over all the data and check
     - Kafka where `kafka.group.id` is not set
     - Kinesis where `consumerMode` is not "efo"
 - Maintenance is automatically paused (for both pipelines) while migration is in progress
-- If an Autoloader source specifies an explicit cloudFiles.schemaLocation, mergeSchema needs to be set to true for the HMS original and UC clone to operate concurrently.
+- If an Autoloader source specifies an explicit `cloudFiles.schemaLocation`, `mergeSchema` needs to be set to true for the HMS original and UC clone to operate concurrently.
 - Pipelines that publish tables to custom schemas are not supported.
 - On tables cloned to UC, time travel queries are undefined when querying by timestamp to versions originally written on HMS. Time travel queries by version will work correctly, as will time travel queries by timestamp to versions written on UC.
 - [All existing limitations](https://docs.databricks.com/en/delta-live-tables/unity-catalog.html#limitations) of using DLT on UC.
