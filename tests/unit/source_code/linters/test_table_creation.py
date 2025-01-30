@@ -8,7 +8,6 @@ from databricks.labs.ucx.source_code.linters.table_creation import DBRv8d0PyLint
 
 METHOD_NAMES = [
     "writeTo",
-    "table",
     "saveAsTable",
 ]
 ASSIGN = [True, False]
@@ -80,18 +79,21 @@ def test_no_format(migration_index, method_name, assign) -> None:
 
 
 @pytest.mark.parametrize(
-    "params",
+    "statement",
     [
-        {"stmt": 'spark.foo().bar().table().baz()', "expected": False},
-        {"stmt": 'spark.foo().bar().table("catalog.db.table").baz()', "expected": True},
-        {"stmt": 'spark.foo().bar().table("catalog.db.table", "xyz").baz()', "expected": False},
-        {"stmt": 'spark.foo().bar().table("catalog.db.table", fmt="xyz").baz()', "expected": False},
+        "spark.foo().bar().table().baz()",
+        "spark.foo().bar().table('catalog.db.table').baz()",
+        "spark.foo().bar().table('catalog.db.table', 'xyz').baz()",
+        "spark.foo().bar().table('catalog.db.table', fmt='xyz').baz()",
     ],
 )
-def test_no_format_args_count(migration_index, params) -> None:
-    """Tests that the number of arguments to table creation call is considered in matching"""
-    old_code = get_code(False, params["stmt"])
-    assert (not params["expected"]) == (not lint(old_code))
+def test_reading_table_yields_no_advice(statement: str) -> None:
+    """Tests that reading a table with `.table()` does not yield an advice.
+
+    Regression test kept for false positive advice on default table format change when reading a table.
+    """
+    old_code = get_code(False, statement)
+    assert not lint(old_code)
 
 
 @pytest.mark.parametrize("assign", ASSIGN)
@@ -118,7 +120,7 @@ def test_has_format_arg_none(migration_index, assign) -> None:
 @pytest.mark.parametrize("dbr_version", DBR_VERSIONS)
 def test_dbr_version_filter(migration_index, dbr_version) -> None:
     """Tests the DBR version cutoff filter"""
-    old_code = get_code(False, 'spark.foo().bar().table("catalog.db.table").baz()')
-    expected = [] if dbr_version["suppress"] else [get_advice(False, 'table', 18)]
+    old_code = get_code(False, 'spark.foo().bar().writeTo("catalog.db.table").baz()')
+    expected = [] if dbr_version["suppress"] else [get_advice(False, 'writeTo', 18)]
     actual = lint(old_code, dbr_version["version"])
     assert actual == expected
