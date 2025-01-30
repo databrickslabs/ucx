@@ -9,7 +9,8 @@ On a high level, the steps in migration process are:
 2. [group migration](/docs/reference/workflows#group-migration-workflow)
 3. [table migration](/docs/process/#table-migration-process)
 4. [data reconciliation](/docs/reference/workflows#post-migration-data-reconciliation-workflow)
-5. [code migration](/docs/reference/commands#code-migration-commands)
+5. [code migration](#code-migration)
+6. [final details](#final-details)
 
 The migration process can be schematic visualized as:
 
@@ -287,4 +288,26 @@ databricks labs ucx revert-migrated-tables --schema X --table Y [--delete-manage
 The [`revert-migrated-tables` command](/docs/reference/commands#revert-migrated-tables) drops the Unity Catalog table or view and reset
 the `upgraded_to` property on the source object. Use this command to allow for migrating a table or view again.
 
+## Code Migration
 
+After you're done with the [table migration](#table-migration-process) and
+[data reconciliation](/docs/reference/workflows#post-migration-data-reconciliation-workflow), you can proceed with code
+migration.
+
+Before migrating code, use the linter to investigate what should be changed to become Unity Catalog compatible:
+- The `assessment` and `migration-progress` [dashboards](/docs/reference/dashboards) show details on
+  linted workspace resources.
+- [`lint-local-code` command](/docs/reference/commands#lint-local-code) lints code on your local file system.
+
+The [linter advices show codes and messages](/docs/reference/linter_codes) on the detected compatability issues and how
+to resolve them.
+
+After investigating the code linter advices, code can be migrated. We recommend to:
+- Use the [`migration-progress` dashboard](/docs/reference/dashboards) to prioritize and track resource migration.
+- Use the [`migrate-` commands`](/docs/reference/commands#code-migration-commands) to migrate resources.
+- Set the [default catalog](https://docs.databricks.com/en/catalogs/default.html) to Unity Catalog.
+
+## Final details
+
+Once you're done with the [code migration](#code-migration), you can run the:
+- [`cluster-remap` command](/docs/reference/commands#cluster-remap) to remap the clusters to be UC compatible.
