@@ -4,7 +4,7 @@ from unittest.mock import Mock, create_autospec
 import pytest
 from databricks.labs.blueprint.tui import MockPrompts
 
-from databricks.labs.ucx.source_code.base import CurrentSessionState, LocatedAdvice, Advice
+from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.graph import DependencyResolver, SourceContainer
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
 from databricks.labs.ucx.source_code.notebooks.migrator import NotebookMigrator
@@ -147,19 +147,7 @@ def test_linter_lints_children_in_context(mock_path_lookup, local_code_linter) -
     paths: set[Path] = set()
     advices = list(local_code_linter.lint_path(path, paths))
     assert len(paths) == 3
-    assert advices == [
-        LocatedAdvice(
-            advice=Advice(
-                code='default-format-changed-in-dbr8',
-                message='The default format changed in Databricks Runtime 8.0, from Parquet to Delta',
-                start_line=3,
-                start_col=0,
-                end_line=3,
-                end_col=33,
-            ),
-            path=path / "child.py",
-        )
-    ]
+    assert not advices
 
 
 def test_triple_dot_import() -> None:

@@ -97,6 +97,7 @@ class NoFormatPythonLinter:
 
 class DBRv8d0PyLinter(PythonLinter):
     """Performs Python linting for backwards incompatible changes in DBR version 8.0.
+
     Specifically, it yields advice for table-creation with implicit format.
     """
 
@@ -106,10 +107,13 @@ class DBRv8d0PyLinter(PythonLinter):
         version_cutoff = (8, 0)
         self._skip_dbr = dbr_version is not None and dbr_version >= version_cutoff
 
+        # A more precise match would check if the method names come from their respective parent classes. However, given
+        # the (current) uniqueness of the names within the Spark module it is not required (yet).
         self._linter = NoFormatPythonLinter(
             [
+                # https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.DataFrame.writeTo.html
                 NoFormatPythonMatcher("writeTo", 1, 1),
-                NoFormatPythonMatcher("table", 1, 1),
+                # https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.DataFrameWriter.saveAsTable.html
                 NoFormatPythonMatcher("saveAsTable", 1, 4, 2, "format"),
             ]
         )
