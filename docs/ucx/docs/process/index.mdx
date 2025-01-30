@@ -331,7 +331,7 @@ Upon the first update, the cloned pipeline will copy over all the data and check
 - HMS pipelines must currently be publishing tables to some target schema.
 - Only the following streaming sources are supported:
     - Delta
-    - Autoloader
+    - [Autoloader](https://docs.databricks.com/en/ingestion/cloud-object-storage/auto-loader/index.html)
         - If your pipeline uses Autoloader with file notification events, do not run the original HMS pipeline after cloning as this will cause some file notification events to be dropped from the UC clone. If the HMS original was started accidentally, missed files can be backfilled by using the `cloudFiles.backfillInterval` option in Autoloader.
     - Kafka where `kafka.group.id` is not set
     - Kinesis where `consumerMode` is not "efo"
