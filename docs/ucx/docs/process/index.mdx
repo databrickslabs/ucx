@@ -335,7 +335,7 @@ Upon the first update, the cloned pipeline will copy over all the data and check
         - If your pipeline uses Autoloader with file notification events, do not run the original HMS pipeline after cloning as this will cause some file notification events to be dropped from the UC clone. If the HMS original was started accidentally, missed files can be backfilled by using the `cloudFiles.backfillInterval` option in Autoloader.
     - Kafka where `kafka.group.id` is not set
     - Kinesis where `consumerMode` is not "efo"
-- Maintenance is automatically paused (for both pipelines) while migration is in progress
+- [Maintenance](https://docs.databricks.com/en/delta-live-tables/index.html#maintenance-tasks-performed-by-delta-live-tables) is automatically paused (for both pipelines) while migration is in progress
 - If an Autoloader source specifies an explicit `cloudFiles.schemaLocation`, `mergeSchema` needs to be set to true for the HMS original and UC clone to operate concurrently.
 - Pipelines that publish tables to custom schemas are not supported.
 - On tables cloned to UC, time travel queries are undefined when querying by timestamp to versions originally written on HMS. Time travel queries by version will work correctly, as will time travel queries by timestamp to versions written on UC.
