@@ -108,8 +108,10 @@ class DBRv8d0PyLinter(PythonLinter):
 
         self._linter = NoFormatPythonLinter(
             [
+                # https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.DataFrame.writeTo.html
                 NoFormatPythonMatcher("writeTo", 1, 1),
                 NoFormatPythonMatcher("table", 1, 1),
+                # https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.DataFrameWriter.saveAsTable.html
                 NoFormatPythonMatcher("saveAsTable", 1, 4, 2, "format"),
             ]
         )
