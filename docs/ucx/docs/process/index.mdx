@@ -344,3 +344,12 @@ Existing HMS DLT pipeline is called "dlt_pipeline", the pipeline will be stopped
 - [All existing limitations](https://docs.databricks.com/en/delta-live-tables/unity-catalog.html#limitations) of using DLT on UC.
 - [Existing UC limitations](https://docs.databricks.com/en/data-governance/unity-catalog/index.html#limitations)
     - If tables in the HMS pipeline specify storage locations (using the "path" parameter in Python or the LOCATION clause in SQL), the configuration "pipelines.migration.ignoreExplicitPath" can be set to "true" to ignore the parameter in the cloned pipeline.
+
+
+### Considerations
+- Do not edit the notebooks that define the pipeline during cloning.
+- The original pipeline should not be running when requesting the clone.
+- When a clone is requested, DLT will automatically start an update to migrate the existing data and metadata for Streaming Tables, allowing them to pick up where the original pipeline left off.
+- It is expected that the update metrics do not include the migrated data.
+- Make sure all name-based references in the HMS pipeline are fully qualified, e.g. hive_metastore.schema.table
+- After the UC clone reaches RUNNING, both the original pipeline and the cloned pipeline may run independently.
