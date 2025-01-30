@@ -1,4 +1,4 @@
-from collections.abc import Iterator
+from collections.abc import Iterator, Callable
 
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.labs.lsql.core import Row
@@ -10,7 +10,9 @@ class DatabricksTableMetadataRetriever(TableMetadataRetriever):
     def __init__(self, sql_backend: SqlBackend):
         self._sql_backend = sql_backend
 
-    def get_metadata(self, entity: TableIdentifier, /, case_sensitive: bool = False) -> TableMetadata:
+    def get_metadata(
+        self, entity: TableIdentifier, *, column_name_transformer: Callable[[str], str] = str
+    ) -> TableMetadata:
         """
         This method retrieves the metadata for a given table. It takes a TableIdentifier object as input,
         which represents the table for which the metadata is to be retrieved.
@@ -24,13 +26,11 @@ class DatabricksTableMetadataRetriever(TableMetadataRetriever):
         # Partition information are typically prefixed with a # symbol,
         # so any column name starting with # is excluded from the final set of column metadata.
         # The column metadata objects are sorted by column name to ensure a consistent order.
-        columns = {
-            ColumnMetadata(
-                str(row["col_name"] if case_sensitive else str(row["col_name"]).lower()), str(row["data_type"])
-            )
-            for row in query_result
-            if not str(row["col_name"]).startswith("#")
-        }
+        columns = set()
+        for row in query_result:
+            if str(row["col_name"]).startswith("#"):
+                continue
+            columns.add(ColumnMetadata(column_name_transformer(str(row["col_name"])), str(row["data_type"])))
         return TableMetadata(entity, sorted(columns, key=lambda x: x.name))
 
     @classmethod

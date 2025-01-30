@@ -1,4 +1,4 @@
-from dataclasses import replace
+from collections.abc import Callable
 
 from .base import (
     SchemaComparator,
@@ -15,8 +15,10 @@ class StandardSchemaComparator(SchemaComparator):
         self._metadata_retriever = metadata_retriever
         self._case_sensitive = case_sensitive
 
-    def _column_name_transformer(self, column_name: str) -> str:
-        return column_name if self._case_sensitive else column_name.lower()
+    def _column_name_transformer(self) -> Callable[[str], str]:
+        if self._case_sensitive:
+            return lambda _: _
+        return str.lower
 
     def compare_schema(self, source: TableIdentifier, target: TableIdentifier) -> SchemaComparisonResult:
         """
@@ -32,8 +34,12 @@ class StandardSchemaComparator(SchemaComparator):
         return SchemaComparisonResult(is_matching, comparison_result)
 
     def _eval_schema_diffs(self, source: TableIdentifier, target: TableIdentifier) -> list[SchemaComparisonEntry]:
-        source_metadata = self._metadata_retriever.get_metadata(source, self._case_sensitive)
-        target_metadata = self._metadata_retriever.get_metadata(target, self._case_sensitive)
+        source_metadata = self._metadata_retriever.get_metadata(
+            source, column_name_transformer=self._column_name_transformer()
+        )
+        target_metadata = self._metadata_retriever.get_metadata(
+            target, column_name_transformer=self._column_name_transformer()
+        )
         # Combine the sets of column names for both the source and target tables
         # to create a set of all unique column names from both tables.
         source_column_names = {column.name for column in source_metadata.columns}
@@ -51,16 +57,9 @@ class StandardSchemaComparator(SchemaComparator):
 def _build_comparison_result_entry(
     source_col: ColumnMetadata | None,
     target_col: ColumnMetadata | None,
-    /,
-    case_sensitive: bool = False,
 ) -> SchemaComparisonEntry:
     if source_col and target_col:
-        if case_sensitive:
-            is_matching = source_col == target_col
-        else:
-            is_matching = replace(source_col, name=source_col.name.lower()) == replace(
-                target_col, name=target_col.name.lower()
-            )
+        is_matching = source_col == target_col
         notes = None
     else:
         is_matching = False

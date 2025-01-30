@@ -1,5 +1,6 @@
 import dataclasses
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass
 
 
@@ -82,7 +83,9 @@ class DataComparisonResult:
 
 class TableMetadataRetriever(ABC):
     @abstractmethod
-    def get_metadata(self, entity: TableIdentifier, /, case_sensitive: bool = False) -> TableMetadata:
+    def get_metadata(
+        self, entity: TableIdentifier, *, column_name_transformer: Callable[[str], str] = str
+    ) -> TableMetadata:
         """
         Get metadata for a given table
         """
