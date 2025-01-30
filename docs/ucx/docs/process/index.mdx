@@ -320,10 +320,12 @@ Once you're done with the [code migration](#code-migration), you can run the:
 
 > You are required to complete the [assessment workflow](/docs/reference/workflows#assessment-workflow) before starting the pipeline migration workflow.
 
-The pipeline migration process is an automated process that migrates Hive Metastore Delta Live Table (DLT) pipelines to the Unity Catalog.
+The pipeline migration process is an automated process that clones the Hive Metastore Delta Live Table (DLT) pipelines to the Unity Catalog.
 
 Upon the first update, the cloned pipeline will copy over all the data and checkpoints, and then run normally thereafter. After the cloned pipeline reaches ‘RUNNING’, both the original and the cloned pipeline can run independently.
 
+#### Example:
+Existing HMS DLT pipeline is called "dlt_pipeline", the pipeline will be stopped and renamed to "dlt_pipeline [OLD]". The new cloned pipeline will be "dlt_pipeline".
 
 ### Known issues and Limitations:
 - Only clones from HMS to UC are supported.
