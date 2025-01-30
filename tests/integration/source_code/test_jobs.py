@@ -194,6 +194,25 @@ def test_lint_local_code(simple_ctx):
     assert len(problems) > 0
 
 
+def test_lint_local_code_sample(simple_ctx) -> None:
+    # no need to connect
+    session_state = CurrentSessionState()
+    linter_context = LinterContext(TableMigrationIndex([]), session_state)
+    path_to_scan = Path(__file__).parent / "samples" / "github_issue_3585.py"
+    # TODO: LocalCheckoutContext has to move into GlobalContext because of this hack
+    linter = LocalCodeLinter(
+        simple_ctx.notebook_loader,
+        simple_ctx.file_loader,
+        simple_ctx.folder_loader,
+        simple_ctx.path_lookup,
+        session_state,
+        simple_ctx.dependency_resolver,
+        lambda: linter_context,
+    )
+    problems = linter.lint(Prompts(), path_to_scan, StringIO())
+    assert not problems
+
+
 @pytest.mark.parametrize("order", [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]])
 def test_graph_computes_magic_run_route_recursively_in_parent_folder(simple_ctx, order) -> None:
     # order in which we consider files influences the algorithm so we check all order
