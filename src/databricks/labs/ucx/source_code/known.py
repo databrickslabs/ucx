@@ -16,7 +16,8 @@ from databricks.labs.blueprint.entrypoint import get_logger
 
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.source_code.base import CurrentSessionState
-from databricks.labs.ucx.source_code.graph import DependencyProblem
+from databricks.labs.ucx.source_code.graph import Dependency, DependencyProblem
+from databricks.labs.ucx.source_code.files import FileLoader
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.notebooks.sources import FileLinter
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
@@ -182,7 +183,8 @@ class KnownList:
         logger.info(f"Processing module: {module_ref}")
         session_state = CurrentSessionState()
         ctx = LinterContext(empty_index, session_state)
-        linter = FileLinter(module_path, PathLookup.from_sys_path(module_path.parent), ctx)
+        dependency = Dependency(FileLoader(), module_path)
+        linter = FileLinter(dependency, PathLookup.from_sys_path(module_path.parent), ctx)
         known_problems = set()
         for problem in linter.lint():
             known_problems.add(KnownProblem(problem.code, problem.message))
