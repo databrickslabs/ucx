@@ -374,8 +374,23 @@ class GlobalContext(abc.ABC):
 
     @cached_property
     def pipelines_migrator(self) -> PipelinesMigrator:
+        include_pipeline_ids = (
+            self.named_parameters.get('include_pipeline_ids', '').split(',')
+            if 'include_pipeline_ids' in self.named_parameters
+            else None
+        )
+        exclude_pipeline_ids = (
+            self.named_parameters.get('exclude_pipeline_ids', '').split(',')
+            if 'exclude_pipeline_ids' in self.named_parameters
+            else None
+        )
         return PipelinesMigrator(
-            self.workspace_client, self.pipelines_crawler, self.jobs_crawler, self.config.ucx_catalog
+            self.workspace_client,
+            self.pipelines_crawler,
+            self.jobs_crawler,
+            self.config.ucx_catalog,
+            include_pipeline_ids=include_pipeline_ids,
+            exclude_pipeline_ids=exclude_pipeline_ids,
         )
 
     @cached_property
