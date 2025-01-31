@@ -660,6 +660,16 @@ It takes a `WorkspaceClient` object and `from` and `to` parameters as parameters
 the `TableMove` class. This command is useful for developers and administrators who want to create an alias for a table.
 It can also be used to debug issues related to table aliasing.
 
+## Pipeline migration commands
+
+These commands are for [pipeline migration](/docs/process#delta-live-table-pipeline-migration-process) and require the [assessment workflow](/docs/reference/workflows#assessment-workflow) to be completed.
+
+### `migrate-dlt-pipelines`
+
+```text
+$ databricks labs ucx migrate-dlt-pipelines [--include-pipeline-ids <comma separated list of pipeline ids>] [--exclude-pipeline-ids <comma separated list of pipeline ids>]
+```
+
 ## Utility commands
 
 ### `logs`

@@ -9,8 +9,9 @@ On a high level, the steps in migration process are:
 2. [group migration](/docs/reference/workflows#group-migration-workflow)
 3. [table migration](/docs/process/#table-migration-process)
 4. [data reconciliation](/docs/reference/workflows#post-migration-data-reconciliation-workflow)
-5. [code migration](#code-migration)
-6. [final details](#final-details)
+6. [code migration](/docs/reference/commands#code-migration-commands)
+7. [delta live table pipeline migration](/docs/process#delta-live-table-pipeline-migration-process)
+8. [final details](#final-details)
 
 The migration process can be schematic visualized as:
 
@@ -288,6 +289,7 @@ databricks labs ucx revert-migrated-tables --schema X --table Y [--delete-manage
 The [`revert-migrated-tables` command](/docs/reference/commands#revert-migrated-tables) drops the Unity Catalog table or view and reset
 the `upgraded_to` property on the source object. Use this command to allow for migrating a table or view again.
 
+
 ## Code Migration
 
 After you're done with the [table migration](#table-migration-process) and
@@ -306,6 +308,45 @@ After investigating the code linter advices, code can be migrated. We recommend 
 - Use the [`migration-progress` dashboard](/docs/reference/dashboards) to prioritize and track resource migration.
 - Use the [`migrate-` commands`](/docs/reference/commands#code-migration-commands) to migrate resources.
 - Set the [default catalog](https://docs.databricks.com/en/catalogs/default.html) to Unity Catalog.
+
+
+## Delta Live Table Pipeline Migration Process
+
+> You are required to complete the [assessment workflow](/docs/reference/workflows#assessment-workflow) before starting the pipeline migration workflow.
+
+The pipeline migration process is a workflow that clones the Hive Metastore Delta Live Table (DLT) pipelines to the Unity Catalog.
+Upon the first update, the cloned pipeline will copy over all the data and checkpoints, and then run normally thereafter. After the cloned pipeline reaches ‘RUNNING’, both the original and the cloned pipeline can run independently.
+
+#### Example:
+Existing HMS DLT pipeline is called "dlt_pipeline", the pipeline will be stopped and renamed to "dlt_pipeline [OLD]". The new cloned pipeline will be "dlt_pipeline".
+
+### Known issues and Limitations:
+- Only clones from HMS to UC are supported.
+- Pipelines may only be cloned within the same workspace.
+- HMS pipelines must currently be publishing tables to some target schema.
+- Only the following streaming sources are supported:
+    - Delta
+    - [Autoloader](https://docs.databricks.com/en/ingestion/cloud-object-storage/auto-loader/index.html)
+        - If your pipeline uses Autoloader with file notification events, do not run the original HMS pipeline after cloning as this will cause some file notification events to be dropped from the UC clone. If the HMS original was started accidentally, missed files can be backfilled by using the `cloudFiles.backfillInterval` option in Autoloader.
+    - Kafka where `kafka.group.id` is not set
+    - Kinesis where `consumerMode` is not "efo"
+- [Maintenance](https://docs.databricks.com/en/delta-live-tables/index.html#maintenance-tasks-performed-by-delta-live-tables) is automatically paused (for both pipelines) while migration is in progress
+- If an Autoloader source specifies an explicit `cloudFiles.schemaLocation`, `mergeSchema` needs to be set to true for the HMS original and UC clone to operate concurrently.
+- Pipelines that publish tables to custom schemas are not supported.
+- On tables cloned to UC, time travel queries are undefined when querying by timestamp to versions originally written on HMS. Time travel queries by version will work correctly, as will time travel queries by timestamp to versions written on UC.
+- [All existing limitations](https://docs.databricks.com/en/delta-live-tables/unity-catalog.html#limitations) of using DLT on UC.
+- [Existing UC limitations](https://docs.databricks.com/en/data-governance/unity-catalog/index.html#limitations)
+    - If tables in the HMS pipeline specify storage locations (using the "path" parameter in Python or the LOCATION clause in SQL), the configuration "pipelines.migration.ignoreExplicitPath" can be set to "true" to ignore the parameter in the cloned pipeline.
+
+
+### Considerations
+- Do not edit the notebooks that define the pipeline during cloning.
+- The original pipeline should not be running when requesting the clone.
+- When a clone is requested, DLT will automatically start an update to migrate the existing data and metadata for Streaming Tables, allowing them to pick up where the original pipeline left off.
+- It is expected that the update metrics do not include the migrated data.
+- Make sure all name-based references in the HMS pipeline are fully qualified, e.g. hive_metastore.schema.table
+- After the UC clone reaches RUNNING, both the original pipeline and the cloned pipeline may run independently.
+
 
 ## Final details
 
