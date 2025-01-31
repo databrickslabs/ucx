@@ -53,7 +53,7 @@ class LocalFile(SourceContainer):
             analyzer = PythonCodeAnalyzer(context, self._original_code)
             problems = analyzer.build_graph()
             for idx, problem in enumerate(problems):
-                if problem.is_path_missing():
+                if problem.has_missing_path():
                     problems[idx] = dataclasses.replace(problem, source_path=self._path)
             return problems
         # supported language that does not generate dependencies
@@ -69,7 +69,7 @@ class LocalFile(SourceContainer):
             inherited = analyzer.build_inherited_context(child_path)
             problems = list(inherited.problems)
             for idx, problem in enumerate(problems):
-                if problem.is_path_missing():
+                if problem.has_missing_path():
                     problems[idx] = dataclasses.replace(problem, source_path=self._path)
             return dataclasses.replace(inherited, problems=problems)
         return InheritedContext(None, False, [])
@@ -150,9 +150,8 @@ class LocalCodeLinter:
             )
             path = Path(response)
         located_advices = list(self.lint_path(path))
-        for located in located_advices:
-            message = located.message_relative_to(path)
-            stdout.write(f"{message}\n")
+        for located_advice in located_advices:
+            stdout.write(f"{located_advice}\n")
         return located_advices
 
     def lint_path(self, path: Path, linted_paths: set[Path] | None = None) -> Iterable[LocatedAdvice]:
@@ -171,8 +170,7 @@ class LocalCodeLinter:
         assert container is not None  # because we just created it
         problems = container.build_dependency_graph(graph)
         for problem in problems:
-            problem_path = Path('UNKNOWN') if problem.is_path_missing() else problem.source_path.absolute()
-            yield problem.as_advisory().for_path(problem_path)
+            yield problem.as_located_advice()
         context_factory = self._context_factory
         session_state = self._session_state
 

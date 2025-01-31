@@ -3,11 +3,12 @@ from pathlib import Path
 
 import pytest
 
-from databricks.labs.ucx.source_code.base import CurrentSessionState
+from databricks.labs.ucx.source_code.base import Advisory, CurrentSessionState, LocatedAdvice
 from databricks.labs.ucx.source_code.linters.files import FileLoader, FolderLoader
 from databricks.labs.ucx.source_code.graph import (
     Dependency,
     DependencyGraph,
+    DependencyProblem,
     InheritedContext,
     DependencyGraphWalker,
 )
@@ -217,3 +218,25 @@ def test_graph_walker_captures_lineage(mock_path_lookup, simple_dependency_resol
 
     walker = _TestWalker(root_graph, set(), mock_path_lookup)
     _ = list(_ for _ in walker)
+
+
+def test_dependency_problem_has_path_missing_by_default() -> None:
+    problem = DependencyProblem("code", "message")
+    assert problem.has_missing_path()
+
+
+def test_dependency_problem_has_path_when_given() -> None:
+    problem = DependencyProblem("code", "message", source_path=Path("location"))
+    assert not problem.has_missing_path()
+
+
+def test_dependency_problem_as_located_advice() -> None:
+    problem = DependencyProblem("code", "message")
+    located_advice = problem.as_located_advice()
+    assert located_advice == LocatedAdvice(Advisory("code", "message", -1, -1, -1, -1), problem.source_path)
+
+
+def test_dependency_problem_as_located_advice_has_path_missing_by_default() -> None:
+    problem = DependencyProblem("code", "message")
+    located_advice = problem.as_located_advice()
+    assert located_advice.has_missing_path()

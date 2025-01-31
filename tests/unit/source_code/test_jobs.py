@@ -246,7 +246,7 @@ def test_workflow_linter_lint_job_logs_problems(dependency_resolver, mock_path_l
 
     directfs_crawler.assert_not_called()
     used_tables_crawler.assert_not_called()
-    assert any(message.startswith(expected_message) for message in caplog.messages)
+    assert any(message.startswith(expected_message) for message in caplog.messages), caplog.messages
 
 
 def test_workflow_task_container_builds_dependency_graph_for_requirements_txt(mock_path_lookup, graph) -> None:

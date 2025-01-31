@@ -12,7 +12,13 @@ from typing import TypeVar, Generic
 from astroid import (  # type: ignore
     NodeNG,
 )
-from databricks.labs.ucx.source_code.base import Advisory, CurrentSessionState, is_a_notebook, LineageAtom
+from databricks.labs.ucx.source_code.base import (
+    Advisory,
+    CurrentSessionState,
+    LineageAtom,
+    LocatedAdvice,
+    is_a_notebook,
+)
 from databricks.labs.ucx.source_code.python.python_ast import Tree
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
@@ -93,7 +99,7 @@ class DependencyGraph:
             return MaybeGraph(child_graph, [problem])
         problems = []
         for problem in container.build_dependency_graph(child_graph):
-            if problem.is_path_missing():
+            if problem.has_missing_path():
                 problem = dataclasses.replace(problem, source_path=dependency.path)
             problems.append(problem)
         return MaybeGraph(child_graph, problems)
@@ -467,7 +473,7 @@ class DependencyResolver:
     def _make_relative_paths(self, problems: list[DependencyProblem], path: Path) -> list[DependencyProblem]:
         adjusted_problems = []
         for problem in problems:
-            out_path = path if problem.is_path_missing() else problem.source_path
+            out_path = path if problem.has_missing_path() else problem.source_path
             if out_path.is_absolute() and out_path.is_relative_to(self._path_lookup.cwd):
                 out_path = out_path.relative_to(self._path_lookup.cwd)
             adjusted_problems.append(dataclasses.replace(problem, source_path=out_path))
@@ -482,20 +488,41 @@ _MISSING_SOURCE_PATH = Path("<MISSING_SOURCE_PATH>")
 
 @dataclass
 class DependencyProblem:
-    code: str
-    message: str
-    source_path: Path = _MISSING_SOURCE_PATH
-    # Lines and columns are both 0-based: the first line is line 0.
-    start_line: int = -1
-    start_col: int = -1
-    end_line: int = -1
-    end_col: int = -1
+    """A problem found with the dependency.
 
-    def is_path_missing(self) -> bool:
+    The line and column indexing is 0-based.
+    """
+
+    code: str
+    """Unique code to identify the problem type."""
+
+    message: str
+    """A message detailing the problem."""
+
+    source_path: Path = _MISSING_SOURCE_PATH
+    """The path to the problem"""
+
+    start_line: int = -1
+    """The line where the problem starts when reading source code."""
+
+    start_col: int = -1
+    """The column where the problem starts when reading source code."""
+
+    end_line: int = -1
+    """The line where the problem ends when reading source code."""
+
+    end_col: int = -1
+    """The column where the problem ends when reading source code."""
+
+    def has_missing_path(self) -> bool:
+        """Flag if the path is missing, or not."""
         return self.source_path == _MISSING_SOURCE_PATH
 
-    def as_advisory(self) -> 'Advisory':
-        return Advisory(
+    def as_located_advice(self) -> LocatedAdvice:
+        """Converts the dependency problem in a located advice for linting."""
+        # Advisory level is chosen to treat a dependency problem as a WARNING. It is the most server while not being
+        # CRITICAL (yet).
+        advisory = Advisory(
             code=self.code,
             message=self.message,
             start_line=self.start_line,
@@ -503,6 +530,7 @@ class DependencyProblem:
             end_line=self.end_line,
             end_col=self.end_col,
         )
+        return LocatedAdvice(advisory, self.source_path)
 
     @staticmethod
     def from_node(code: str, message: str, node: NodeNG) -> DependencyProblem:
