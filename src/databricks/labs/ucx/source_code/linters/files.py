@@ -221,11 +221,15 @@ class ModuleDependency(Dependency):
     Next to the default parameters, this dependency has a module name.
     """
 
-    def __init__(
-        self, loader: DependencyLoader, *, path: Path = Path("<MISSING_SOURCE_PATH>"), module_name: str
-    ) -> None:
-        super().__init__(loader, path, inherits_context=False)
+    _MISSING_SOURCE_PATH = Path("<MISSING_SOURCE_PATH>")
+
+    def __init__(self, loader: DependencyLoader, *, path: Path | None = None, module_name: str, known: bool) -> None:
+        super().__init__(loader, path or self._MISSING_SOURCE_PATH, inherits_context=False)
         self._module_name = module_name
+        self.known = known
+
+        if self._path == self._MISSING_SOURCE_PATH and not self.known:
+            assert ValueError("Only known modules can have a missing source path.")
 
     def __repr__(self) -> str:
         return f"ModuleDependency<{self._module_name} ({self._path})>"
@@ -254,6 +258,7 @@ class ImportFileResolver(BaseImportResolver, BaseFileResolver):
         """Resolve a simple or composite import name."""
         if not name:
             return MaybeDependency(None, [DependencyProblem("ucx-bug", "Import name is empty")])
+        known = self._allow_list.module_compatibility(name).known
         parts = []
         # Relative imports use leading dots. A single leading dot indicates a relative import, starting with
         # the current package. Two or more leading dots indicate a relative import to the parent(s) of the current
@@ -272,11 +277,12 @@ class ImportFileResolver(BaseImportResolver, BaseFileResolver):
             absolute_path = path_lookup.resolve(relative_path)
             if not absolute_path:
                 continue
-            dependency = ModuleDependency(self._file_loader, path=absolute_path, module_name=name)
+            dependency = ModuleDependency(self._file_loader, path=absolute_path, module_name=name, known=known)
             return MaybeDependency(dependency, [])
-        if self._allow_list.module_compatibility(name).known:
-            # For known modules, we allow the source path to be missing
-            dependency = ModuleDependency(self._file_loader, module_name=name)
+        if known:
+            # For known modules, we allow the source path to be missing, however, we do not return early as we prefer
+            # to find the source path for reporting reasons
+            dependency = ModuleDependency(self._file_loader, module_name=name, known=known)
             return MaybeDependency(dependency, [])
         return MaybeDependency(None, [DependencyProblem("import-not-found", f"Could not locate import: {name}")])
 
