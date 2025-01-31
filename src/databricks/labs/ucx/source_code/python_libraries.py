@@ -41,7 +41,7 @@ class PythonLibraryResolver(LibraryResolver):
         if len(libraries) == 1:  # Multiple libraries might be installation flags
             compatibility = self._allow_list.distribution_compatibility(libraries[0])
             if compatibility.known:
-                return compatibility.problems
+                return []  # Known problems are surfaced during linting
         return self._install_library(path_lookup, *libraries)
 
     @cached_property
