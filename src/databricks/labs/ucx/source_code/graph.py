@@ -659,6 +659,7 @@ class DependencyGraphWalker(abc.ABC, Generic[T]):
         self._lineage.append(dependency)
         self._walked_paths.add(dependency.path)
         self._log_walk_one(dependency)
+        # Why this condition? Why not always iterate over dependencies?
         if dependency.path.is_file() or is_a_notebook(dependency.path) or getattr(dependency, "known", False):
             inherited_tree = graph.root.build_inherited_tree(root_path, dependency.path)
             path_lookup = self._path_lookup.change_directory(dependency.path.parent)

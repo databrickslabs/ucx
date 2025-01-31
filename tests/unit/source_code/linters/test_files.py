@@ -4,7 +4,7 @@ from unittest.mock import Mock, call, create_autospec
 import pytest
 from databricks.labs.blueprint.tui import MockPrompts
 
-from databricks.labs.ucx.source_code.base import CurrentSessionState
+from databricks.labs.ucx.source_code.base import CurrentSessionState, Failure, LocatedAdvice
 from databricks.labs.ucx.source_code.graph import DependencyResolver, SourceContainer
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
 from databricks.labs.ucx.source_code.notebooks.migrator import NotebookMigrator
@@ -156,9 +156,21 @@ def test_linter_lints_import_from_known_list(tmp_path, mock_path_lookup, local_c
     path = tmp_path / "file.py"
     path.write_text(content)
     located_advices = list(local_code_linter.lint_path(path))
-    assert located_advices
-    assert not [la for la in located_advices if la.advice.start_line > 1], "Start line cannot be after than total lines"
-    assert not [la for la in located_advices if la.path == path], "Advice should be given for respective module"
+
+    failures = [
+        Failure(
+            "jvm-access-in-shared-clusters", "Cannot access Spark Driver JVM on UC Shared Clusters", -1, -1, -1, -1
+        ),
+        Failure(
+            "jvm-access-in-shared-clusters",
+            "sc is not supported on UC Shared Clusters. Rewrite it using spark",
+            -1,
+            -1,
+            -1,
+            -1,
+        ),
+    ]
+    assert located_advices == [LocatedAdvice(failure, Path("<MISSING_SOURCE_PATH>")) for failure in failures]
 
 
 def test_triple_dot_import() -> None:
