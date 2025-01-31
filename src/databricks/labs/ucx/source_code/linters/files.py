@@ -215,6 +215,17 @@ class FolderLoader(DependencyLoader):
         return Folder(absolute_path, self._notebook_loader, self._file_loader, self)
 
 
+class ModuleDependency(Dependency):
+    """A dependency representing a (Python) module.
+
+    Next to the default parameters, this dependency has a module name.
+    """
+
+    def __init__(self, loader: DependencyLoader, *, path: Path = Path("<MISSING_SOURCE_PATH>"), module_name: str) -> None:
+        super().__init__(loader, path, inherits_context=False)
+        self._module_name = module_name
+
+
 class ImportFileResolver(BaseImportResolver, BaseFileResolver):
     """Resolve module import
 
@@ -236,24 +247,6 @@ class ImportFileResolver(BaseImportResolver, BaseFileResolver):
 
     def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
         """Resolve a simple or composite import name."""
-        maybe = self._resolve_allow_list(name)
-        if maybe is not None:
-            return maybe
-        maybe = self._resolve_import(path_lookup, name)
-        if maybe is not None:
-            return maybe
-        return self._fail('import-not-found', f"Could not locate import: {name}")
-
-    def _resolve_allow_list(self, name: str) -> MaybeDependency | None:
-        """Reuse known module"""
-        compatibility = self._allow_list.module_compatibility(name)
-        if not compatibility.known:
-            logger.debug(f"Resolving unknown import: {name}")
-            return None
-        return MaybeDependency(None, [])  # Known problems are surfaced during linting
-
-    def _resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency | None:
-        """Resolve a simple or composite import name."""
         if not name:
             return MaybeDependency(None, [DependencyProblem("ucx-bug", "Import name is empty")])
         parts = []
@@ -274,13 +267,13 @@ class ImportFileResolver(BaseImportResolver, BaseFileResolver):
             absolute_path = path_lookup.resolve(relative_path)
             if not absolute_path:
                 continue
-            dependency = Dependency(self._file_loader, absolute_path, False)
+            dependency = ModuleDependency(self._file_loader, path=absolute_path, module_name=name)
             return MaybeDependency(dependency, [])
-        return None
-
-    @staticmethod
-    def _fail(code: str, message: str) -> MaybeDependency:
-        return MaybeDependency(None, [DependencyProblem(code, message)])
+        if self._allow_list.module_compatibility(name).known:
+            # For known modules, we allow the source path to be missing
+            dependency = ModuleDependency(self._file_loader, module_name=name)
+            return MaybeDependency(dependency, [])
+        return MaybeDependency(None, [DependencyProblem("import-not-found", f"Could not locate import: {name}")])
 
     def __repr__(self):
         return "ImportFileResolver()"
