@@ -327,7 +327,7 @@ class Dependency:
         return hash(self.path)
 
     def __eq__(self, other):
-        return isinstance(other, type(self)) and self.path == other.path
+        return isinstance(other, Dependency) and self.path == other.path
 
     def load(self, path_lookup: PathLookup) -> SourceContainer | None:
         return self._loader.load_dependency(path_lookup, self)
