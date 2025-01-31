@@ -80,10 +80,8 @@ def _collect_unparseable(advices: list[LocatedAdvice]):
     return list(located_advice for located_advice in advices if located_advice.advice.code == 'parse-error')
 
 
-def _print_advices(advices: list[LocatedAdvice]):
-    messages = list(
-        located_advice.message_relative_to(dist.parent).replace('\n', ' ') + '\n' for located_advice in advices
-    )
+def _print_advices(located_advices: list[LocatedAdvice]) -> None:
+    messages = [f"{located_advice}\n" for located_advice in located_advices]
     if os.getenv("CI"):
         advices_path = build / "advices.txt"
         with advices_path.open("a") as advices_file:

@@ -474,7 +474,7 @@ class WorkflowLinter:
             if not advices:
                 advices = self._lint_task(task, graph, session_state, linted_paths)
             for advice in advices:
-                absolute_path = advice.path.absolute().as_posix() if advice.path != self._UNKNOWN else 'UNKNOWN'
+                absolute_path = "UNKNOWN" if advice.has_missing_path() else advice.path.absolute().as_posix()
                 job_problem = JobProblem(
                     job_id=job.job_id,
                     job_name=job.settings.name,
@@ -521,10 +521,7 @@ class WorkflowLinter:
         )
         graph = DependencyGraph(root_dependency, None, self._resolver, self._path_lookup, session_state)
         problems = container.build_dependency_graph(graph)
-        located_advices: list[LocatedAdvice] = []
-        for problem in problems:
-            source_path = self._UNKNOWN if problem.is_path_missing() else problem.source_path
-            located_advices.append(LocatedAdvice(problem.as_advisory(), source_path))
+        located_advices = [problem.as_located_advice() for problem in problems]
         return graph, located_advices, session_state
 
     def _lint_task(

@@ -246,7 +246,7 @@ def test_workflow_linter_lint_job_logs_problems(dependency_resolver, mock_path_l
 
     directfs_crawler.assert_not_called()
     used_tables_crawler.assert_not_called()
-    assert any(message.startswith(expected_message) for message in caplog.messages)
+    assert any(message.startswith(expected_message) for message in caplog.messages), caplog.messages
 
 
 def test_workflow_task_container_builds_dependency_graph_for_requirements_txt(mock_path_lookup, graph) -> None:
@@ -516,7 +516,7 @@ def test_xxx(graph) -> None:
 
 
 def test_linting_walker_populates_paths(dependency_resolver, mock_path_lookup, migration_index) -> None:
-    path = mock_path_lookup.resolve(Path("functional/values_across_cells.py"))
+    path = mock_path_lookup.resolve(Path("functional/values_across_notebooks_dbutils_notebook_run.py"))
     root = Dependency(NotebookLoader(), path)
     xgraph = DependencyGraph(root, None, dependency_resolver, mock_path_lookup, CurrentSessionState())
     walker = LintingWalker(xgraph, set(), mock_path_lookup, "key", CurrentSessionState(), migration_index)

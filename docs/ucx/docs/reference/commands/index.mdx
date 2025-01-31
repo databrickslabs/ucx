@@ -9,14 +9,7 @@ This section contains the reference documentation for the UCX commands.
 
 ## Code migration commands
 
-See the [migration process diagram](/docs/process) to understand the role of the code migration commands in the migration process.
-
-After you're done with the [table migration](/docs/process#table-migration-process), you can proceed to the code migration.
-
-Once you're done with the code migration, you can run the [`cluster-remap` command](/docs/reference/commands#cluster-remap) to remap the
-clusters to be UC compatible.
-
-
+This section contains the code related commands.
 
 ### `lint-local-code`
 
@@ -35,8 +28,6 @@ When run from an IDE terminal, this command generates output as follows:
 ![img.png](/img/lint-local-code-output.png)
 With modern IDEs, clicking on the file link opens the file at the problematic line
 
-
-
 ### `migrate-local-code`
 
 ```text
@@ -47,8 +38,6 @@ databricks labs ucx migrate-local-code
 migrate all python and SQL files in the current working directory. This command is highly experimental and
 at the moment only supports Python and SQL files and discards code comments and formatting during
 the automated transformation process.
-
-
 
 ### `migrate-dbsql-dashboards`
 
@@ -67,8 +56,6 @@ This command can be run with `--dashboard-id` flag to migrate a specific dashboa
 
 This command is incremental and can be run multiple times to migrate new dashboards.
 
-
-
 ### `revert-dbsql-dashboards`
 
 ```text
@@ -79,7 +66,6 @@ databricks labs ucx revert-dbsql-dashboards [--dashboard-id <dashboard-id>]
 `migrate-dbsql-dashboards` command is executed.
 
 This command can be run with `--dashboard-id` flag to migrate a specific dashboard.
-
 
 ## Cross-workspace installation commands
 
@@ -93,8 +79,6 @@ authenticate your machine with:
 Ask your Databricks Account admin to run the [`sync-workspace-info` command](/docs/reference/commands#sync-workspace-info) to sync the
 workspace information with the UCX installations. Once the workspace information is synced, you can run the
 [`create-table-mapping` command](/docs/reference/commands#create-table-mapping) to align your tables with the Unity Catalog.
-
-
 
 ### `sync-workspace-info`
 
@@ -120,8 +104,6 @@ If you cannot get account administrator privileges in reasonable time, you can t
 run [`manual-workspace-info` command](/docs/reference/commands#manual-workspace-info) to enter Databricks Workspace IDs and Databricks
 Workspace names.
 
-
-
 ### `manual-workspace-info`
 
 ```text
@@ -144,8 +126,6 @@ run. It prompts the user to enter the required information manually and creates 
 useful for workspace administrators who are unable to use the `sync-workspace-info` command, because they are not
 Databricks Account Administrators. It can also be used to manually create the workspace info in a new workspace.
 
-
-
 ### `create-account-groups`
 
 ```text
@@ -166,8 +146,6 @@ This command is useful for the setups, that don't have SCIM provisioning in plac
 
 Once you're done with this command, proceed to the [group migration workflow](/docs/reference/workflows#group-migration-workflow).
 
-
-
 ### `validate-groups-membership`
 
 ```text
@@ -185,8 +163,6 @@ used to debug issues related to group membership. See [group migration](docs/ref
 [group migration](/docs/reference/workflows#group-migration-workflow) for more details.
 
 Valid group membership is important to ensure users has correct access after legacy table ACL is migrated in [table migration process](/docs/process/#table-migration-process)
-
-
 
 ### `validate-table-locations`
 
@@ -217,8 +193,6 @@ Considerations when resolving tables with overlapping locations are:
     - Tags
   - ACLs
 
-
-
 ### `cluster-remap`
 
 ```text
@@ -242,8 +216,6 @@ to revert the cluster remapping.
 
 You can revert the cluster remapping using the [`revert-cluster-remap` command](/docs/reference/commands#revert-cluster-remap).
 
-
-
 ### `revert-cluster-remap`
 
 ```text
@@ -258,8 +230,6 @@ If a customer want's to revert the cluster remap done using the [`cluster-remap`
 its configuration from UC to original one.It will iterate through the list of clusters from the backup folder and reverts the
 cluster configurations to original one.This will also ask the user to provide the list of clusters that has to be reverted as a prompt.
 By default, it will revert all the clusters present in the backup folder
-
-
 
 ### `upload`
 
@@ -320,8 +290,6 @@ Ex: `databricks labs ucx ensure-assessment-run --run-as-collection=True`
 These commands are used to assign a Unity Catalog metastore to a workspace. The metastore assignment is a pre-requisite
 for any further migration steps.
 
-
-
 ### `show-all-metastores`
 
 ```text
@@ -332,8 +300,6 @@ This command lists all the metastores available to be assigned to a workspace. I
 all the metastores available in the account. This command is useful when there are multiple metastores available within
 a region, and you want to see which ones are available for assignment.
 
-
-
 ### `assign-metastore`
 
 ```text
@@ -343,8 +309,6 @@ databricks labs ucx assign-metastore --workspace-id <workspace-id> [--metastore-
 This command assigns a metastore to a workspace with `--workspace-id`. If there is only a single metastore in the
 workspace region, the command automatically assigns that metastore to the workspace. If there are multiple metastores
 available, the command prompts for specification of the metastore (id) you want to assign to the workspace.
-
-
 
 ### `create-ucx-catalog`
 
@@ -387,8 +351,6 @@ using the [`skip` command](/docs/reference/commands#skip).
 
 Once you're done with the table migration, proceed to the [code migration](/docs/reference/commands#code-migration-commands).
 
-
-
 ### `principal-prefix-access`
 
 ```text
@@ -401,8 +363,6 @@ identifies all the storage accounts used by tables in the workspace and their pe
 Once you're done running this command, proceed to the [`migrate-credentials` command](/docs/reference/commands#migrate-credentials).
 
 The "prefix" refers to the start - i.e. prefix - of table locations that point to the cloud storage location.
-
-
 
 #### Access for AWS S3 Buckets
 
@@ -424,8 +384,6 @@ It has the following format:
 
 Once done, proceed to the [`migrate-credentials` command](/docs/reference/commands#migrate-credentials).
 
-
-
 #### Access for Azure Storage Accounts
 
 ```commandline
@@ -441,8 +399,6 @@ Note: This cmd only lists azure storage account gen2, storage format wasb:// or 
 will be skipped.
 
 Once done, proceed to the [`migrate-credentials` command](/docs/reference/commands#migrate-credentials).
-
-
 
 ### `create-missing-principals`
 
@@ -462,8 +418,6 @@ Two optional parameter are available for this command:
 `--role-name` - This parameter is used to set the prefix for the role name. The default value is `UCX-ROLE`.
 `--role-policy` - This parameter is used to set the prefix for the role policy name. The default value is `UCX-POLICY`.
 
-
-
 ### `delete-missing-principals`
 
 <Admonition type="warning">
@@ -476,8 +430,6 @@ databricks labs ucx delete-missing-principals --aws-profile <aws_profile>
 This command helps to delete the IAM role created by UCX. It lists all the IAM Roles generated by the principal-prefix-access
 command and allows user to select multiple roles to delete. It also checks if selected roles are mapped to any storage credentials
 and asks for confirmation from user. Once confirmed, it deletes the role and its associated inline policy.
-
-
 
 ### `create-uber-principal`
 
@@ -496,8 +448,6 @@ On Azure, it creates a principal with `Storage Blob Data Contributor` role assig
 Azure Resource Manager APIs.
 
 This command is one of prerequisites for the [table migration process](/docs/process/#table-migration-process).
-
-
 
 ### `migrate-credentials`
 
@@ -527,8 +477,6 @@ Please review the file and delete the Instance Profiles you do not want to be mi
 
 Once you're done with this command, run [`validate-external-locations` command](/docs/reference/commands#validate-external-locations) after this one.
 
-
-
 ### `validate-external-locations`
 
 ```text
@@ -541,8 +489,6 @@ run this command to validate and report the missing Unity Catalog external locat
 This command validates and provides mapping to external tables to external locations, also as Terraform configurations.
 
 Once you're done with this command, proceed to the [`migrate-locations` command](/docs/reference/commands#migrate-locations).
-
-
 
 ### `migrate-locations`
 
@@ -564,8 +510,6 @@ maps the bucket to the external locations created and grants `CREATE_EXTERNAL_TA
 or SQL warehouse
 
 Once you're done with this command, proceed to the [`create-table-mapping` command](/docs/reference/commands#create-table-mapping).
-
-
 
 ### `create-table-mapping`
 
@@ -600,8 +544,6 @@ This command is one of prerequisites for the [table migration process](/docs/pro
 
 Once you're done with table migration, proceed to the [code migration](/docs/reference/commands#code-migration-commands).
 
-
-
 ### `skip`
 
 ```text
@@ -617,8 +559,6 @@ only be used exclusively. This command is useful to temporarily disable migratio
 
 Once you're done with table migration, proceed to the [code migration](/docs/reference/commands#code-migration-commands).
 
-
-
 ### `unskip`
 
 ```commandline
@@ -626,8 +566,6 @@ databricks labs ucx unskip --schema X [--table Y] [--view Z]
 ```
 
 This command removes the mark set by the [`skip` command](/docs/reference/commands/#skip) on the given schema, table or view.
-
-
 
 ### `create-catalogs-schemas`
 
@@ -645,7 +583,6 @@ For AWS, it checks any instance profiles mapped to the interactive cluster or sq
 to the bucket. It then maps the bucket to the tables which has external location on those bucket created and grants `USAGE` access to
 the schema and catalog if at least one such table is migrated to it.
 
-
 ### `assign-owner-group`
 
 ```text
@@ -657,8 +594,6 @@ The owner group is an account group that will be designated as an owner to all m
 The principal running the command and later, the migration workflows, is required to be a member of this group.
 The command will list all the groups the principal is a member of and allow the selection of the owner group.
 It sets the default_owner_group property in the config.yml file.
-
-
 
 ### `migrate-tables`
 
@@ -680,8 +615,6 @@ For AWS, it checks any instance profiles mapped to the interactive cluster or sq
 to the bucket. It then maps the bucket to the tables which has external location on those bucket created and grants either `SELECT` permission if
 the instance profile only has read access on the bucket and `ALL_PRIVILEGES` if the instance profile has write access on the bucket.
 
-
-
 ### `revert-migrated-tables`
 
 ```text
@@ -695,8 +628,6 @@ This command is useful for developers and administrators who want to revert the 
 to debug issues related to table migration.
 
 Go back to the [`create-table-mapping` command](/docs/reference/commands#create-table-mapping) after you're done with this command.
-
-
 
 ### `move`
 
@@ -718,8 +649,6 @@ This is due to Unity Catalog not supporting multiple tables with overlapping pat
 
 This command supports moving multiple tables at once, by specifying `*` as the table name.
 
-
-
 ### `alias`
 
 ```text
@@ -730,8 +659,6 @@ This command aliases a UC table/tables from one schema to another schema in the 
 It takes a `WorkspaceClient` object and `from` and `to` parameters as parameters and aliases the tables using
 the `TableMove` class. This command is useful for developers and administrators who want to create an alias for a table.
 It can also be used to debug issues related to table aliasing.
-
-
 
 ## Utility commands
 
@@ -747,8 +674,6 @@ check the logs of the last run of a workflow and ensure that it was executed as 
 debugging purposes when a workflow is not behaving as expected. By default, only `INFO`, `WARNING`, and `ERROR` logs
 are displayed. To display `DEBUG` logs, use the `--debug` flag.
 
-
-
 ### `ensure-assessment-run`
 
 ```commandline
@@ -759,8 +684,6 @@ This command ensures that the [assessment workflow](/docs/reference/workflows#as
 This command will block until job finishes.
 Failed workflows can be fixed with the [`repair-run` command](/docs/reference/commands#repair-run). Workflows and their status can be
 listed with the [`workflows` command](/docs/reference/commands#workflows).
-
-
 
 ### `update-migration-progress`
 
@@ -776,8 +699,6 @@ it to complete.
 Workflows and their status can be listed with the [`workflows` command](/docs/reference/commands#workflows), while failed workflows can
 be fixed with the [`repair-run` command](/docs/reference/commands#repair-run).
 
-
-
 ### `repair-run`
 
 ```commandline
@@ -788,8 +709,6 @@ This command repairs a failed [UCX Workflow](#workflows). This command is useful
 want to repair a failed job. It can also be used to debug issues related to job failures. This operation can also be
 done via [user interface](https://docs.databricks.com/en/workflows/jobs/repair-job-failures.html). Workflows and their
 status can be listed with the [`workflows` command](/docs/reference/commands#workflows).
-
-
 
 ### `workflows`
 
@@ -810,8 +729,6 @@ job status from the workspace and prints it in a table format. This command is u
 who want to check the status of UCX workflows and ensure that they have been executed as expected. It can also be used
 for debugging purposes when a workflow is not behaving as expected. Failed workflows can be fixed with
 the [`repair-run` command](/docs/reference/commands#repair-run).
-
-
 
 ### `open-remote-config`
 
@@ -847,8 +764,6 @@ access the configuration file from the command line. Here's the description of c
   * `policy_id`: An optional string representing the ID of the cluster policy.
   * `include_databases`: An optional list of strings representing the names of databases to include for migration.
 
-
-
 ### `installations`
 
 ```text
@@ -869,9 +784,6 @@ This command displays the [installations](/docs/installation) by different users
 the installations where the `ucx` package is installed and prints their details in JSON format. This command is useful
 for administrators who want to see which users have installed `ucx` and where. It can also be used to debug issues
 related to multiple installations of `ucx` on the same workspace.
-
-
-
 
 ### `report-account-compatibility`
 
@@ -894,7 +806,6 @@ databricks labs ucx report-account-compatibility --profile labs-azure-account
 12:56:21  INFO [d.l.u.account.aggregate] Non-DELTA format: UNKNOWN: 5 objects
 ```
 
-
 ### `export-assessment`
 
 ```commandline
@@ -911,5 +822,3 @@ The export-assessment command is used to export UCX assessment results to a spec
         - `interactive`
         - `main`
     - **Default:** `main`
-
-
