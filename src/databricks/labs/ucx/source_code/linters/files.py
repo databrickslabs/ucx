@@ -126,6 +126,7 @@ class LocalCodeLinter:
         problems = container.build_dependency_graph(graph)
         for problem in problems:
             yield problem.as_located_advice()
+            return  # If dependency graph is not complete, we will not lint it's contents
         context_factory = self._context_factory
 
         class LintingWalker(DependencyGraphWalker[LocatedAdvice]):
