@@ -137,8 +137,8 @@ def test_linter_walks_directory(mock_path_lookup, local_code_linter) -> None:
     path = Path(__file__).parent / "../samples" / "simulate-sys-path"
     paths: set[Path] = set()
     advices = list(local_code_linter.lint_path(path, paths))
-    assert len(paths) > 10
     assert not advices
+    assert len(paths) > 10
 
 
 def test_linter_lints_children_in_context(mock_path_lookup, local_code_linter) -> None:
