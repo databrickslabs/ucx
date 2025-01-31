@@ -216,6 +216,10 @@ class FolderLoader(DependencyLoader):
 
 
 class ImportFileResolver(BaseImportResolver, BaseFileResolver):
+    """Resolve module import
+
+    TODO: Split into two classes
+    """
 
     def __init__(self, file_loader: FileLoader, allow_list: KnownList):
         super().__init__()
@@ -223,6 +227,7 @@ class ImportFileResolver(BaseImportResolver, BaseFileResolver):
         self._file_loader = file_loader
 
     def resolve_file(self, path_lookup, path: Path) -> MaybeDependency:
+        """Locates a file."""
         absolute_path = path_lookup.resolve(path)
         if absolute_path:
             return MaybeDependency(Dependency(self._file_loader, absolute_path), [])
@@ -230,6 +235,7 @@ class ImportFileResolver(BaseImportResolver, BaseFileResolver):
         return MaybeDependency(None, [problem])
 
     def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
+        """Resolve a simple or composite import name."""
         maybe = self._resolve_allow_list(name)
         if maybe is not None:
             return maybe
@@ -239,6 +245,7 @@ class ImportFileResolver(BaseImportResolver, BaseFileResolver):
         return self._fail('import-not-found', f"Could not locate import: {name}")
 
     def _resolve_allow_list(self, name: str) -> MaybeDependency | None:
+        """Reuse known module"""
         compatibility = self._allow_list.module_compatibility(name)
         if not compatibility.known:
             logger.debug(f"Resolving unknown import: {name}")
@@ -246,6 +253,7 @@ class ImportFileResolver(BaseImportResolver, BaseFileResolver):
         return MaybeDependency(None, [])  # Known problems are surfaced during linting
 
     def _resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency | None:
+        """Resolve a simple or composite import name."""
         if not name:
             return MaybeDependency(None, [DependencyProblem("ucx-bug", "Import name is empty")])
         parts = []
