@@ -150,6 +150,16 @@ def test_linter_lints_children_in_context(mock_path_lookup, local_code_linter) -
     assert not advices
 
 
+def test_linter_lints_import_from_known_list(tmp_path, mock_path_lookup, local_code_linter) -> None:
+    content = "import pyspark.sql.functions"  # Has known issues
+    path = tmp_path / "file.py"
+    path.write_text(content)
+    located_advices = list(local_code_linter.lint_path(path))
+    assert located_advices
+    assert not [la for la in located_advices if la.advice.start_line > 1], "Start line cannot be after than total lines"
+    assert not [la for la in located_advices if la.path == path], "Advice should be given for respective module"
+
+
 def test_triple_dot_import() -> None:
     file_resolver = ImportFileResolver(FileLoader(), KnownList())
     path_lookup = create_autospec(PathLookup)
