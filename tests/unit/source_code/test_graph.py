@@ -9,9 +9,10 @@ from databricks.labs.ucx.source_code.files import FileLoader
 from databricks.labs.ucx.source_code.graph import (
     Dependency,
     DependencyGraph,
+    DependencyGraphWalker,
     DependencyProblem,
     InheritedContext,
-    DependencyGraphWalker,
+    MaybeDependency,
 )
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
@@ -219,6 +220,18 @@ def test_graph_walker_captures_lineage(mock_path_lookup, simple_dependency_resol
 
     walker = _TestWalker(root_graph, set(), mock_path_lookup)
     _ = list(_ for _ in walker)
+
+
+def test_maybe_dependency_raises_value_error_if_no_dependency_nor_problems() -> None:
+    with pytest.raises(ValueError, match="Dependency or problems should be given: *"):
+        MaybeDependency(None, [])
+
+
+def test_maybe_dependency_raises_value_error_if_dependency_and_problems() -> None:
+    dependency = Dependency(FileLoader(), Path("test"))
+    problem = DependencyProblem("code", "message")
+    with pytest.raises(ValueError, match="Dependency and problems should not be both given: *"):
+        MaybeDependency(dependency, [problem])
 
 
 def test_dependency_problem_has_path_missing_by_default() -> None:
