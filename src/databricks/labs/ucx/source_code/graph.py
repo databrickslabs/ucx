@@ -69,10 +69,6 @@ class DependencyGraph:
         if not name:
             return [DependencyProblem('import-empty', 'Empty import name')]
         maybe = self._resolver.resolve_import(self.path_lookup, name)
-        if maybe.dependency and getattr(maybe.dependency, "known", False):  # TODO: Use proper type hinting, not getattr
-            # Known modules are not registered for optimization reasons as it avoid traversing a known dependency graph
-            # Known module's problem are surfaced during linting
-            return []
         if maybe.problems:
             return maybe.problems
         assert maybe.dependency is not None
@@ -98,6 +94,10 @@ class DependencyGraph:
         # nay, create the child graph and populate it
         child_graph = DependencyGraph(dependency, self, self._resolver, self._path_lookup, self._session_state)
         self._dependencies[dependency] = child_graph
+        if getattr(dependency, "known", False):  # TODO: Use proper type hinting, not getattr
+            # Known modules are not registered for optimization reasons as it avoid traversing a known dependency graph
+            # Known module's problem are surfaced during linting
+            return MaybeGraph(child_graph, [])
         container = dependency.load(self.path_lookup)
         # TODO: Return either (child) graph OR problems
         if not container:
