@@ -65,11 +65,17 @@ class DependencyGraph:
         return maybe_graph.problems
 
     def register_import(self, name: str) -> list[DependencyProblem]:
+        """Register an import of a module."""
         if not name:
             return [DependencyProblem('import-empty', 'Empty import name')]
         maybe = self._resolver.resolve_import(self.path_lookup, name)
-        if not maybe.dependency:
+        if maybe.dependency and getattr(maybe.dependency, "known", False):  # TODO: Use proper type hinting, not getattr
+            # Known modules are not registered for optimization reasons as it avoid traversing a known dependency graph
+            # Known module's problem are surfaced during linting
+            return []
+        if maybe.problems:
             return maybe.problems
+        assert maybe.dependency is not None
         maybe_graph = self.register_dependency(maybe.dependency)
         return maybe_graph.problems
 
