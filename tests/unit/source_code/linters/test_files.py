@@ -195,7 +195,7 @@ def test_import_resolver_resolves_known_import() -> None:
 
     maybe_dependency = resolver.resolve_import(path_lookup, "numpy")
 
-    assert maybe_dependency.dependency == ModuleDependency(file_loader, module_name="numpy")
+    assert maybe_dependency.dependency == ModuleDependency(file_loader, module_name="numpy", known=True)
     path_lookup.resolve.assert_has_calls([call(Path('numpy.py')), call(Path("numpy/__init__.py"))])
 
 
