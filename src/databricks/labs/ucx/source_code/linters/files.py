@@ -221,9 +221,14 @@ class ModuleDependency(Dependency):
     Next to the default parameters, this dependency has a module name.
     """
 
-    def __init__(self, loader: DependencyLoader, *, path: Path = Path("<MISSING_SOURCE_PATH>"), module_name: str) -> None:
+    def __init__(
+        self, loader: DependencyLoader, *, path: Path = Path("<MISSING_SOURCE_PATH>"), module_name: str
+    ) -> None:
         super().__init__(loader, path, inherits_context=False)
         self._module_name = module_name
+
+    def __repr__(self) -> str:
+        return f"ModuleDependency<{self._module_name} ({self._path})>"
 
 
 class ImportFileResolver(BaseImportResolver, BaseFileResolver):
