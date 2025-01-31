@@ -1,5 +1,5 @@
 from pathlib import Path
-from unittest.mock import Mock, create_autospec
+from unittest.mock import Mock, call, create_autospec
 
 import pytest
 from databricks.labs.blueprint.tui import MockPrompts
@@ -15,11 +15,12 @@ from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.source_code.linters.files import (
+    Folder,
+    FolderLoader,
     LocalFileMigrator,
     LocalCodeLinter,
-    FolderLoader,
+    ModuleDependency,
     ImportFileResolver,
-    Folder,
 )
 from databricks.labs.ucx.source_code.files import FileLoader
 from databricks.labs.ucx.source_code.linters.context import LinterContext
@@ -184,6 +185,18 @@ def test_single_dot_import() -> None:
     assert maybe.dependency is not None
     assert maybe.dependency.path == Path('/some/path/to/folder/foo.py')
     path_lookup.resolve.assert_called_once_with(Path('/some/path/to/folder/foo.py'))
+
+
+def test_import_resolver_resolves_known_import() -> None:
+    file_loader = FileLoader()
+    resolver = ImportFileResolver(file_loader, KnownList())
+    path_lookup = create_autospec(PathLookup)
+    path_lookup.resolve.return_value = None
+
+    maybe_dependency = resolver.resolve_import(path_lookup, "numpy")
+
+    assert maybe_dependency.dependency == ModuleDependency(file_loader, module_name="numpy")
+    path_lookup.resolve.assert_has_calls([call(Path('numpy.py')), call(Path("numpy/__init__.py"))])
 
 
 def test_folder_has_repr() -> None:
