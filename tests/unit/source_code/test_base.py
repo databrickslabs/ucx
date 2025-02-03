@@ -10,6 +10,7 @@ from databricks.labs.ucx.source_code.base import (
     Deprecation,
     LocatedAdvice,
     Failure,
+    Fixer,
     UsedTable,
 )
 
@@ -70,3 +71,33 @@ def test_located_advice_message() -> None:
     located_advice = LocatedAdvice(advice, Path("test.py"))
 
     assert str(located_advice) == "test.py:1:0: [code] message"
+
+
+def test_fixer_is_supported_for_diagnostic_test_code() -> None:
+    class TestFixer(Fixer):
+        @property
+        def diagnostic_code(self) -> str:
+            return "test"
+
+        def apply(self, code) -> str:
+            return "not-implemented"
+
+    fixer = TestFixer()
+
+    assert fixer.is_supported("test")
+    assert not fixer.is_supported("other-code")
+
+
+def test_fixer_is_never_supported_for_diagnostic_empty_code() -> None:
+    class TestFixer(Fixer):
+        @property
+        def diagnostic_code(self) -> str:
+            return ""
+
+        def apply(self, code) -> str:
+            return "not-implemented"
+
+    fixer = TestFixer()
+
+    assert not fixer.is_supported("test")
+    assert not fixer.is_supported("other-code")
