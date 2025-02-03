@@ -333,6 +333,7 @@ class FileLinter:
         dependency: Dependency,
         path_lookup: PathLookup,
         context: LinterContext,
+        *,
         inherited_tree: Tree | None = None,
     ):
         self._dependency = dependency
