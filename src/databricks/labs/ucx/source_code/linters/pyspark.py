@@ -530,8 +530,8 @@ class FromTableSqlPyLinter(_SparkSqlPyLinter):
        ```
     """
 
-    def __init__(self, sql_linter: FromTableSqlLinter, sql_fixer: FromTableSqlLinter):
-        super().__init__(sql_linter, sql_fixer)
+    def __init__(self, sql_linter: FromTableSqlLinter):
+        super().__init__(sql_linter, sql_linter)
 
     @property
     def diagnostic_code(self) -> str:

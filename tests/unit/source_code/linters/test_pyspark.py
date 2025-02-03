@@ -119,7 +119,7 @@ for i in range(10):
 """
     session_state = CurrentSessionState()
     from_table = FromTableSqlLinter(migration_index, session_state)
-    spark_linter = FromTableSqlPyLinter(from_table, from_table)
+    spark_linter = FromTableSqlPyLinter(from_table)
     fixed_code = spark_linter.apply(source_code)
     assert fixed_code == expected_code
 

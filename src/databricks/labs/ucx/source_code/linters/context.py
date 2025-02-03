@@ -58,7 +58,7 @@ class LinterContext:
             sql_linters.append(from_table)
             sql_fixers.append(from_table)
             sql_table_collectors.append(from_table)
-            spark_sql = FromTableSqlPyLinter(from_table, from_table)
+            spark_sql = FromTableSqlPyLinter(from_table)
             python_linters.append(spark_sql)
             python_fixers.append(spark_sql)
             python_table_collectors.append(SparkSqlTablePyCollector(from_table))
