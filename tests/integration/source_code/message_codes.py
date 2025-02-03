@@ -17,8 +17,20 @@ def main():
         tree = maybe_tree.tree
         # recursively detect values of "code" kwarg in calls
         for node in tree.walk():
-            if not isinstance(node, astroid.Call):
+            if not isinstance(node, (astroid.Call, astroid.ClassDef)):
                 continue
+            # Filter coders from Fixer classes
+            if isinstance(node, astroid.ClassDef):
+                diagnostic_code_methods = []
+                for child_node in node.body:
+                    if isinstance(child_node, astroid.FunctionDef) and child_node.name == "diagnostic_code":
+                        diagnostic_code_methods.append(child_node)
+                if diagnostic_code_methods and diagnostic_code_methods[0].body:
+                    problem_code = diagnostic_code_methods[0].body[0].value.value
+                    print("found code", problem_code)
+                    codes.add(problem_code)
+                continue
+            # Filter codes from Advice calls
             for keyword in node.keywords:
                 name = keyword.arg
                 if name != "code":
@@ -32,4 +44,8 @@ def main():
 
 
 if __name__ == "__main__":
+    main()
+
+
+def test_main():
     main()
