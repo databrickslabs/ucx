@@ -3,7 +3,7 @@ import pytest
 from databricks.labs.ucx.source_code.graph import Dependency
 from databricks.labs.ucx.source_code.files import FileLoader
 from databricks.labs.ucx.source_code.linters.context import LinterContext
-from databricks.labs.ucx.source_code.notebooks.sources import FileLinter
+from databricks.labs.ucx.source_code.linters.files import FileLinter
 
 
 def test_file_linter_lints_python(tmp_path, migration_index, mock_path_lookup) -> None:

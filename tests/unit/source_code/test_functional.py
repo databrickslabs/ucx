@@ -18,7 +18,7 @@ from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.files import FileLoader
 from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader
-from databricks.labs.ucx.source_code.notebooks.sources import FileLinter
+from databricks.labs.ucx.source_code.linters.files import FileLinter
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 

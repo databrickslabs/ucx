@@ -176,7 +176,7 @@ class KnownList:
         # Avoiding circular import when rebuilding KnownList as FileLinter uses KnownList to skip known libraries
         # for optimization reasons, while here we add new libraries to the KnownList
         # pylint: disable-next=import-outside-toplevel,cyclic-import
-        from databricks.labs.ucx.source_code.notebooks.sources import FileLinter
+        from databricks.labs.ucx.source_code.linters.files import FileLinter
 
         empty_index = TableMigrationIndex([])
         relative_path = module_path.relative_to(library_root)
