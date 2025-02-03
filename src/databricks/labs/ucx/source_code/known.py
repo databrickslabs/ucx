@@ -19,7 +19,6 @@ from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.graph import Dependency, DependencyProblem
 from databricks.labs.ucx.source_code.files import FileLoader
 from databricks.labs.ucx.source_code.linters.context import LinterContext
-from databricks.labs.ucx.source_code.notebooks.sources import FileLinter
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 logger = logging.getLogger(__name__)
@@ -174,6 +173,11 @@ class KnownList:
 
     @classmethod
     def _analyze_file(cls, known_distributions, library_root, dist_info, module_path) -> None:
+        # Avoiding circular import when rebuilding KnownList as FileLinter uses KnownList to skip known libraries
+        # for optimization reasons, while here we add new libraries to the KnownList
+        # pylint: disable-next=import-outside-toplevel,cyclic-import
+        from databricks.labs.ucx.source_code.notebooks.sources import FileLinter
+
         empty_index = TableMigrationIndex([])
         relative_path = module_path.relative_to(library_root)
         module_ref = relative_path.as_posix().replace('/', '.')
@@ -184,7 +188,7 @@ class KnownList:
         session_state = CurrentSessionState()
         ctx = LinterContext(empty_index, session_state)
         dependency = Dependency(FileLoader(), module_path)
-        linter = FileLinter(dependency, PathLookup.from_sys_path(module_path.parent), ctx)
+        linter = FileLinter(dependency, PathLookup.from_sys_path(module_path.parent), ctx, allow_list=cls())
         known_problems = set()
         for problem in linter.lint():
             known_problems.add(KnownProblem(problem.code, problem.message))

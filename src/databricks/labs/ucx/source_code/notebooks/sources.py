@@ -26,6 +26,7 @@ from databricks.labs.ucx.source_code.graph import (
     SourceContainer,
 )
 from databricks.labs.ucx.source_code.files import LocalFile
+from databricks.labs.ucx.source_code.known import KnownList
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.linters.imports import (
     SysPathChange,
@@ -334,11 +335,13 @@ class FileLinter:
         path_lookup: PathLookup,
         context: LinterContext,
         *,
+        allow_list: KnownList | None = None,
         inherited_tree: Tree | None = None,
     ):
         self._dependency = dependency
         self._path_lookup = path_lookup
         self._context = context
+        self._allow_list = allow_list or KnownList()
         self._inherited_tree = inherited_tree
 
     def lint(self) -> Iterable[Advice]:
