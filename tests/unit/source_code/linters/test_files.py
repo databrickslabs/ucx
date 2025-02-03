@@ -162,7 +162,7 @@ def test_linter_lints_import_from_known_list(tmp_path, mock_path_lookup, local_c
             "jvm-access-in-shared-clusters", "Cannot access Spark Driver JVM on UC Shared Clusters", -1, -1, -1, -1
         ),
         Failure(
-            "jvm-access-in-shared-clusters",
+            "legacy-context-in-shared-clusters",
             "sc is not supported on UC Shared Clusters. Rewrite it using spark",
             -1,
             -1,
