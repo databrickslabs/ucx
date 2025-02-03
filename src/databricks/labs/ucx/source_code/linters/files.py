@@ -241,14 +241,14 @@ class ModuleDependency(Dependency):
 
     def __init__(self, loader: DependencyLoader, *, path: Path | None = None, module_name: str, known: bool) -> None:
         super().__init__(loader, path or self._MISSING_SOURCE_PATH, inherits_context=False)
-        self._module_name = module_name
+        self.module_name = module_name
         self.known = known
 
         if self._path == self._MISSING_SOURCE_PATH and not self.known:
             assert ValueError("Only known modules can have a missing source path.")
 
     def __repr__(self) -> str:
-        return f"ModuleDependency<{self._module_name} ({self._path})>"
+        return f"ModuleDependency<{self.module_name} ({self._path})>"
 
 
 class ImportFileResolver(BaseImportResolver, BaseFileResolver):
@@ -533,6 +533,14 @@ class FileLinter:
 
     def lint(self) -> Iterable[Advice]:
         """Lint the file."""
+        if isinstance(self._dependency, ModuleDependency):
+            compatibility = self._allow_list.module_compatibility(self._dependency.module_name)
+            if compatibility.known:
+                # TODO: Move into Advisory
+                # TODO: Add location information (https://github.com/databrickslabs/ucx/issues/3625)
+                advices = [Failure(p.code, p.message, -1, -1, -1, -1) for p in compatibility.problems]
+                yield from advices
+                return
         if self._dependency.path.suffix.lower() in self._IGNORED_SUFFIXES:
             return
         if self._dependency.path.name.lower() in self._IGNORED_NAMES:
