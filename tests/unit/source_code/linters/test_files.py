@@ -218,6 +218,50 @@ def test_folder_has_repr() -> None:
     assert len(repr(folder)) > 0
 
 
+S3FS_DEPRECATION_MESSAGE = (
+    'S3fs library assumes AWS IAM Instance Profile to work with '
+    'S3, which is not compatible with Databricks Unity Catalog, '
+    'that routes access through Storage Credentials.'
+)
+
+
+@pytest.mark.parametrize(
+    "source, maybe_failure",
+    [
+        (
+            "import s3fs",
+            Failure("direct-filesystem-access", S3FS_DEPRECATION_MESSAGE, -1, -1, -1, -1),
+        ),
+        (
+            "from s3fs import something",
+            Failure("direct-filesystem-access", S3FS_DEPRECATION_MESSAGE, -1, -1, -1, -1),
+        ),
+        ("import certifi", None),
+        ("from certifi import core", None),
+        (
+            "import s3fs, certifi",
+            Failure("direct-filesystem-access", S3FS_DEPRECATION_MESSAGE, -1, -1, -1, -1),
+        ),
+        ("from certifi import core, s3fs", None),
+        ("def func():\n    import s3fs", Failure("direct-filesystem-access", S3FS_DEPRECATION_MESSAGE, -1, -1, -1, -1)),
+        ("import s3fs as s", Failure("direct-filesystem-access", S3FS_DEPRECATION_MESSAGE, -1, -1, -1, -1)),
+        (
+            "from s3fs.subpackage import something",
+            Failure("direct-filesystem-access", S3FS_DEPRECATION_MESSAGE, -1, -1, -1, -1),
+        ),
+        ("", None),
+    ],
+)
+def test_file_linter_lints_s3_direct_file_system_access(
+    tmp_path, local_code_linter, source: str, maybe_failure: Failure | None
+) -> None:
+    expected = [LocatedAdvice(maybe_failure, Path("<MISSING_SOURCE_PATH>"))] if maybe_failure else []
+    path = tmp_path / "test_detect_s3fs_import.py"
+    path.write_text(source)
+    advices = list(local_code_linter.lint_path(path))
+    assert advices == expected
+
+
 site_packages = locate_site_packages()
 
 
