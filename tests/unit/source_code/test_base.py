@@ -76,7 +76,7 @@ def test_located_advice_message() -> None:
 def test_fixer_is_supported_for_diagnostic_test_code() -> None:
     class TestFixer(Fixer):
         @property
-        def diagnostic_code(self) -> str | None:
+        def diagnostic_code(self) -> str:
             return "test"
 
         def apply(self, code) -> str:
@@ -88,11 +88,11 @@ def test_fixer_is_supported_for_diagnostic_test_code() -> None:
     assert not fixer.is_supported("other-code")
 
 
-def test_fixer_is_never_supported_for_diagnostic_none_code() -> None:
+def test_fixer_is_never_supported_for_diagnostic_empty_code() -> None:
     class TestFixer(Fixer):
         @property
-        def diagnostic_code(self) -> str | None:
-            return None
+        def diagnostic_code(self) -> str:
+            return ""
 
         def apply(self, code) -> str:
             return "not-implemented"

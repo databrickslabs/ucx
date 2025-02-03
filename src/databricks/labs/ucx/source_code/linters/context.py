@@ -24,7 +24,8 @@ from databricks.labs.ucx.source_code.linters.directfs import DirectFsAccessPyLin
 from databricks.labs.ucx.source_code.linters.imports import DbutilsPyLinter
 
 from databricks.labs.ucx.source_code.linters.pyspark import (
-    SparkSqlPyLinter,
+    DirectFsAccessSqlPylinter,
+    FromTableSqlPyLinter,
     SparkTableNamePyLinter,
     SparkSqlTablePyCollector,
 )
@@ -57,7 +58,7 @@ class LinterContext:
             sql_linters.append(from_table)
             sql_fixers.append(from_table)
             sql_table_collectors.append(from_table)
-            spark_sql = SparkSqlPyLinter(from_table, from_table)
+            spark_sql = FromTableSqlPyLinter(from_table, from_table)
             python_linters.append(spark_sql)
             python_fixers.append(spark_sql)
             python_table_collectors.append(SparkSqlTablePyCollector(from_table))
@@ -75,7 +76,7 @@ class LinterContext:
             DBRv8d0PyLinter(dbr_version=session_state.dbr_version),
             SparkConnectPyLinter(session_state),
             DbutilsPyLinter(session_state),
-            SparkSqlPyLinter(sql_direct_fs, None),
+            DirectFsAccessSqlPylinter(sql_direct_fs),
         ]
 
         python_dfsa_collectors += [DirectFsAccessPyLinter(session_state, prevent_spark_duplicates=False)]

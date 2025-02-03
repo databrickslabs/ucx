@@ -1,17 +1,15 @@
-from typing import cast
-
 import pytest
 
 from astroid import Call, Const, Expr  # type: ignore
 
 from databricks.sdk.service.workspace import Language
 
-from databricks.labs.ucx.source_code.base import Deprecation, CurrentSessionState, SqlLinter
+from databricks.labs.ucx.source_code.base import Deprecation, CurrentSessionState
 from databricks.labs.ucx.source_code.linters.context import LinterContext
-from databricks.labs.ucx.source_code.python.python_ast import MaybeTree, TreeHelper
-from databricks.labs.ucx.source_code.linters.pyspark import SparkSqlPyLinter
+from databricks.labs.ucx.source_code.linters.pyspark import FromTableSqlPyLinter
 from databricks.labs.ucx.source_code.linters.from_table import FromTableSqlLinter
 from databricks.labs.ucx.source_code.linters.pyspark import SparkCallMatcher, SparkTableNamePyLinter
+from databricks.labs.ucx.source_code.python.python_ast import MaybeTree, TreeHelper
 
 
 def test_spark_no_sql(empty_index) -> None:
@@ -33,30 +31,27 @@ df4.write.saveAsTable(f"{schema}.member_measure")
     assert not list(sqf.lint(source))
 
 
-def test_spark_sql_no_match(empty_index) -> None:
+def test_linter_context_python_linter_lints_table_pending_migration_with_empty_index(empty_index) -> None:
+    source_code = """
+    for i in range(10):
+        result = spark.sql("SELECT * FROM old.things").collect()
+        print(len(result))
+    """
     context = LinterContext(empty_index, CurrentSessionState())
-    sql_linter = context.linter(Language.SQL)
-    spark_linter = SparkSqlPyLinter(cast(SqlLinter, sql_linter), None)
-
-    old_code = """
-for i in range(10):
-    result = spark.sql("SELECT * FROM old.things").collect()
-    print(len(result))
-"""
-
-    assert not list(spark_linter.lint(old_code))
+    linter = context.linter(Language.PYTHON)
+    advices = list(linter.lint(source_code))
+    assert not advices
 
 
-def test_spark_sql_match(migration_index) -> None:
+def test_linter_context_python_linter_lints_migrated_table_and_dfsa(migration_index) -> None:
+    source_code = """
+    spark.sql("SELECT * FROM old.things")
+    spark.sql("SELECT * FROM csv.`s3://bucket/path`")
+    """
     context = LinterContext(migration_index, CurrentSessionState())
-    sql_linter = context.linter(Language.SQL)
-    spark_linter = SparkSqlPyLinter(cast(SqlLinter, sql_linter), None)
-    python_code = """
-spark.sql("SELECT * FROM old.things")
-spark.sql("SELECT * FROM csv.`s3://bucket/path`")
-"""
-    advices = list(spark_linter.lint(python_code))
-    assert [
+    linter = context.linter(Language.PYTHON)
+    advices = list(linter.lint(source_code))
+    assert advices == [
         Deprecation(
             code='table-migrated-to-uc-python-sql',
             message='Table old.things is migrated to brand.new.stuff in Unity Catalog',
@@ -73,26 +68,25 @@ spark.sql("SELECT * FROM csv.`s3://bucket/path`")
             end_line=2,
             end_col=49,
         ),
-    ] == advices
+    ]
 
 
-def test_spark_sql_match_named(migration_index) -> None:
+def test_linter_context_python_linter_lints_sql_query_parameter(migration_index) -> None:
+    source_code = """
+    for i in range(10):
+        result = spark.sql(args=[1], sqlQuery = "SELECT * FROM old.things").collect()
+        print(len(result))
+    """
     context = LinterContext(migration_index, CurrentSessionState())
-    sql_linter = context.linter(Language.SQL)
-    spark_linter = SparkSqlPyLinter(cast(SqlLinter, sql_linter), None)
-    old_code = """
-spark.read.csv("s3://bucket/path")
-for i in range(10):
-    result = spark.sql(args=[1], sqlQuery = "SELECT * FROM old.things").collect()
-    print(len(result))
-"""
-    assert list(spark_linter.lint(old_code)) == [
+    linter = context.linter(Language.PYTHON)
+    advices = list(linter.lint(source_code))
+    assert advices == [
         Deprecation(
             code='table-migrated-to-uc-python-sql',
             message='Table old.things is migrated to brand.new.stuff in Unity Catalog',
-            start_line=3,
+            start_line=2,
             start_col=13,
-            end_line=3,
+            end_line=2,
             end_col=71,
         ),
     ]
@@ -110,24 +104,24 @@ for table in spark.catalog.listTables():
     assert fixed_code.rstrip() == old_code.rstrip()
 
 
-def test_spark_sql_tablename_fix(migration_index) -> None:
-    session_state = CurrentSessionState()
-    ftf = FromTableSqlLinter(migration_index, session_state)
-    spark_linter = SparkSqlPyLinter(ftf, ftf)
-
-    old_code = """spark.read.csv("s3://bucket/path")
+def test_from_table_sql_py_linter_fixes_migrated_table(migration_index) -> None:
+    source_code = """spark.read.csv("s3://bucket/path")
 for i in range(10):
     result = spark.sql("SELECT * FROM old.things").collect()
     print(len(result))
+
 """
-    fixed_code = spark_linter.apply(old_code)
-    assert (
-        fixed_code.rstrip()
-        == """spark.read.csv('s3://bucket/path')
+    expected_code = """spark.read.csv('s3://bucket/path')
 for i in range(10):
     result = spark.sql('SELECT * FROM brand.new.stuff').collect()
-    print(len(result))"""
-    )
+    print(len(result))
+
+"""
+    session_state = CurrentSessionState()
+    from_table = FromTableSqlLinter(migration_index, session_state)
+    spark_linter = FromTableSqlPyLinter(from_table, from_table)
+    fixed_code = spark_linter.apply(source_code)
+    assert fixed_code == expected_code
 
 
 @pytest.mark.parametrize(
