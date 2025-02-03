@@ -112,9 +112,9 @@ def local_code_linter(mock_path_lookup, migration_index):
     file_loader = FileLoader()
     folder_loader = FolderLoader(notebook_loader, file_loader)
     allow_list = KnownList()
-    pip_resolver = PythonLibraryResolver(allow_list)
+    pip_resolver = PythonLibraryResolver(allow_list=allow_list)
     session_state = CurrentSessionState()
-    import_file_resolver = ImportFileResolver(file_loader, allow_list)
+    import_file_resolver = ImportFileResolver(file_loader, allow_list=allow_list)
     resolver = DependencyResolver(
         pip_resolver,
         NotebookResolver(NotebookLoader()),
@@ -174,7 +174,7 @@ def test_linter_lints_import_from_known_list(tmp_path, mock_path_lookup, local_c
 
 
 def test_triple_dot_import() -> None:
-    file_resolver = ImportFileResolver(FileLoader(), KnownList())
+    file_resolver = ImportFileResolver(FileLoader(), allow_list=KnownList())
     path_lookup = create_autospec(PathLookup)
     path_lookup.cwd.as_posix.return_value = '/some/path/to/folder'
     path_lookup.resolve.return_value = Path('/some/path/foo.py')
@@ -187,7 +187,7 @@ def test_triple_dot_import() -> None:
 
 
 def test_single_dot_import() -> None:
-    file_resolver = ImportFileResolver(FileLoader(), KnownList())
+    file_resolver = ImportFileResolver(FileLoader(), allow_list=KnownList())
     path_lookup = create_autospec(PathLookup)
     path_lookup.cwd.as_posix.return_value = '/some/path/to/folder'
     path_lookup.resolve.return_value = Path('/some/path/to/folder/foo.py')
@@ -201,7 +201,7 @@ def test_single_dot_import() -> None:
 
 def test_import_resolver_resolves_known_import() -> None:
     file_loader = FileLoader()
-    resolver = ImportFileResolver(file_loader, KnownList())
+    resolver = ImportFileResolver(file_loader, allow_list=KnownList())
     path_lookup = create_autospec(PathLookup)
     path_lookup.resolve.return_value = None
 
@@ -234,8 +234,8 @@ def test_known_issues(path: Path, migration_index) -> None:
     session_state = CurrentSessionState()
     allow_list = KnownList()
     notebook_resolver = NotebookResolver(NotebookLoader())
-    import_resolver = ImportFileResolver(file_loader, allow_list)
-    pip_resolver = PythonLibraryResolver(allow_list)
+    import_resolver = ImportFileResolver(file_loader, allow_list=allow_list)
+    pip_resolver = PythonLibraryResolver(allow_list=allow_list)
     resolver = DependencyResolver(pip_resolver, notebook_resolver, import_resolver, import_resolver, path_lookup)
     linter = LocalCodeLinter(
         notebook_loader,

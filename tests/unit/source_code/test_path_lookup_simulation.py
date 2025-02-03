@@ -47,8 +47,8 @@ def test_locates_notebooks(source: list[str], expected: int, mock_path_lookup) -
     notebook_loader = NotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
     allow_list = KnownList()
-    import_resolver = ImportFileResolver(file_loader, allow_list)
-    pip_resolver = PythonLibraryResolver(allow_list)
+    import_resolver = ImportFileResolver(file_loader, allow_list=allow_list)
+    pip_resolver = PythonLibraryResolver(allow_list=allow_list)
     dependency_resolver = DependencyResolver(
         pip_resolver, notebook_resolver, import_resolver, import_resolver, mock_path_lookup
     )
@@ -76,8 +76,8 @@ def test_locates_files(source: list[str], expected: int) -> None:
     file_loader = FileLoader()
     notebook_loader = NotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
-    import_resolver = ImportFileResolver(file_loader, allow_list)
-    pip_resolver = PythonLibraryResolver(allow_list)
+    import_resolver = ImportFileResolver(file_loader, allow_list=allow_list)
+    pip_resolver = PythonLibraryResolver(allow_list=allow_list)
     resolver = DependencyResolver(pip_resolver, notebook_resolver, import_resolver, import_resolver, lookup)
     maybe = resolver.build_local_file_dependency_graph(file_path, CurrentSessionState())
     assert not maybe.problems
@@ -115,8 +115,8 @@ sys.path.append('{child_dir_path.as_posix()}')
         notebook_resolver = NotebookResolver(notebook_loader)
         file_loader = FileLoader()
         allow_list = KnownList()
-        import_resolver = ImportFileResolver(file_loader, allow_list)
-        pip_resolver = PythonLibraryResolver(allow_list)
+        import_resolver = ImportFileResolver(file_loader, allow_list=allow_list)
+        pip_resolver = PythonLibraryResolver(allow_list=allow_list)
         resolver = DependencyResolver(pip_resolver, notebook_resolver, import_resolver, import_resolver, lookup)
         maybe = resolver.build_notebook_dependency_graph(parent_file_path, CurrentSessionState())
         assert not maybe.problems
@@ -155,8 +155,8 @@ def func():
         notebook_resolver = NotebookResolver(notebook_loader)
         allow_list = KnownList()
         file_loader = FileLoader()
-        import_resolver = ImportFileResolver(file_loader, allow_list)
-        pip_resolver = PythonLibraryResolver(allow_list)
+        import_resolver = ImportFileResolver(file_loader, allow_list=allow_list)
+        pip_resolver = PythonLibraryResolver(allow_list=allow_list)
         resolver = DependencyResolver(pip_resolver, notebook_resolver, import_resolver, import_resolver, lookup)
         maybe = resolver.build_notebook_dependency_graph(parent_file_path, CurrentSessionState())
         assert not maybe.problems
