@@ -398,8 +398,28 @@ class BaseFileResolver(abc.ABC):
 
 @dataclass
 class MaybeDependency:
+    """A class:`Dependency` or a :class:`Failure`.
+
+    The `MaybeDependency` is designed to either contain a `Tree` OR a `Failure`,
+    never both or neither. Typically, a `Dependency` is constructed by a
+    resolver yielding a `MaybeDependency` with `list[Problems]` if the
+    dependency could NOT be resolved, otherwise it yields the `Dependency`,
+    resulting in code that looks like:
+
+    ``` python
+    maybe_dependency = resolver.resolve_import(path_lookup, module_name)
+    if maybe_dependency.problems:
+        # Handle failure and return early
+    assert maybe_dependency.dependency, "Dependency should be given when no problems are given."
+    # Use dependency
+    ```
+    """
+
     dependency: Dependency | None
+    """The dependency"""
+
     problems: list[DependencyProblem]
+    """The problems during constructing the dependency"""
 
 
 class DependencyResolver:
