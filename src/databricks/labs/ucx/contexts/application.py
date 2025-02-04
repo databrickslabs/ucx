@@ -65,16 +65,17 @@ from databricks.labs.ucx.hive_metastore.verification import VerifyHasCatalog, Ve
 from databricks.labs.ucx.installer.workflows import DeployedWorkflows
 from databricks.labs.ucx.progress.install import VerifyProgressTracking
 from databricks.labs.ucx.source_code.graph import DependencyResolver
-from databricks.labs.ucx.source_code.jobs import WorkflowLinter
+from databricks.labs.ucx.source_code.linters.jobs import WorkflowLinter
 from databricks.labs.ucx.source_code.known import KnownList
-from databricks.labs.ucx.source_code.linters.files import FileLoader, FolderLoader, ImportFileResolver
+from databricks.labs.ucx.source_code.folders import FolderLoader
+from databricks.labs.ucx.source_code.files import FileLoader, ImportFileResolver
 from databricks.labs.ucx.source_code.notebooks.loaders import (
     NotebookResolver,
     NotebookLoader,
 )
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
-from databricks.labs.ucx.source_code.queries import QueryLinter
-from databricks.labs.ucx.source_code.redash import Redash
+from databricks.labs.ucx.source_code.linters.queries import QueryLinter
+from databricks.labs.ucx.source_code.linters.redash import Redash
 from databricks.labs.ucx.workspace_access import generic, redash
 from databricks.labs.ucx.workspace_access.groups import GroupManager
 from databricks.labs.ucx.workspace_access.manager import PermissionManager

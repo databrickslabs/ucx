@@ -2,7 +2,7 @@ import pytest
 
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.source_code.base import DirectFsAccess, LineageAtom
-from databricks.labs.ucx.source_code.jobs import WorkflowLinter
+from databricks.labs.ucx.source_code.linters.jobs import WorkflowLinter
 
 
 def test_legacy_query_dfsa_ownership(runtime_ctx) -> None:

@@ -11,7 +11,7 @@ from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.progress.history import ProgressEncoder
 from databricks.labs.ucx.progress.install import Historical
 from databricks.labs.ucx.source_code.base import UsedTable
-from databricks.labs.ucx.source_code.queries import QueryProblem
+from databricks.labs.ucx.source_code.linters.queries import QueryProblem
 from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
 
 

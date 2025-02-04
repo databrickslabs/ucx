@@ -25,10 +25,11 @@ from databricks.labs.ucx.source_code.base import (
 from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage
-from databricks.labs.ucx.source_code.notebooks.sources import FileLinter, Notebook
+from databricks.labs.ucx.source_code.notebooks.sources import Notebook
+from databricks.labs.ucx.source_code.linters.files import FileLinter
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
-from databricks.labs.ucx.source_code.python.python_ast import MaybeTree, PythonSequentialLinter, Tree
-
+from databricks.labs.ucx.source_code.python.python_ast import MaybeTree, Tree
+from databricks.labs.ucx.source_code.linters.python import PythonSequentialLinter
 
 logger = logging.getLogger(__name__)
 T = TypeVar("T")

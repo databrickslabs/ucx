@@ -13,8 +13,6 @@ from pathlib import Path
 from typing import Any, BinaryIO, TextIO, TypeVar
 
 from astroid import NodeNG  # type: ignore
-from sqlglot import Expression, parse as parse_sql
-from sqlglot.errors import SqlglotError
 
 from databricks.sdk.service import compute
 from databricks.sdk.service.workspace import Language
@@ -123,56 +121,6 @@ class Deprecation(Advice):
 
 class Convention(Advice):
     """A suggestion for a better way to write the code."""
-
-
-class Linter:
-    @abstractmethod
-    def lint(self, code: str) -> Iterable[Advice]: ...
-
-
-class SqlLinter(Linter):
-
-    def lint(self, code: str) -> Iterable[Advice]:
-        try:
-            # TODO: unify with SqlParser.walk_expressions(...)
-            expressions = parse_sql(code, read='databricks')
-            for expression in expressions:
-                if not expression:
-                    continue
-                yield from self.lint_expression(expression)
-        except SqlglotError as e:
-            logger.debug(f"Failed to parse SQL: {code}", exc_info=e)
-            yield self.sql_parse_failure(code)
-
-    @staticmethod
-    def sql_parse_failure(code: str) -> Failure:
-        return Failure(
-            code='sql-parse-error',
-            message=f"SQL expression is not supported yet: {code}",
-            # SQLGlot does not propagate tokens yet. See https://github.com/tobymao/sqlglot/issues/3159
-            start_line=0,
-            start_col=0,
-            end_line=0,
-            end_col=1024,
-        )
-
-    @abstractmethod
-    def lint_expression(self, expression: Expression) -> Iterable[Advice]: ...
-
-
-class Fixer(ABC):
-
-    @property
-    @abstractmethod
-    def diagnostic_code(self) -> str:
-        """The diagnostic code that this fixer fixes."""
-
-    def is_supported(self, diagnostic_code: str) -> bool:
-        """Indicate if the diagnostic code is supported by this fixer."""
-        return self.diagnostic_code is not None and diagnostic_code == self.diagnostic_code
-
-    @abstractmethod
-    def apply(self, code: str) -> str: ...
 
 
 @dataclass
@@ -364,31 +312,6 @@ class CurrentSessionState:
         except ValueError:
             logger.warning(f'Unknown data_security_mode {mode_str}')
             return None
-
-
-class SqlSequentialLinter(SqlLinter, DfsaCollector, TableCollector):
-
-    def __init__(
-        self,
-        linters: list[SqlLinter],
-        dfsa_collectors: list[DfsaSqlCollector],
-        table_collectors: list[TableSqlCollector],
-    ):
-        self._linters = linters
-        self._dfsa_collectors = dfsa_collectors
-        self._table_collectors = table_collectors
-
-    def lint_expression(self, expression: Expression) -> Iterable[Advice]:
-        for linter in self._linters:
-            yield from linter.lint_expression(expression)
-
-    def collect_dfsas(self, source_code: str) -> Iterable[DirectFsAccess]:
-        for collector in self._dfsa_collectors:
-            yield from collector.collect_dfsas(source_code)
-
-    def collect_tables(self, source_code: str) -> Iterable[UsedTable]:
-        for collector in self._table_collectors:
-            yield from collector.collect_tables(source_code)
 
 
 SUPPORTED_EXTENSION_LANGUAGES = {

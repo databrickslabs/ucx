@@ -23,7 +23,9 @@ from databricks.labs.ucx.source_code.base import CurrentSessionState, LineageAto
 from databricks.labs.ucx.source_code.directfs_access import DirectFsAccess
 from databricks.labs.ucx.source_code.graph import Dependency
 from databricks.labs.ucx.source_code.known import UNKNOWN, KnownList
-from databricks.labs.ucx.source_code.linters.files import LocalCodeLinter, FileLoader, FolderLoader
+from databricks.labs.ucx.source_code.folders import FolderLoader
+from databricks.labs.ucx.source_code.files import FileLoader
+from databricks.labs.ucx.source_code.linters.folders import LocalCodeLinter
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
