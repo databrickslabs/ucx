@@ -1,5 +1,5 @@
 ## Check a literal reference to a known table that is migrated.
-# ucx[table-migrated-to-uc:+1:0:+1:38] Table old.things is migrated to brand.new.stuff in Unity Catalog
+# ucx[table-migrated-to-uc-python:+1:0:+1:38] Table old.things is migrated to brand.new.stuff in Unity Catalog
 spark.catalog.cacheTable("old.things")
 
 ## Check a literal reference to an unknown table (that is not migrated); we expect no warning.
@@ -9,7 +9,7 @@ spark.catalog.cacheTable("table.we.know.nothing.about")
 spark.catalog.cacheTable("old.things", None, "extra-argument")
 
 ## Check a call with an out-of-position named argument referencing a table known to be migrated.
-# ucx[table-migrated-to-uc:+1:0:+1:67] Table old.things is migrated to brand.new.stuff in Unity Catalog
+# ucx[table-migrated-to-uc-python:+1:0:+1:67] Table old.things is migrated to brand.new.stuff in Unity Catalog
 spark.catalog.cacheTable(storageLevel=None, tableName="old.things")
 
 ## Some calls that use a variable whose value is unknown: they could potentially reference a migrated table.

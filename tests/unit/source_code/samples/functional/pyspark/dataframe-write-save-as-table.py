@@ -3,7 +3,7 @@ df = spark.read.csv("s3://bucket/path")
 for i in range(10):
 
     ## Check a literal reference to a known table that is migrated.
-    # ucx[table-migrated-to-uc:+1:4:+1:54] Table old.things is migrated to brand.new.stuff in Unity Catalog
+    # ucx[table-migrated-to-uc-python:+1:4:+1:54] Table old.things is migrated to brand.new.stuff in Unity Catalog
     df.write.format("delta").saveAsTable("old.things")
 
     ## Check a literal reference to an unknown table (that is not migrated); we expect no warning.
@@ -13,7 +13,7 @@ for i in range(10):
     df.write.format("delta").saveAsTable("old.things", None, None, None, "extra-argument")
 
     ## Check a call with an out-of-position named argument referencing a table known to be migrated.
-    # ucx[table-migrated-to-uc:+1:4:+1:57] Table old.things is migrated to brand.new.stuff in Unity Catalog
+    # ucx[table-migrated-to-uc-python:+1:4:+1:57] Table old.things is migrated to brand.new.stuff in Unity Catalog
     df.write.saveAsTable(format="xyz", name="old.things")
 
     ## Some calls that use a variable whose value is unknown: they could potentially reference a migrated table.

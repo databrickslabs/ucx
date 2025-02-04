@@ -8,7 +8,7 @@
 USE different_db
 
 -- COMMAND ----------
--- ucx[table-migrated-to-uc:+0:0:+0:1024] Table different_db.testtable is migrated to cata2.newspace.table in Unity Catalog
+-- ucx[table-migrated-to-uc-sql:+0:0:+0:1024] Table different_db.testtable is migrated to cata2.newspace.table in Unity Catalog
 -- DBTITLE 1,A SQL cell that references tables
 
 SELECT * FROM  testtable LIMIT 10
@@ -19,13 +19,13 @@ SELECT * FROM  testtable LIMIT 10
 USE old
 
 -- COMMAND ----------
--- ucx[table-migrated-to-uc:+0:0:+0:1024] Table old.testtable is migrated to cata3.newspace.table in Unity Catalog
+-- ucx[table-migrated-to-uc-sql:+0:0:+0:1024] Table old.testtable is migrated to cata3.newspace.table in Unity Catalog
 -- DBTITLE 1,A SQL cell that references tables
 
 SELECT * FROM  testtable LIMIT 10
 
 -- COMMAND ----------
--- ucx[table-migrated-to-uc:+0:0:+0:1024] Table old.stuff is migrated to brand.new.things in Unity Catalog
+-- ucx[table-migrated-to-uc-sql:+0:0:+0:1024] Table old.stuff is migrated to brand.new.things in Unity Catalog
 -- DBTITLE 1,A SQL cell that references tables
 
 SELECT * FROM  stuff LIMIT 10
@@ -38,13 +38,13 @@ SELECT * FROM  stuff LIMIT 10
 spark.sql("use different_db")
 
 -- COMMAND ----------
--- ucx[table-migrated-to-uc:+0:0:+0:1024] Table different_db.testtable is migrated to cata2.newspace.table in Unity Catalog
+-- ucx[table-migrated-to-uc-sql:+0:0:+0:1024] Table different_db.testtable is migrated to cata2.newspace.table in Unity Catalog
 -- DBTITLE 1,A SQL cell that references DBFS
 
 SELECT * FROM testtable LIMIT 10
 
 -- COMMAND ----------
--- ucx[table-migrated-to-uc:+0:0:+0:1024] Table old.testtable is migrated to cata3.newspace.table in Unity Catalog
+-- ucx[table-migrated-to-uc-sql:+0:0:+0:1024] Table old.testtable is migrated to cata3.newspace.table in Unity Catalog
 -- DBTITLE 1,A SQL cell that references DBFS
 
 SELECT * FROM old.testtable LIMIT 10
@@ -55,7 +55,7 @@ SELECT * FROM old.testtable LIMIT 10
 USE default
 
 -- COMMAND ----------
--- ucx[table-migrated-to-uc:+0:0:+0:1024] Table default.testtable is migrated to cata.nondefault.table in Unity Catalog
+-- ucx[table-migrated-to-uc-sql:+0:0:+0:1024] Table default.testtable is migrated to cata.nondefault.table in Unity Catalog
 -- DBTITLE 1,A SQL cell that references DBFS
 
 SELECT * FROM testtable LIMIT 10

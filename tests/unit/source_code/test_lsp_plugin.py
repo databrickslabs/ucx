@@ -176,7 +176,7 @@ def test_with_migration_index(workspace, config) -> None:
     assert diagnostics == [
         {
             'range': {'end': {'character': 67, 'line': 0}, 'start': {'character': 9, 'line': 0}},
-            'code': 'table-migrated-to-uc',
+            'code': 'table-migrated-to-uc-python-sql',
             'source': 'databricks.labs.ucx',
             'message': 'Table old.things is migrated to brand.new.stuff in Unity Catalog',
             'severity': 2,

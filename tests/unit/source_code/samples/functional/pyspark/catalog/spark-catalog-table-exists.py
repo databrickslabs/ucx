@@ -3,11 +3,11 @@ spark.read.csv("s3://bucket/path")
 for i in range(10):
 
     ## Check a literal reference to a known table that is migrated.
-    # ucx[table-migrated-to-uc:+1:7:+1:46] Table old.things is migrated to brand.new.stuff in Unity Catalog
+    # ucx[table-migrated-to-uc-python:+1:7:+1:46] Table old.things is migrated to brand.new.stuff in Unity Catalog
     if spark.catalog.tableExists("old.things"):
         pass
     # TODO: Fix missing migration warning:
-    # #ucx[table-migrated-to-uc:+1:0:+1:0] Table old.things is migrated to brand.new.stuff in Unity Catalog
+    # #ucx[table-migrated-to-uc-python:+1:0:+1:0] Table old.things is migrated to brand.new.stuff in Unity Catalog
     if spark.catalog.tableExists("things", "old"):
         pass
 
@@ -21,7 +21,7 @@ for i in range(10):
 
     ## Check a call with an out-of-position named argument referencing a table known to be migrated.
     # TODO: Fix missing migration warning
-    # # ucx[table-migrated-to-uc:+1:0:+1:0] Table old.things is migrated to brand.new.stuff in Unity Catalog
+    # # ucx[table-migrated-to-uc-python:+1:0:+1:0] Table old.things is migrated to brand.new.stuff in Unity Catalog
     if spark.catalog.tableExists(dbName="old", name="things"):
         pass
 

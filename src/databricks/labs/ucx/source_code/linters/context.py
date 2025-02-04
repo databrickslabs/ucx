@@ -24,7 +24,8 @@ from databricks.labs.ucx.source_code.linters.directfs import DirectFsAccessPyLin
 from databricks.labs.ucx.source_code.linters.imports import DbutilsPyLinter
 
 from databricks.labs.ucx.source_code.linters.pyspark import (
-    SparkSqlPyLinter,
+    DirectFsAccessSqlPylinter,
+    FromTableSqlPyLinter,
     SparkTableNamePyLinter,
     SparkSqlTablePyCollector,
 )
@@ -59,7 +60,7 @@ class LinterContext:
             sql_linters.append(from_table)
             sql_fixers.append(from_table)
             sql_table_collectors.append(from_table)
-            spark_sql = SparkSqlPyLinter(from_table, from_table)
+            spark_sql = FromTableSqlPyLinter(from_table)
             python_linters.append(spark_sql)
             python_fixers.append(spark_sql)
             python_table_collectors.append(SparkSqlTablePyCollector(from_table))
@@ -77,7 +78,7 @@ class LinterContext:
             DBRv8d0PyLinter(dbr_version=self.session_state.dbr_version),
             SparkConnectPyLinter(self.session_state),
             DbutilsPyLinter(self.session_state),
-            SparkSqlPyLinter(sql_direct_fs, None),
+            DirectFsAccessSqlPylinter(sql_direct_fs),
         ]
 
         python_dfsa_collectors += [DirectFsAccessPyLinter(self.session_state, prevent_spark_duplicates=False)]
@@ -114,10 +115,16 @@ class LinterContext:
         raise ValueError(f"Unsupported language: {language}")
 
     def fixer(self, language: Language, diagnostic_code: str) -> Fixer | None:
-        if language not in self._fixers:
-            return None
-        for fixer in self._fixers[language]:
-            if fixer.name == diagnostic_code:
+        """Get the fixer for a language that matches the code.
+
+        The first fixer which name matches with the diagnostic code is returned. This logic assumes the fixers have
+        unique names.
+
+        Returns :
+            Fixer | None : The fixer if a match is found, otherwise None.
+        """
+        for fixer in self._fixers.get(language, []):
+            if fixer.is_supported(diagnostic_code):
                 return fixer
         return None
 

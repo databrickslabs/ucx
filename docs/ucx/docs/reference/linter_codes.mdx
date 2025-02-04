@@ -31,11 +31,11 @@ spark.table(f"foo_{some_table_name}")
 
 We even detect string constants when coming either from `dbutils.widgets.get` (via job named parameters) or through
 loop variables. If `old.things` table is migrated to `brand.new.stuff` in Unity Catalog, the following code will
-trigger two messages: [`table-migrated-to-uc`](#table-migrated-to-uc) for the first query, as the contents are clearly
-analysable, and `cannot-autofix-table-reference` for the second query.
+trigger two messages: [`table-migrated-to-uc-{sql,python,python-sql}`](#table-migrated-to-uc-sqlpythonpython-sql) for
+the first query, as the contents are clearly analysable, and `cannot-autofix-table-reference` for the second query.
 
 ```python
-# ucx[table-migrated-to-uc:+4:4:+4:20] Table old.things is migrated to brand.new.stuff in Unity Catalog
+# ucx[table-migrated-to-uc-python-sql:+4:4:+4:20] Table old.things is migrated to brand.new.stuff in Unity Catalog
 # ucx[cannot-autofix-table-reference:+3:4:+3:20] Can't migrate table_name argument in 'spark.sql(query)' because its value cannot be computed
 table_name = f"table_{index}"
 for query in ["SELECT * FROM old.things", f"SELECT * FROM {table_name}"]:
@@ -247,12 +247,16 @@ analysis where the path is located.
 
 
 
-## `table-migrated-to-uc`
+## `table-migrated-to-uc-{sql,python,python-sql}`
 
 This message indicates that the linter has found a table that has been migrated to Unity Catalog. The user must ensure
 that the table is available in Unity Catalog.
 
-
+| Postfix    | Explanation                                     |
+|------------|-------------------------------------------------|
+| sql        | Table reference in SparkSQL                     |
+| python     | Table reference in PySpark                      |
+| python-sql | Table reference in SparkSQL called from PySpark |
 
 ## `to-json-in-shared-clusters`
 
