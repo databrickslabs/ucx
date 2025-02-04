@@ -215,6 +215,12 @@ def test_known_loader_loads_known_container_with_problems(
     path_lookup.resolve.assert_called_once_with(dependency.path)
 
 
+@pytest.mark.parametrize("problems", [[], [DependencyProblem("test", "test")]])
+def test_known_dependency_has_problems(problems: list[DependencyProblem]) -> None:
+    dependency = KnownDependency("test", problems)
+    assert dependency.problems == problems
+
+
 site_packages = locate_site_packages()
 
 
