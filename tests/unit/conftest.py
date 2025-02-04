@@ -189,9 +189,8 @@ def acc_client():
 
 
 class MockPathLookup(PathLookup):
-
-    def __init__(self, cwd: Path = Path(__file__).parent / "source_code/samples", sys_paths: list[Path] | None = None):
-        super().__init__(cwd, sys_paths or [])
+    def __init__(self, cwd='source_code/samples', sys_paths: list[Path] | None = None):
+        super().__init__(Path(__file__).parent / cwd, sys_paths or [])
 
     def change_directory(self, new_working_directory: Path) -> 'MockPathLookup':
         return MockPathLookup(new_working_directory, self._sys_paths)
