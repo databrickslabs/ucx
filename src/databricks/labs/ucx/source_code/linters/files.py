@@ -336,7 +336,8 @@ class KnownDependency(Dependency):
     """A dependency for known libraries, see :class:KnownList."""
 
     def __init__(self, module_name: str, problems: list[DependencyProblem]):
-        super().__init__(KnownLoader(), Path(f"/ucx/known/{module_name}"), inherits_context=False)
+        known_url = "https://github.com/databrickslabs/ucx/blob/main/src/databricks/labs/ucx/source_code/known.json"
+        super().__init__(KnownLoader(), Path(f"{known_url}#{module_name}"), inherits_context=False)
         self.problems = problems
         self.module_name = module_name
 
