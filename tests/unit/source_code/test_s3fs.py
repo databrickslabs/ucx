@@ -116,6 +116,10 @@ S3FS_DEPRECATION_MESSAGE = (
 def test_detect_s3fs_import(
     empty_index, source: str, expected: list[DependencyProblem], tmp_path, mock_path_lookup
 ) -> None:
+    known_url = "https://github.com/databrickslabs/ucx/blob/main/src/databricks/labs/ucx/source_code/known.json"
+    module_name = "s3fs.subpackage" if "subpackage" in source else "s3fs"
+    expected_path = Path(f"{known_url}#{module_name}")
+
     sample = tmp_path / "test_detect_s3fs_import.py"
     sample.write_text(source)
     mock_path_lookup.append_path(tmp_path)
@@ -129,7 +133,7 @@ def test_detect_s3fs_import(
         pip_resolver, notebook_resolver, import_resolver, import_resolver, mock_path_lookup
     )
     maybe = dependency_resolver.build_local_file_dependency_graph(sample, CurrentSessionState())
-    assert maybe.problems == [dataclasses.replace(_, source_path=sample) for _ in expected]
+    assert maybe.problems == [dataclasses.replace(_, source_path=expected_path) for _ in expected]
 
 
 @pytest.mark.parametrize(
@@ -153,6 +157,8 @@ def test_detect_s3fs_import(
 def test_detect_s3fs_import_in_dependencies(
     empty_index, expected: list[DependencyProblem], mock_path_lookup, mock_notebook_resolver
 ) -> None:
+    known_url = "https://github.com/databrickslabs/ucx/blob/main/src/databricks/labs/ucx/source_code/known.json"
+    expected_path = Path(f"{known_url}#s3fs")
     file_loader = FileLoader()
     allow_list = KnownList()
     import_resolver = ImportFileResolver(file_loader, allow_list)
@@ -162,4 +168,4 @@ def test_detect_s3fs_import_in_dependencies(
     )
     sample = mock_path_lookup.cwd / "root9.py"
     maybe = dependency_resolver.build_local_file_dependency_graph(sample, CurrentSessionState())
-    assert maybe.problems == expected
+    assert maybe.problems == [dataclasses.replace(p, source_path=expected_path) for p in expected]
