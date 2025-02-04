@@ -340,10 +340,10 @@ class ImportFileResolver(BaseImportResolver, BaseFileResolver):
         if not compatibility.known:
             logger.debug(f"Resolving unknown import: {name}")
             return None
-        if not compatibility.problems:
-            return MaybeDependency(None, [])
-        # TODO move to linter, see https://github.com/databrickslabs/ucx/issues/1527
-        return MaybeDependency(None, compatibility.problems)
+        if compatibility.problems:
+            # TODO move to linter, see https://github.com/databrickslabs/ucx/issues/1527
+            return MaybeDependency(None, compatibility.problems)
+        return None
 
     def _resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency | None:
         if not name:
