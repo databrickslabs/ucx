@@ -297,7 +297,7 @@ class KnownLoader(DependencyLoader):
     This loader is used in combination with the KnownList to load known dependencies and their known problems.
     """
 
-    def load_dependency(self, path_lookup: PathLookup, dependency: Dependency) -> SourceContainer | None:
+    def load_dependency(self, path_lookup: PathLookup, dependency: Dependency) -> KnownContainer:
         """Load the dependency."""
         if not isinstance(dependency, KnownDependency):
             raise RuntimeError("Only KnownDependency is supported")
