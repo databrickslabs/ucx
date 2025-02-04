@@ -189,8 +189,13 @@ def acc_client():
 
 
 class MockPathLookup(PathLookup):
-    def __init__(self, cwd='source_code/samples', sys_paths: list[Path] | None = None):
-        super().__init__(Path(__file__).parent / cwd, sys_paths or [])
+
+    def __init__(self, cwd: Path = Path(__file__).parent / "source_code/samples", sys_paths: list[Path] | None = None):
+        super().__init__(cwd, sys_paths or [])
+
+    @classmethod
+    def from_sys_path(cls, cwd: Path = Path(__file__).parent / "source_code/samples") -> PathLookup:
+        return PathLookup(cwd, [Path(path) for path in sys.path])
 
     def change_directory(self, new_working_directory: Path) -> 'MockPathLookup':
         return MockPathLookup(new_working_directory, self._sys_paths)
@@ -201,7 +206,7 @@ class MockPathLookup(PathLookup):
 
 @pytest.fixture
 def mock_path_lookup() -> PathLookup:
-    return MockPathLookup()
+    return MockPathLookup.from_sys_path()
 
 
 @pytest.fixture
