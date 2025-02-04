@@ -20,6 +20,7 @@ from astroid import (  # type: ignore
     Import,
     ImportFrom,
     Instance,
+    JoinedStr,
     Module,
     Name,
     NodeNG,
@@ -220,30 +221,31 @@ class Tree:
     def attach_child_tree(self, tree: Tree) -> None:
         """Attach a child tree.
 
-        Attaching a child tree is a **stateful** operation for both the parent and child tree. After attaching a child
-        tree, a tree can be traversed starting from the parent or child tree. From both starting points all nodes in
-        both trees can be reached, though, the order of nodes will be different as that is relative to the starting
-        point.
+        1. Make parent tree of the nodes in the child tree
+        2. Extend parents globals with child globals
+
+        Attaching a child tree is a **stateful** operation for the child tree. After attaching a child
+        tree, the tree can be traversed starting from the child tree as a child knows its parent. However, the tree can
+        not be traversed from the parent tree as that node object does not contain a list with children trees.
         """
         if not isinstance(tree.node, Module):
             raise NotImplementedError(f"Cannot attach child tree: {type(tree.node).__name__}")
         tree_module: Module = cast(Module, tree.node)
-        self.attach_nodes(tree_module.body)
+        self.attach_child_nodes(tree_module.body)
         self.extend_globals(tree_module.globals)
 
-    def attach_nodes(self, nodes: list[NodeNG]) -> None:
-        """Attach nodes.
+    def attach_child_nodes(self, nodes: list[NodeNG]) -> None:
+        """Attach child nodes.
 
-        Attaching nodes is a **stateful** operation for both this tree's node, the parent node, and the child nodes.
-        After attaching the nodes, the parent node has the nodes in its body and the child nodes have this tree's node
-        as parent node.
+        Attaching a child tree is a **stateful** operation for the child tree. After attaching a child
+        tree, the tree can be traversed starting from the child tree as a child knows its parent. However, the tree can
+        not be traversed from the parent tree as that node object does not contain a list with children trees.
         """
         if not isinstance(self.node, Module):
             raise NotImplementedError(f"Cannot attach nodes to: {type(self.node).__name__}")
         self_module: Module = cast(Module, self.node)
         for node in nodes:
             node.parent = self_module
-            self_module.body.append(node)
 
     def extend_globals(self, globs: dict[str, list[NodeNG]]) -> None:
         """Extend globals by extending the global values for each global key.
@@ -559,6 +561,11 @@ class MatchingVisitor(TreeVisitor):
             return
         self._matched_nodes.append(node)
 
+    def visit_joinedstr(self, node: JoinedStr) -> None:
+        if self._node_type is not JoinedStr:
+            return
+        self._matched_nodes.append(node)
+
     def _matches(self, node: NodeNG, depth: int) -> bool:
         if depth >= len(self._match_nodes):
             return False
@@ -674,7 +681,8 @@ class DfsaPyCollector(DfsaCollector, ABC):
     def collect_dfsas_from_tree(self, tree: Tree) -> Iterable[DirectFsAccessNode]: ...
 
 
-class PythonSequentialLinter(Linter, DfsaCollector, TableCollector):
+class PythonSequentialLinter(PythonLinter, DfsaPyCollector, TablePyCollector):
+    """A linter for sequencing python linters and collectors."""
 
     def __init__(
         self,
@@ -685,74 +693,15 @@ class PythonSequentialLinter(Linter, DfsaCollector, TableCollector):
         self._linters = linters
         self._dfsa_collectors = dfsa_collectors
         self._table_collectors = table_collectors
-        self._tree: Tree | None = None
-
-    def lint(self, code: str) -> Iterable[Advice]:
-        maybe_tree = self._parse_and_append(code)
-        if maybe_tree.failure:
-            yield maybe_tree.failure
-            return
-        assert maybe_tree.tree is not None
-        yield from self.lint_tree(maybe_tree.tree)
 
     def lint_tree(self, tree: Tree) -> Iterable[Advice]:
         for linter in self._linters:
             yield from linter.lint_tree(tree)
 
-    def _parse_and_append(self, code: str) -> MaybeTree:
-        maybe_tree = MaybeTree.from_source_code(code)
-        if maybe_tree.failure:
-            return maybe_tree
-        assert maybe_tree.tree is not None
-        self.append_tree(maybe_tree.tree)
-        return maybe_tree
-
-    def append_tree(self, tree: Tree) -> None:
-        self._make_tree().attach_child_tree(tree)
-
-    def append_nodes(self, nodes: list[NodeNG]) -> None:
-        self._make_tree().attach_nodes(nodes)
-
-    def append_globals(self, globs: dict) -> None:
-        self._make_tree().extend_globals(globs)
-
-    def process_child_cell(self, code: str) -> None:
-        this_tree = self._make_tree()
-        maybe_tree = MaybeTree.from_source_code(code)
-        if maybe_tree.failure:
-            # TODO: bubble up this error
-            logger.warning(maybe_tree.failure.message)
-            return
-        assert maybe_tree.tree is not None
-        this_tree.attach_child_tree(maybe_tree.tree)
-
-    def collect_dfsas(self, source_code: str) -> Iterable[DirectFsAccess]:
-        maybe_tree = self._parse_and_append(source_code)
-        if maybe_tree.failure:
-            logger.warning(maybe_tree.failure.message)
-            return
-        assert maybe_tree.tree is not None
-        for dfsa_node in self.collect_dfsas_from_tree(maybe_tree.tree):
-            yield dfsa_node.dfsa
-
     def collect_dfsas_from_tree(self, tree: Tree) -> Iterable[DirectFsAccessNode]:
         for collector in self._dfsa_collectors:
             yield from collector.collect_dfsas_from_tree(tree)
 
-    def collect_tables(self, source_code: str) -> Iterable[UsedTable]:
-        maybe_tree = self._parse_and_append(source_code)
-        if maybe_tree.failure:
-            logger.warning(maybe_tree.failure.message)
-            return
-        assert maybe_tree.tree is not None
-        for table_node in self.collect_tables_from_tree(maybe_tree.tree):
-            yield table_node.table
-
     def collect_tables_from_tree(self, tree: Tree) -> Iterable[UsedTableNode]:
         for collector in self._table_collectors:
             yield from collector.collect_tables_from_tree(tree)
-
-    def _make_tree(self) -> Tree:
-        if self._tree is None:
-            self._tree = Tree.new_module()
-        return self._tree

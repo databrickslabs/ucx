@@ -63,3 +63,7 @@ cells:
     starts_at_line: 60
     content: |
       %lsmagic
+  - type: Run
+    starts_at_line: 64
+    content: |
+      %run ./test
