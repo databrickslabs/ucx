@@ -1,3 +1,4 @@
+import dataclasses
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Iterator
@@ -18,7 +19,11 @@ from databricks.labs.ucx.source_code.base import (
     TableSqlCollector,
     DfsaSqlCollector,
 )
-from databricks.labs.ucx.source_code.linters.directfs import DIRECT_FS_ACCESS_PATTERNS, DirectFsAccessNode
+from databricks.labs.ucx.source_code.linters.directfs import (
+    DIRECT_FS_ACCESS_PATTERNS,
+    DirectFsAccessNode,
+    DirectFsAccessSqlLinter,
+)
 from databricks.labs.ucx.source_code.python.python_infer import InferredValue
 from databricks.labs.ucx.source_code.linters.from_table import FromTableSqlLinter
 from databricks.labs.ucx.source_code.python.python_ast import (
@@ -155,7 +160,7 @@ class SparkCallMatcher(_TableNameMatcher):
             if dst is None:
                 continue
             yield Deprecation.from_node(
-                code='table-migrated-to-uc',
+                code='table-migrated-to-uc-python',
                 message=f"Table {used_table[0]} is migrated to {dst.destination()} in Unity Catalog",
                 # SQLGlot does not propagate tokens yet. See https://github.com/tobymao/sqlglot/issues/3159
                 node=node,
@@ -387,6 +392,14 @@ class SparkTableNameMatchers:
 
 
 class SparkTableNamePyLinter(PythonLinter, Fixer, TablePyCollector):
+    """Linter for table name references in PySpark
+
+    Examples:
+    1. Find table name referenceS
+       ``` python
+       spark.read.table("hive_metastore.schema.table")
+       ```
+    """
 
     def __init__(
         self,
@@ -400,9 +413,9 @@ class SparkTableNamePyLinter(PythonLinter, Fixer, TablePyCollector):
         self._spark_matchers = SparkTableNameMatchers(False).matchers
 
     @property
-    def name(self) -> str:
-        # this is the same fixer, just in a different language context
-        return self._from_table.name
+    def diagnostic_code(self) -> str:
+        """The diagnostic codes that this fixer fixes."""
+        return "table-migrated-to-uc-python"
 
     def lint_tree(self, tree: Tree) -> Iterable[Advice]:
         for node in tree.walk():
@@ -461,28 +474,32 @@ class _SparkSqlAnalyzer:
             yield call_node, query
 
 
-class SparkSqlPyLinter(_SparkSqlAnalyzer, PythonLinter, Fixer):
+class _SparkSqlPyLinter(_SparkSqlAnalyzer, PythonLinter, Fixer):
+    """Linter for SparkSQL used within PySpark."""
 
     def __init__(self, sql_linter: SqlLinter, sql_fixer: Fixer | None):
         self._sql_linter = sql_linter
         self._sql_fixer = sql_fixer
 
-    @property
-    def name(self) -> str:
-        return "<none>" if self._sql_fixer is None else self._sql_fixer.name
-
     def lint_tree(self, tree: Tree) -> Iterable[Advice]:
+        inferable_values = []
         for call_node, query in self._visit_call_nodes(tree):
             for value in InferredValue.infer_from_node(query):
-                if not value.is_inferred():
+                if value.is_inferred():
+                    inferable_values.append((call_node, value))
+                else:
                     yield Advisory.from_node(
                         code="cannot-autofix-table-reference",
                         message=f"Can't migrate table_name argument in '{query.as_string()}' because its value cannot be computed",
                         node=call_node,
                     )
-                    continue
-                for advice in self._sql_linter.lint(value.as_string()):
-                    yield advice.replace_from_node(call_node)
+        for call_node, value in inferable_values:
+            for advice in self._sql_linter.lint(value.as_string()):
+                # Replacing the fixer code to indicate that the SparkSQL fixer is wrapped with PySpark
+                code = advice.code
+                if self._sql_fixer and code == self._sql_fixer.diagnostic_code:
+                    code = self.diagnostic_code
+                yield dataclasses.replace(advice.replace_from_node(call_node), code=code)
 
     def apply(self, code: str) -> str:
         if not self._sql_fixer:
@@ -501,6 +518,45 @@ class SparkSqlPyLinter(_SparkSqlAnalyzer, PythonLinter, Fixer):
             new_query = self._sql_fixer.apply(query.value)
             query.value = new_query
         return tree.node.as_string()
+
+
+class FromTableSqlPyLinter(_SparkSqlPyLinter):
+    """Lint tables and views in Spark SQL wrapped by PySpark code.
+
+    Examples:
+    1. Find table name reference in SparkSQL:
+       ``` python
+       spark.sql("SELECT * FROM hive_metastore.schema.table").collect()
+       ```
+    """
+
+    def __init__(self, sql_linter: FromTableSqlLinter):
+        super().__init__(sql_linter, sql_linter)
+
+    @property
+    def diagnostic_code(self) -> str:
+        """The diagnostic codes that this fixer fixes."""
+        return "table-migrated-to-uc-python-sql"
+
+
+class DirectFsAccessSqlPylinter(_SparkSqlPyLinter):
+    """Lint direct file system access in Spark SQL wrapped by PySpark code.
+
+    Examples:
+    1. Find table name reference in SparkSQL:
+       ``` python
+       spark.sql("SELECT * FROM parquet.`/dbfs/path/to/table`").collect()
+       ```
+    """
+
+    def __init__(self, sql_linter: DirectFsAccessSqlLinter):
+        # TODO: Implement fixer for direct filesystem access (https://github.com/databrickslabs/ucx/issues/2021)
+        super().__init__(sql_linter, None)
+
+    @property
+    def diagnostic_code(self) -> str:
+        """The diagnostic codes that this fixer fixes."""
+        return "direct-filesystem-access-python-sql"
 
 
 class SparkSqlDfsaPyCollector(_SparkSqlAnalyzer, DfsaPyCollector):

@@ -253,7 +253,7 @@ spark.table(table_name)
 
     assert advices
     assert advices[0] == Deprecation(
-        code='table-migrated-to-uc',
+        code='table-migrated-to-uc-python',
         message='Table old.things is migrated to brand.new.stuff in Unity Catalog',
         start_line=6,
         start_col=0,
@@ -315,7 +315,7 @@ table_name = "not_migrated.table"  # NOT a migrated table according to the migra
     first_advice = next(iter(linter.lint()))
 
     assert first_advice == Deprecation(
-        code='table-migrated-to-uc',
+        code='table-migrated-to-uc-python',
         message='Table old.things is migrated to brand.new.stuff in Unity Catalog',
         start_line=6,
         start_col=0,
