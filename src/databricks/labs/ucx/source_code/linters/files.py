@@ -303,6 +303,44 @@ class StandardLibraryModuleDependency(Dependency):
         self.module_name = module_name
 
 
+class KnownContainer(SourceContainer):
+    """A container for known libraries."""
+
+    def __init__(self, path: Path, problems: list[DependencyProblem]):
+        super().__init__()
+        self._path = path
+        self._problems = problems
+
+    def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
+        return self._problems
+
+
+class KnownLoader(DependencyLoader):
+    """Always load as `KnownContainer`.
+
+    This loader is used in combination with the KnownList to load known dependencies and their known problems.
+    """
+
+    def load_dependency(self, path_lookup: PathLookup, dependency: Dependency) -> SourceContainer | None:
+        """Load the dependency."""
+        if not isinstance(dependency, KnownDependency):
+            raise RuntimeError("Only KnownDependency is supported")
+        absolute_path = path_lookup.resolve(dependency.path)
+        if absolute_path:
+            return KnownContainer(absolute_path, dependency.problems)
+        # For testing performance, the sys paths are not in the PathLookup
+        return KnownContainer(dependency.path, dependency.problems)
+
+
+class KnownDependency(Dependency):
+    """A dependency for known libraries, see :class:KnownList."""
+
+    def __init__(self, module_name: str, problems: list[DependencyProblem]):
+        super().__init__(StubLoader(), Path(f"/ucx/known/{module_name}"), inherits_context=False)
+        self.problems = problems
+        self.module_name = module_name
+
+
 class ImportFileResolver(BaseImportResolver, BaseFileResolver):
 
     def __init__(self, file_loader: FileLoader, allow_list: KnownList):
@@ -340,10 +378,8 @@ class ImportFileResolver(BaseImportResolver, BaseFileResolver):
         if not compatibility.known:
             logger.debug(f"Resolving unknown import: {name}")
             return None
-        if compatibility.problems:
-            # TODO move to linter, see https://github.com/databrickslabs/ucx/issues/1527
-            return MaybeDependency(None, compatibility.problems)
-        return None
+        dependency = KnownDependency(name, compatibility.problems)
+        return MaybeDependency(dependency, [])  # Problems are surfaced during dependency graph building
 
     def _resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency | None:
         if not name:
