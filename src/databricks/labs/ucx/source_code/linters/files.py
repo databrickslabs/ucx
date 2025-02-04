@@ -314,6 +314,8 @@ class KnownDependency(Dependency):
 
     def __init__(self, module_name: str, problems: list[DependencyProblem]):
         known_url = "https://github.com/databrickslabs/ucx/blob/main/src/databricks/labs/ucx/source_code/known.json"
+        # Note that Github does not support navigating JSON files, hence the #<module_name> does nothing.
+        # https://docs.github.com/en/repositories/working-with-files/using-files/navigating-code-on-github
         super().__init__(KnownLoader(), Path(f"{known_url}#{module_name}"), inherits_context=False)
         self._module_name = module_name
         self.problems = problems
