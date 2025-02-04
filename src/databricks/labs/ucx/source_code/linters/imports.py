@@ -17,7 +17,8 @@ from astroid import (  # type: ignore
 )
 
 from databricks.labs.ucx.source_code.base import Advice, Advisory, CurrentSessionState
-from databricks.labs.ucx.source_code.python.python_ast import Tree, NodeBase, TreeVisitor, PythonLinter
+from databricks.labs.ucx.source_code.python.python_ast import Tree, NodeBase, TreeVisitor
+from databricks.labs.ucx.source_code.linters.base import PythonLinter
 from databricks.labs.ucx.source_code.python.python_infer import InferredValue
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 

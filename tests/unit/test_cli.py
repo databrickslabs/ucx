@@ -74,8 +74,8 @@ from databricks.labs.ucx.hive_metastore import TablesCrawler, ExternalLocations
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocation
 from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.progress.install import VerifyProgressTracking
-from databricks.labs.ucx.source_code.linters.files import LocalFileMigrator
-from databricks.labs.ucx.source_code.redash import Redash
+from databricks.labs.ucx.source_code.linters.folders import LocalFileMigrator
+from databricks.labs.ucx.source_code.linters.redash import Redash
 
 
 def create_workspace_client_mock(workspace_id: int) -> WorkspaceClient:

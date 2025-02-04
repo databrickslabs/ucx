@@ -23,7 +23,7 @@ from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigra
 from databricks.labs.ucx.progress.install import ProgressTrackingInstallation
 from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.linters.context import LinterContext
-from databricks.labs.ucx.source_code.linters.files import LocalFileMigrator, LocalCodeLinter
+from databricks.labs.ucx.source_code.linters.folders import LocalCodeLinter, LocalFileMigrator
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader
 from databricks.labs.ucx.workspace_access.clusters import ClusterAccess
 

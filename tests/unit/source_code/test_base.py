@@ -10,9 +10,9 @@ from databricks.labs.ucx.source_code.base import (
     Deprecation,
     LocatedAdvice,
     Failure,
-    Fixer,
     UsedTable,
 )
+from databricks.labs.ucx.source_code.linters.base import Fixer
 
 
 def test_message_initialization() -> None:

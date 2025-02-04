@@ -8,11 +8,17 @@ from typing import cast
 
 from astroid import AstroidSyntaxError, ImportFrom, Try, Name  # type: ignore
 
+from databricks.labs.ucx.source_code.base import (
+    Advice,
+    DirectFsAccessNode,
+    UsedTableNode,
+)
 from databricks.labs.ucx.source_code.graph import (
     DependencyGraphContext,
     DependencyProblem,
     InheritedContext,
 )
+from databricks.labs.ucx.source_code.linters.base import PythonLinter, DfsaPyCollector, TablePyCollector
 from databricks.labs.ucx.source_code.linters.imports import (
     SysPathChange,
     DbutilsPyLinter,
@@ -203,3 +209,29 @@ class PythonCodeAnalyzer:
             )
             return
         change.apply_to(self._context.path_lookup)
+
+
+class PythonSequentialLinter(PythonLinter, DfsaPyCollector, TablePyCollector):
+    """A linter for sequencing python linters and collectors."""
+
+    def __init__(
+        self,
+        linters: list[PythonLinter],
+        dfsa_collectors: list[DfsaPyCollector],
+        table_collectors: list[TablePyCollector],
+    ):
+        self._linters = linters
+        self._dfsa_collectors = dfsa_collectors
+        self._table_collectors = table_collectors
+
+    def lint_tree(self, tree: Tree) -> Iterable[Advice]:
+        for linter in self._linters:
+            yield from linter.lint_tree(tree)
+
+    def collect_dfsas_from_tree(self, tree: Tree) -> Iterable[DirectFsAccessNode]:
+        for collector in self._dfsa_collectors:
+            yield from collector.collect_dfsas_from_tree(tree)
+
+    def collect_tables_from_tree(self, tree: Tree) -> Iterable[UsedTableNode]:
+        for collector in self._table_collectors:
+            yield from collector.collect_tables_from_tree(tree)

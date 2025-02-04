@@ -7,7 +7,7 @@ from databricks.labs.ucx.source_code.directfs_access import DirectFsAccess
 from databricks.labs.ucx.source_code.jobs import JobProblem
 from databricks.sdk.service.iam import PermissionLevel
 
-from databricks.labs.ucx.source_code.queries import QueryProblem
+from databricks.labs.ucx.source_code.linters.queries import QueryProblem
 
 
 def _populate_workflow_problems(installation_ctx):

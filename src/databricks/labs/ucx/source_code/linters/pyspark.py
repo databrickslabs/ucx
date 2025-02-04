@@ -12,12 +12,17 @@ from databricks.labs.ucx.source_code.base import (
     Advisory,
     Deprecation,
     CurrentSessionState,
-    SqlLinter,
-    Fixer,
     UsedTable,
     UsedTableNode,
     TableSqlCollector,
     DfsaSqlCollector,
+)
+from databricks.labs.ucx.source_code.linters.base import (
+    SqlLinter,
+    Fixer,
+    PythonLinter,
+    DfsaPyCollector,
+    TablePyCollector,
 )
 from databricks.labs.ucx.source_code.linters.directfs import (
     DIRECT_FS_ACCESS_PATTERNS,
@@ -27,11 +32,8 @@ from databricks.labs.ucx.source_code.linters.directfs import (
 from databricks.labs.ucx.source_code.python.python_infer import InferredValue
 from databricks.labs.ucx.source_code.linters.from_table import FromTableSqlLinter
 from databricks.labs.ucx.source_code.python.python_ast import (
-    DfsaPyCollector,
     MatchingVisitor,
     MaybeTree,
-    PythonLinter,
-    TablePyCollector,
     Tree,
     TreeHelper,
 )

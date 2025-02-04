@@ -74,7 +74,7 @@ from databricks.labs.ucx.runtime import Workflows
 from databricks.labs.ucx.source_code.base import UsedTable
 from databricks.labs.ucx.source_code.directfs_access import DirectFsAccess
 from databricks.labs.ucx.source_code.jobs import JobProblem
-from databricks.labs.ucx.source_code.queries import QueryProblem
+from databricks.labs.ucx.source_code.linters.queries import QueryProblem
 from databricks.labs.ucx.workspace_access.base import Permissions
 from databricks.labs.ucx.workspace_access.generic import WorkspaceObjectInfo
 from databricks.labs.ucx.workspace_access.groups import AccountGroupLookup, ConfigureGroups, MigratedGroup

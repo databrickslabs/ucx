@@ -9,7 +9,8 @@ from databricks.sdk.service.workspace import Language
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.source_code.base import CurrentSessionState, Deprecation, Failure
 from databricks.labs.ucx.source_code.linters.context import LinterContext
-from databricks.labs.ucx.source_code.notebooks.sources import FileLinter, Notebook, NotebookLinter
+from databricks.labs.ucx.source_code.linters.files import FileLinter, NotebookLinter
+from databricks.labs.ucx.source_code.notebooks.sources import Notebook
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 

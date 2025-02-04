@@ -2,7 +2,7 @@ import pytest
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
-from databricks.labs.ucx.source_code.base import Fixer, Linter
+from databricks.labs.ucx.source_code.linters.base import Linter, Fixer
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 
 

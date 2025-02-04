@@ -20,7 +20,7 @@ from databricks.labs.ucx.progress.install import ProgressTrackingInstallation
 from databricks.labs.ucx.progress.workflow_runs import WorkflowRun
 from databricks.labs.ucx.source_code.base import DirectFsAccess, LineageAtom
 from databricks.labs.ucx.source_code.jobs import JobProblem
-from databricks.labs.ucx.source_code.queries import QueryProblem
+from databricks.labs.ucx.source_code.linters.queries import QueryProblem
 from databricks.labs.ucx.source_code.used_table import UsedTable
 
 from ..conftest import MockRuntimeContext
