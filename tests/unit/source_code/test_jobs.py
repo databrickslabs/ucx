@@ -46,9 +46,9 @@ def test_job_problem_as_message() -> None:
 def dependency_resolver(mock_path_lookup) -> DependencyResolver:
     file_loader = FileLoader()
     allow_list = KnownList()
-    import_file_resolver = ImportFileResolver(file_loader, allow_list)
+    import_file_resolver = ImportFileResolver(file_loader, allow_list=allow_list)
     resolver = DependencyResolver(
-        PythonLibraryResolver(allow_list),
+        PythonLibraryResolver(allow_list=allow_list),
         NotebookResolver(NotebookLoader()),
         import_file_resolver,
         import_file_resolver,

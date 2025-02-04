@@ -52,7 +52,8 @@ from databricks.labs.ucx.source_code.graph import (
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage
 from databricks.labs.ucx.source_code.python.python_ast import MaybeTree, Tree, PythonSequentialLinter
-from databricks.labs.ucx.source_code.notebooks.sources import FileLinter, Notebook
+from databricks.labs.ucx.source_code.notebooks.sources import Notebook
+from databricks.labs.ucx.source_code.linters.files import FileLinter
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
 
@@ -597,7 +598,7 @@ class LintingWalker(DependencyGraphWalker[LocatedAdvice]):
         inherited_tree: Tree | None,
     ) -> Iterable[LocatedAdvice]:
         # FileLinter determines which file/notebook linter to use
-        linter = FileLinter(dependency, path_lookup, self._linter_context, inherited_tree)
+        linter = FileLinter(dependency, path_lookup, self._linter_context, inherited_tree=inherited_tree)
         for advice in linter.lint():
             yield LocatedAdvice(advice, dependency.path)
 

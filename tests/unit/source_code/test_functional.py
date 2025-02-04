@@ -18,7 +18,7 @@ from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.files import FileLoader
 from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader
-from databricks.labs.ucx.source_code.notebooks.sources import FileLinter
+from databricks.labs.ucx.source_code.linters.files import FileLinter
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 
@@ -162,7 +162,7 @@ class Functional:
             inherited_tree = root_graph.build_inherited_tree(self.parent, self.path)
         dependency = self._make_dependency(self.path)
         context = LinterContext(migration_index, session_state)
-        linter = FileLinter(dependency, path_lookup, context, inherited_tree)
+        linter = FileLinter(dependency, path_lookup, context, inherited_tree=inherited_tree)
         return linter.lint()
 
     def _regex_match(self, regex: re.Pattern[str]) -> Generator[tuple[Comment, dict[str, Any]], None, None]:

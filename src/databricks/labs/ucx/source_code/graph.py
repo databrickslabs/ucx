@@ -65,11 +65,13 @@ class DependencyGraph:
         return maybe_graph.problems
 
     def register_import(self, name: str) -> list[DependencyProblem]:
+        """Register an import of a module."""
         if not name:
             return [DependencyProblem('import-empty', 'Empty import name')]
         maybe = self._resolver.resolve_import(self.path_lookup, name)
-        if not maybe.dependency:
+        if maybe.problems:
             return maybe.problems
+        assert maybe.dependency is not None
         maybe_graph = self.register_dependency(maybe.dependency)
         return maybe_graph.problems
 
@@ -92,6 +94,10 @@ class DependencyGraph:
         # nay, create the child graph and populate it
         child_graph = DependencyGraph(dependency, self, self._resolver, self._path_lookup, self._session_state)
         self._dependencies[dependency] = child_graph
+        if getattr(dependency, "known", False):  # TODO: Use proper type hinting, not getattr
+            # Known modules are not registered for optimization reasons as it avoid traversing a known dependency graph
+            # Known module's problem are surfaced during linting
+            return MaybeGraph(child_graph, [])
         container = dependency.load(self.path_lookup)
         # TODO: Return either (child) graph OR problems
         if not container:
@@ -327,7 +333,7 @@ class Dependency:
         return hash(self.path)
 
     def __eq__(self, other):
-        return isinstance(other, type(self)) and self.path == other.path
+        return isinstance(other, Dependency) and self.path == other.path
 
     def load(self, path_lookup: PathLookup) -> SourceContainer | None:
         return self._loader.load_dependency(path_lookup, self)
@@ -399,8 +405,34 @@ class BaseFileResolver(abc.ABC):
 
 @dataclass
 class MaybeDependency:
+    """A class:`Dependency` or a :class:`Failure`.
+
+    The `MaybeDependency` is designed to either contain a `Tree` OR a `Failure`,
+    never both or neither. Typically, a `Dependency` is constructed by a
+    resolver yielding a `MaybeDependency` with `list[Problems]` if the
+    dependency could NOT be resolved,, otherwise it yields the `Dependency`,
+    resulting in code that looks like:
+
+    ``` python
+    maybe_dependency = resolver.resolve_import(path_lookup, module_name)
+    if maybe_dependency.problems:
+        # Handle failure and return early
+    assert maybe_dependency.dependency, "Dependency should be given when no problems are given."
+    # Use dependency
+    ```
+    """
+
     dependency: Dependency | None
-    problems: list[DependencyProblem]
+    """The dependency"""
+
+    problems: list[DependencyProblem] = dataclasses.field(default_factory=list)
+    """The problems during constructing the dependency"""
+
+    def __post_init__(self):
+        if not self.dependency and not self.problems:
+            raise ValueError(f"Dependency or problems should be given: {self}")
+        if self.dependency and self.problems:
+            raise ValueError(f"Dependency and problems should not be both given: {self}")
 
 
 class DependencyResolver:
@@ -627,7 +659,8 @@ class DependencyGraphWalker(abc.ABC, Generic[T]):
         self._lineage.append(dependency)
         self._walked_paths.add(dependency.path)
         self._log_walk_one(dependency)
-        if dependency.path.is_file() or is_a_notebook(dependency.path):
+        # Why this condition? Why not always iterate over dependencies?
+        if dependency.path.is_file() or is_a_notebook(dependency.path) or getattr(dependency, "known", False):
             inherited_tree = graph.root.build_inherited_tree(root_path, dependency.path)
             path_lookup = self._path_lookup.change_directory(dependency.path.parent)
             yield from self._process_dependency(dependency, path_lookup, inherited_tree)

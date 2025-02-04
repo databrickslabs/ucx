@@ -1,10 +1,10 @@
 from pathlib import Path
-from unittest.mock import Mock, create_autospec
+from unittest.mock import Mock, call, create_autospec
 
 import pytest
 from databricks.labs.blueprint.tui import MockPrompts
 
-from databricks.labs.ucx.source_code.base import CurrentSessionState
+from databricks.labs.ucx.source_code.base import CurrentSessionState, Failure, LocatedAdvice
 from databricks.labs.ucx.source_code.graph import DependencyResolver, SourceContainer
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
 from databricks.labs.ucx.source_code.notebooks.migrator import NotebookMigrator
@@ -15,11 +15,12 @@ from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.source_code.linters.files import (
+    Folder,
+    FolderLoader,
     LocalFileMigrator,
     LocalCodeLinter,
-    FolderLoader,
+    ModuleDependency,
     ImportFileResolver,
-    Folder,
 )
 from databricks.labs.ucx.source_code.files import FileLoader
 from databricks.labs.ucx.source_code.linters.context import LinterContext
@@ -111,9 +112,9 @@ def local_code_linter(mock_path_lookup, migration_index):
     file_loader = FileLoader()
     folder_loader = FolderLoader(notebook_loader, file_loader)
     allow_list = KnownList()
-    pip_resolver = PythonLibraryResolver(allow_list)
+    pip_resolver = PythonLibraryResolver(allow_list=allow_list)
     session_state = CurrentSessionState()
-    import_file_resolver = ImportFileResolver(file_loader, allow_list)
+    import_file_resolver = ImportFileResolver(file_loader, allow_list=allow_list)
     resolver = DependencyResolver(
         pip_resolver,
         NotebookResolver(NotebookLoader()),
@@ -137,8 +138,8 @@ def test_linter_walks_directory(mock_path_lookup, local_code_linter) -> None:
     path = Path(__file__).parent / "../samples" / "simulate-sys-path"
     paths: set[Path] = set()
     advices = list(local_code_linter.lint_path(path, paths))
-    assert len(paths) > 10
     assert not advices
+    assert len(paths) > 10
 
 
 def test_linter_lints_children_in_context(mock_path_lookup, local_code_linter) -> None:
@@ -150,8 +151,30 @@ def test_linter_lints_children_in_context(mock_path_lookup, local_code_linter) -
     assert not advices
 
 
+def test_linter_lints_import_from_known_list(tmp_path, mock_path_lookup, local_code_linter) -> None:
+    content = "import pyspark.sql.functions"  # Has known issues
+    path = tmp_path / "file.py"
+    path.write_text(content)
+    located_advices = list(local_code_linter.lint_path(path))
+
+    failures = [
+        Failure(
+            "jvm-access-in-shared-clusters", "Cannot access Spark Driver JVM on UC Shared Clusters", -1, -1, -1, -1
+        ),
+        Failure(
+            "legacy-context-in-shared-clusters",
+            "sc is not supported on UC Shared Clusters. Rewrite it using spark",
+            -1,
+            -1,
+            -1,
+            -1,
+        ),
+    ]
+    assert located_advices == [LocatedAdvice(failure, Path("<MISSING_SOURCE_PATH>")) for failure in failures]
+
+
 def test_triple_dot_import() -> None:
-    file_resolver = ImportFileResolver(FileLoader(), KnownList())
+    file_resolver = ImportFileResolver(FileLoader(), allow_list=KnownList())
     path_lookup = create_autospec(PathLookup)
     path_lookup.cwd.as_posix.return_value = '/some/path/to/folder'
     path_lookup.resolve.return_value = Path('/some/path/foo.py')
@@ -164,7 +187,7 @@ def test_triple_dot_import() -> None:
 
 
 def test_single_dot_import() -> None:
-    file_resolver = ImportFileResolver(FileLoader(), KnownList())
+    file_resolver = ImportFileResolver(FileLoader(), allow_list=KnownList())
     path_lookup = create_autospec(PathLookup)
     path_lookup.cwd.as_posix.return_value = '/some/path/to/folder'
     path_lookup.resolve.return_value = Path('/some/path/to/folder/foo.py')
@@ -176,11 +199,67 @@ def test_single_dot_import() -> None:
     path_lookup.resolve.assert_called_once_with(Path('/some/path/to/folder/foo.py'))
 
 
+def test_import_resolver_resolves_known_import() -> None:
+    file_loader = FileLoader()
+    resolver = ImportFileResolver(file_loader, allow_list=KnownList())
+    path_lookup = create_autospec(PathLookup)
+    path_lookup.resolve.return_value = None
+
+    maybe_dependency = resolver.resolve_import(path_lookup, "numpy")
+
+    assert maybe_dependency.dependency == ModuleDependency(file_loader, module_name="numpy", known=True)
+    path_lookup.resolve.assert_has_calls([call(Path('numpy.py')), call(Path("numpy/__init__.py"))])
+
+
 def test_folder_has_repr() -> None:
     notebook_loader = NotebookLoader()
     file_loader = FileLoader()
     folder = Folder(Path("test"), notebook_loader, file_loader, FolderLoader(notebook_loader, file_loader))
     assert len(repr(folder)) > 0
+
+
+S3FS_DEPRECATION_MESSAGE = (
+    'S3fs library assumes AWS IAM Instance Profile to work with '
+    'S3, which is not compatible with Databricks Unity Catalog, '
+    'that routes access through Storage Credentials.'
+)
+
+
+@pytest.mark.parametrize(
+    "source, maybe_failure",
+    [
+        (
+            "import s3fs",
+            Failure("direct-filesystem-access", S3FS_DEPRECATION_MESSAGE, -1, -1, -1, -1),
+        ),
+        (
+            "from s3fs import something",
+            Failure("direct-filesystem-access", S3FS_DEPRECATION_MESSAGE, -1, -1, -1, -1),
+        ),
+        ("import certifi", None),
+        ("from certifi import core", None),
+        (
+            "import s3fs, certifi",
+            Failure("direct-filesystem-access", S3FS_DEPRECATION_MESSAGE, -1, -1, -1, -1),
+        ),
+        ("from certifi import core, s3fs", None),
+        ("def func():\n    import s3fs", Failure("direct-filesystem-access", S3FS_DEPRECATION_MESSAGE, -1, -1, -1, -1)),
+        ("import s3fs as s", Failure("direct-filesystem-access", S3FS_DEPRECATION_MESSAGE, -1, -1, -1, -1)),
+        (
+            "from s3fs.subpackage import something",
+            Failure("direct-filesystem-access", S3FS_DEPRECATION_MESSAGE, -1, -1, -1, -1),
+        ),
+        ("", None),
+    ],
+)
+def test_file_linter_lints_s3_direct_file_system_access(
+    tmp_path, local_code_linter, source: str, maybe_failure: Failure | None
+) -> None:
+    expected = [LocatedAdvice(maybe_failure, Path("<MISSING_SOURCE_PATH>"))] if maybe_failure else []
+    path = tmp_path / "test_detect_s3fs_import.py"
+    path.write_text(source)
+    advices = list(local_code_linter.lint_path(path))
+    assert advices == expected
 
 
 site_packages = locate_site_packages()
@@ -199,8 +278,8 @@ def test_known_issues(path: Path, migration_index) -> None:
     session_state = CurrentSessionState()
     allow_list = KnownList()
     notebook_resolver = NotebookResolver(NotebookLoader())
-    import_resolver = ImportFileResolver(file_loader, allow_list)
-    pip_resolver = PythonLibraryResolver(allow_list)
+    import_resolver = ImportFileResolver(file_loader, allow_list=allow_list)
+    pip_resolver = PythonLibraryResolver(allow_list=allow_list)
     resolver = DependencyResolver(pip_resolver, notebook_resolver, import_resolver, import_resolver, path_lookup)
     linter = LocalCodeLinter(
         notebook_loader,

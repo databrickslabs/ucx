@@ -26,10 +26,11 @@ class PythonLibraryResolver(LibraryResolver):
 
     def __init__(
         self,
-        allow_list: KnownList,
+        *,
+        allow_list: KnownList | None = None,
         runner: Callable[[str | list[str]], tuple[int, str, str]] = run_command,
     ) -> None:
-        self._allow_list = allow_list
+        self._allow_list = allow_list or KnownList()
         self._runner = runner
 
     def register_library(self, path_lookup: PathLookup, *libraries: str) -> list[DependencyProblem]:
@@ -41,7 +42,7 @@ class PythonLibraryResolver(LibraryResolver):
         if len(libraries) == 1:  # Multiple libraries might be installation flags
             compatibility = self._allow_list.distribution_compatibility(libraries[0])
             if compatibility.known:
-                return compatibility.problems
+                return []  # Known problems are surfaced during linting
         return self._install_library(path_lookup, *libraries)
 
     @cached_property

@@ -34,9 +34,9 @@ from tests.unit import (
             ],
             3,
         ),
-        (["simulate-sys-path", "via-sys-path", "run_notebook_1.py"], 1),
-        (["simulate-sys-path", "via-sys-path", "run_notebook_2.py"], 1),
-        (["simulate-sys-path", "via-sys-path", "run_notebook_4.py"], 2),
+        (["simulate-sys-path", "via-sys-path", "run_notebook_1.py"], 2),
+        (["simulate-sys-path", "via-sys-path", "run_notebook_2.py"], 2),
+        (["simulate-sys-path", "via-sys-path", "run_notebook_4.py"], 3),
     ],
 )
 def test_locates_notebooks(source: list[str], expected: int, mock_path_lookup) -> None:
@@ -47,8 +47,8 @@ def test_locates_notebooks(source: list[str], expected: int, mock_path_lookup) -
     notebook_loader = NotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
     allow_list = KnownList()
-    import_resolver = ImportFileResolver(file_loader, allow_list)
-    pip_resolver = PythonLibraryResolver(allow_list)
+    import_resolver = ImportFileResolver(file_loader, allow_list=allow_list)
+    pip_resolver = PythonLibraryResolver(allow_list=allow_list)
     dependency_resolver = DependencyResolver(
         pip_resolver, notebook_resolver, import_resolver, import_resolver, mock_path_lookup
     )
@@ -63,8 +63,8 @@ def test_locates_notebooks(source: list[str], expected: int, mock_path_lookup) -
     "source, expected",
     [
         (["simulate-sys-path", "siblings", "sibling1_file.py"], 2),
-        (["simulate-sys-path", "via-sys-path", "import_file_1.py"], 2),
-        (["simulate-sys-path", "via-sys-path", "import_file_2.py"], 2),
+        (["simulate-sys-path", "via-sys-path", "import_file_1.py"], 3),
+        (["simulate-sys-path", "via-sys-path", "import_file_2.py"], 3),
     ],
 )
 def test_locates_files(source: list[str], expected: int) -> None:
@@ -76,8 +76,8 @@ def test_locates_files(source: list[str], expected: int) -> None:
     file_loader = FileLoader()
     notebook_loader = NotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
-    import_resolver = ImportFileResolver(file_loader, allow_list)
-    pip_resolver = PythonLibraryResolver(allow_list)
+    import_resolver = ImportFileResolver(file_loader, allow_list=allow_list)
+    pip_resolver = PythonLibraryResolver(allow_list=allow_list)
     resolver = DependencyResolver(pip_resolver, notebook_resolver, import_resolver, import_resolver, lookup)
     maybe = resolver.build_local_file_dependency_graph(file_path, CurrentSessionState())
     assert not maybe.problems
@@ -115,14 +115,14 @@ sys.path.append('{child_dir_path.as_posix()}')
         notebook_resolver = NotebookResolver(notebook_loader)
         file_loader = FileLoader()
         allow_list = KnownList()
-        import_resolver = ImportFileResolver(file_loader, allow_list)
-        pip_resolver = PythonLibraryResolver(allow_list)
+        import_resolver = ImportFileResolver(file_loader, allow_list=allow_list)
+        pip_resolver = PythonLibraryResolver(allow_list=allow_list)
         resolver = DependencyResolver(pip_resolver, notebook_resolver, import_resolver, import_resolver, lookup)
         maybe = resolver.build_notebook_dependency_graph(parent_file_path, CurrentSessionState())
         assert not maybe.problems
         assert maybe.graph is not None
         all_paths = [d.path for d in maybe.graph.all_dependencies]
-        assert len(all_paths) == 2
+        assert len(all_paths) == 3  # sys module, sys.path.append and %run notebook
 
 
 def test_locates_files_with_absolute_path() -> None:
@@ -155,8 +155,8 @@ def func():
         notebook_resolver = NotebookResolver(notebook_loader)
         allow_list = KnownList()
         file_loader = FileLoader()
-        import_resolver = ImportFileResolver(file_loader, allow_list)
-        pip_resolver = PythonLibraryResolver(allow_list)
+        import_resolver = ImportFileResolver(file_loader, allow_list=allow_list)
+        pip_resolver = PythonLibraryResolver(allow_list=allow_list)
         resolver = DependencyResolver(pip_resolver, notebook_resolver, import_resolver, import_resolver, lookup)
         maybe = resolver.build_notebook_dependency_graph(parent_file_path, CurrentSessionState())
         assert not maybe.problems
