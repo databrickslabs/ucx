@@ -279,30 +279,6 @@ class FolderLoader(FileLoader):
         return Folder(absolute_path, self._notebook_loader, self._file_loader, self)
 
 
-class StubLoader(DependencyLoader):
-    """Always load as StubContainer.
-
-    This loader is useful when we know a dependency path cannot be resolved, but want to load it anyway like a stub.
-    """
-
-    def load_dependency(self, path_lookup: PathLookup, dependency: Dependency) -> SourceContainer | None:
-        """Load the dependency."""
-        absolute_path = path_lookup.resolve(dependency.path)
-        if absolute_path:
-            return StubContainer(absolute_path)
-        return StubContainer(dependency.path)
-
-
-class StandardLibraryModuleDependency(Dependency):
-    """A dependency for Python's standard library modules"""
-
-    def __init__(self, module_name: str):
-        if module_name not in sys.stdlib_module_names:
-            raise ValueError(f"Not a builtin module: {module_name}")
-        super().__init__(StubLoader(), Path(f"/python/stdlib/{module_name}"), inherits_context=False)
-        self.module_name = module_name
-
-
 class KnownContainer(SourceContainer):
     """A container for known libraries."""
 
@@ -358,9 +334,6 @@ class ImportFileResolver(BaseImportResolver, BaseFileResolver):
         return MaybeDependency(None, [problem])
 
     def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
-        maybe = self._resolve_standard_library_module(name)
-        if maybe is not None:
-            return maybe
         maybe = self._resolve_allow_list(name)
         if maybe is not None:
             return maybe
@@ -368,12 +341,6 @@ class ImportFileResolver(BaseImportResolver, BaseFileResolver):
         if maybe is not None:
             return maybe
         return self._fail('import-not-found', f"Could not locate import: {name}")
-
-    def _resolve_standard_library_module(self, name: str) -> MaybeDependency | None:
-        """Resolve a standard library module."""
-        if name in sys.stdlib_module_names:
-            return MaybeDependency(StandardLibraryModuleDependency(name), [])
-        return None
 
     def _resolve_allow_list(self, name: str) -> MaybeDependency | None:
         compatibility = self._allow_list.module_compatibility(name)
