@@ -336,7 +336,7 @@ class KnownDependency(Dependency):
     """A dependency for known libraries, see :class:KnownList."""
 
     def __init__(self, module_name: str, problems: list[DependencyProblem]):
-        super().__init__(StubLoader(), Path(f"/ucx/known/{module_name}"), inherits_context=False)
+        super().__init__(KnownLoader(), Path(f"/ucx/known/{module_name}"), inherits_context=False)
         self.problems = problems
         self.module_name = module_name
 
