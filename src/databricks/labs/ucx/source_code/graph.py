@@ -421,6 +421,12 @@ class MaybeDependency:
     problems: list[DependencyProblem]
     """The problems during constructing the dependency"""
 
+    def __post_init__(self):
+        if not self.dependency and not self.problems:
+            raise ValueError(f"Dependency or problems should be given: {self}")
+        if self.dependency and self.problems:
+            raise ValueError(f"Dependency and problems should not be both given: {self}")
+
 
 class DependencyResolver:
     """the DependencyResolver is responsible for locating "stuff", mimicking the Databricks runtime behavior.
