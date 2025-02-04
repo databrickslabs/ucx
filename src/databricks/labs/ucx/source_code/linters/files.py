@@ -293,11 +293,11 @@ class StubLoader(DependencyLoader):
         return StubContainer(dependency.path)
 
 
-class BuiltinPythonModuleDependency(Dependency):
-    """A dependency for the builtin modules"""
+class StandardLibraryModuleDependency(Dependency):
+    """A dependency for Python's standard library modules"""
 
     def __init__(self, module_name: str):
-        if module_name not in sys.builtin_module_names:
+        if module_name not in sys.stdlib_module_names:
             raise ValueError(f"Not a builtin module: {module_name}")
         super().__init__(StubLoader(), Path(f"/python/builtins/{module_name}"), inherits_context=False)
         self.module_name = module_name
@@ -318,7 +318,7 @@ class ImportFileResolver(BaseImportResolver, BaseFileResolver):
         return MaybeDependency(None, [problem])
 
     def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
-        maybe = self._resolve_builtin_module(name)
+        maybe = self._resolve_standard_library_module(name)
         if maybe is not None:
             return maybe
         maybe = self._resolve_allow_list(name)
@@ -329,10 +329,10 @@ class ImportFileResolver(BaseImportResolver, BaseFileResolver):
             return maybe
         return self._fail('import-not-found', f"Could not locate import: {name}")
 
-    def _resolve_builtin_module(self, name: str) -> MaybeDependency | None:
-        """Resolve a builtin module."""
-        if name in sys.builtin_module_names:
-            return MaybeDependency(BuiltinPythonModuleDependency(name), [])
+    def _resolve_standard_library_module(self, name: str) -> MaybeDependency | None:
+        """Resolve a standard library module."""
+        if name in sys.stdlib_module_names:
+            return MaybeDependency(StandardLibraryModuleDependency(name), [])
         return None
 
     def _resolve_allow_list(self, name: str) -> MaybeDependency | None:
