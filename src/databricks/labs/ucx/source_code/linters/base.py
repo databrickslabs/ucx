@@ -16,6 +16,8 @@ from databricks.labs.ucx.source_code.base import (
     TableSqlCollector,
     DirectFsAccess,
     UsedTable,
+    DirectFsAccessNode,
+    UsedTableNode,
 )
 from databricks.labs.ucx.source_code.python.python_ast import MaybeTree, Tree
 
@@ -110,3 +112,33 @@ class PythonLinter(Linter):
 
     @abstractmethod
     def lint_tree(self, tree: Tree) -> Iterable[Advice]: ...
+
+
+class DfsaPyCollector(DfsaCollector, ABC):
+
+    def collect_dfsas(self, source_code: str) -> Iterable[DirectFsAccess]:
+        maybe_tree = MaybeTree.from_source_code(source_code)
+        if maybe_tree.failure:
+            logger.warning(maybe_tree.failure.message)
+            return
+        assert maybe_tree.tree is not None
+        for dfsa_node in self.collect_dfsas_from_tree(maybe_tree.tree):
+            yield dfsa_node.dfsa
+
+    @abstractmethod
+    def collect_dfsas_from_tree(self, tree: Tree) -> Iterable[DirectFsAccessNode]: ...
+
+
+class TablePyCollector(TableCollector, ABC):
+
+    def collect_tables(self, source_code: str) -> Iterable[UsedTable]:
+        maybe_tree = MaybeTree.from_source_code(source_code)
+        if maybe_tree.failure:
+            logger.warning(maybe_tree.failure.message)
+            return
+        assert maybe_tree.tree is not None
+        for table_node in self.collect_tables_from_tree(maybe_tree.tree):
+            yield table_node.table
+
+    @abstractmethod
+    def collect_tables_from_tree(self, tree: Tree) -> Iterable[UsedTableNode]: ...

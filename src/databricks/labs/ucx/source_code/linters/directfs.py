@@ -13,13 +13,12 @@ from databricks.labs.ucx.source_code.base import (
     DfsaSqlCollector,
     DirectFsAccess,
 )
-from databricks.labs.ucx.source_code.linters.base import SqlLinter, PythonLinter
+from databricks.labs.ucx.source_code.linters.base import SqlLinter, PythonLinter, DfsaPyCollector
 from databricks.labs.ucx.source_code.python.python_ast import (
     Tree,
     TreeVisitor,
     TreeHelper,
 )
-from databricks.labs.ucx.source_code.linters.python import DfsaPyCollector
 from databricks.labs.ucx.source_code.python.python_infer import InferredValue
 from databricks.labs.ucx.source_code.sql.sql_parser import SqlParser, SqlExpression
 

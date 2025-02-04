@@ -17,7 +17,13 @@ from databricks.labs.ucx.source_code.base import (
     TableSqlCollector,
     DfsaSqlCollector,
 )
-from databricks.labs.ucx.source_code.linters.base import SqlLinter, Fixer, PythonLinter
+from databricks.labs.ucx.source_code.linters.base import (
+    SqlLinter,
+    Fixer,
+    PythonLinter,
+    DfsaPyCollector,
+    TablePyCollector,
+)
 from databricks.labs.ucx.source_code.linters.directfs import (
     DIRECT_FS_ACCESS_PATTERNS,
     DirectFsAccessNode,
@@ -31,7 +37,6 @@ from databricks.labs.ucx.source_code.python.python_ast import (
     Tree,
     TreeHelper,
 )
-from databricks.labs.ucx.source_code.linters.python import TablePyCollector, DfsaPyCollector
 
 logger = logging.getLogger(__name__)
 

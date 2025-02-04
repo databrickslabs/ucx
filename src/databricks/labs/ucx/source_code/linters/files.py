@@ -7,25 +7,23 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import cast
 
-from astroid import Module, NodeNG  # type: ignore
 from databricks.sdk.service.workspace import Language
 
-from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.source_code.base import (
     CurrentSessionState,
     file_language,
     is_a_notebook,
     Advice,
     Failure,
-    Advisory,
     safe_read_text,
     read_text,
 )
-from databricks.labs.ucx.source_code.linters.base import Linter
 from databricks.labs.ucx.source_code.graph import Dependency
+from databricks.labs.ucx.source_code.linters.base import PythonLinter
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.linters.imports import SysPathChange, UnresolvedPath
 from databricks.labs.ucx.source_code.notebooks.cells import (
+    Cell,
     PythonCell,
     RunCell,
     RunCommand,
@@ -34,8 +32,7 @@ from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader
 from databricks.labs.ucx.source_code.notebooks.magic import MagicLine
 from databricks.labs.ucx.source_code.notebooks.sources import Notebook
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
-from databricks.labs.ucx.source_code.python.python_ast import Tree, MaybeTree, NodeBase
-from databricks.labs.ucx.source_code.linters.python import PythonSequentialLinter
+from databricks.labs.ucx.source_code.python.python_ast import Tree, MaybeTree
 
 logger = logging.getLogger(__name__)
 
@@ -46,55 +43,38 @@ class NotebookLinter:
     to the code cells according to the language of the cell.
     """
 
-    @classmethod
-    def from_source(
-        cls,
-        index: TableMigrationIndex,
-        path_lookup: PathLookup,
-        session_state: CurrentSessionState,
-        source: str,
-        default_language: Language,
-    ) -> NotebookLinter:
-        ctx = LinterContext(index)
-        notebook = Notebook.parse(Path(""), source, default_language)
-        assert notebook is not None
-        return cls(ctx, path_lookup, session_state, notebook)
-
     def __init__(
         self,
         context: LinterContext,
         path_lookup: PathLookup,
         session_state: CurrentSessionState,
         notebook: Notebook,
-        inherited_tree: Tree | None = None,
+        parent_tree: Tree | None = None,
     ):
         self._context: LinterContext = context
         self._path_lookup = path_lookup
         self._session_state = session_state
         self._notebook: Notebook = notebook
-        # reuse Python linter across related files and notebook cells
-        # this is required in order to accumulate statements for improved inference
-        self._python_linter: PythonSequentialLinter = cast(PythonSequentialLinter, context.linter(Language.PYTHON))
-        if inherited_tree is not None:
-            self._python_linter.append_tree(inherited_tree)
-        self._python_trees: dict[PythonCell, Tree] = {}  # the original trees to be linted
+        self._parent_tree = parent_tree or Tree.new_module()
+
+        # Python trees are constructed during notebook parsing and cached for later usage
+        self._python_tree_cache: dict[tuple[Path, Cell], Tree] = {}  # Path in key is the notebook's path
 
     def lint(self) -> Iterable[Advice]:
-        has_failure = False
-        for advice in self._load_tree_from_notebook(self._notebook, True):
-            if isinstance(advice, Failure):  # happens when a cell is unparseable
-                has_failure = True
-            yield advice
-        if has_failure:
+        maybe_tree = self._parse_notebook(self._notebook, parent_tree=self._parent_tree)
+        if maybe_tree and maybe_tree.failure:
+            yield maybe_tree.failure
             return
         for cell in self._notebook.cells:
-            if not self._context.is_supported(cell.language.language):
+            try:
+                linter = self._context.linter(cell.language.language)
+            except ValueError:  # Language is not supported (yet)
                 continue
             if isinstance(cell, PythonCell):
-                tree = self._python_trees[cell]
-                advices = self._python_linter.lint_tree(tree)
+                linter = cast(PythonLinter, linter)
+                tree = self._python_tree_cache[(self._notebook.path, cell)]
+                advices = linter.lint_tree(tree)
             else:
-                linter = self._linter(cell.language.language)
                 advices = linter.lint(cell.original_code)
             for advice in advices:
                 yield dataclasses.replace(
@@ -102,107 +82,128 @@ class NotebookLinter:
                     start_line=advice.start_line + cell.original_offset,
                     end_line=advice.end_line + cell.original_offset,
                 )
+        return
 
-    def _load_tree_from_notebook(self, notebook: Notebook, register_trees: bool) -> Iterable[Advice]:
+    def _parse_notebook(self, notebook: Notebook, *, parent_tree: Tree) -> MaybeTree | None:
+        """Parse a notebook by parsing its cells.
+
+        The notebook linter is designed to parse a valid tree for its notebook **only**. Possible child notebooks
+        referenced by run cells are brought into the scope of this notebook, however, their trees are not valid complete
+        for linting. The child notebooks are linted with another call to the notebook linter that includes the
+        context(s) from which these notebooks are ran.
+
+        Returns :
+            MaybeTree | None : The tree or failure belonging to the **last** cell. If None, it signals that none of the
+                cells contain Python code.
+        """
+        maybe_tree = None
         for cell in notebook.cells:
             if isinstance(cell, RunCell):
-                yield from self._load_tree_from_run_cell(cell)
-                continue
-            if isinstance(cell, PythonCell):
-                yield from self._load_tree_from_python_cell(cell, register_trees)
-                continue
+                maybe_tree = self._resolve_and_parse_run_cell(cell, parent_tree=parent_tree)
+            elif isinstance(cell, PythonCell):
+                maybe_tree = self._parse_python_cell(cell, parent_tree=parent_tree)
+            if maybe_tree and maybe_tree.failure:
+                return maybe_tree
+            if maybe_tree and maybe_tree.tree:
+                self._python_tree_cache[(notebook.path, cell)] = maybe_tree.tree
+                parent_tree = maybe_tree.tree  # The subsequent cell gets the globals from the previous cell
+        return maybe_tree
 
-    def _load_tree_from_python_cell(self, python_cell: PythonCell, register_trees: bool) -> Iterable[Advice]:
+    def _resolve_and_parse_run_cell(self, run_cell: RunCell, *, parent_tree: Tree) -> MaybeTree | None:
+        """Resolve the path in the run cell and parse the notebook it refers."""
+        path = run_cell.maybe_notebook_path()
+        if path is None:
+            return None  # malformed run cell already reported
+        notebook = self._resolve_and_parse_notebook_path(path)
+        if not notebook:
+            return None
+        maybe_tree = self._parse_notebook(notebook, parent_tree=parent_tree)
+        if maybe_tree and maybe_tree.tree:
+            # From the perspective of this cell, a run cell pulls the globals from the child notebook in
+            parent_tree.extend_globals(maybe_tree.tree.node.globals)
+        return maybe_tree
+
+    def _parse_python_cell(self, python_cell: PythonCell, *, parent_tree: Tree) -> MaybeTree:
+        """Parse the Python cell."""
+        failure: Failure | None
         maybe_tree = MaybeTree.from_source_code(python_cell.original_code)
         if maybe_tree.failure:
-            yield maybe_tree.failure
-        tree = maybe_tree.tree
-        # a cell with only comments will not produce a tree
-        if register_trees:
-            self._python_trees[python_cell] = tree or Tree.new_module()
-        if not tree:
-            return
-        yield from self._load_children_from_tree(tree)
+            failure = dataclasses.replace(
+                maybe_tree.failure,
+                start_line=maybe_tree.failure.start_line + python_cell.original_offset,
+                end_line=maybe_tree.failure.end_line + python_cell.original_offset,
+            )
+            return MaybeTree(None, failure)
+        assert maybe_tree.tree is not None
+        maybe_tree.tree.extend_globals(parent_tree.node.globals)
+        failure = self._parse_tree(maybe_tree.tree)
+        if failure:
+            return MaybeTree(None, failure)
+        return maybe_tree
 
-    def _load_children_from_tree(self, tree: Tree) -> Iterable[Advice]:
-        assert isinstance(tree.node, Module)
-        # look for child notebooks (and sys.path changes that might affect their loading)
-        base_nodes: list[NodeBase] = []
-        base_nodes.extend(self._list_run_magic_lines(tree))
-        base_nodes.extend(SysPathChange.extract_from_tree(self._session_state, tree))
-        if len(base_nodes) == 0:
-            self._python_linter.append_tree(tree)
-            return
-        # append globals
-        globs = cast(Module, tree.node).globals
-        self._python_linter.append_globals(globs)
-        # need to execute things in intertwined sequence so concat and sort them
-        nodes = list(cast(Module, tree.node).body)
-        base_nodes = sorted(base_nodes, key=lambda node: (node.node.lineno, node.node.col_offset))
-        yield from self._load_children_with_base_nodes(nodes, base_nodes)
-        # append remaining nodes
-        self._python_linter.append_nodes(nodes)
+    def _parse_tree(self, tree: Tree) -> Failure | None:
+        """Parse tree by looking for referred notebooks and path changes that might affect loading notebooks."""
+        code_path_nodes = self._list_magic_lines_with_run_command(tree) + SysPathChange.extract_from_tree(
+            self._session_state, tree
+        )
+        # Sys path changes require to load children in order of reading
+        for base_node in sorted(code_path_nodes, key=lambda node: (node.node.lineno, node.node.col_offset)):
+            failure = self._process_code_node(base_node, parent_tree=tree)
+            if failure:
+                return failure
+        return None
 
     @staticmethod
-    def _list_run_magic_lines(tree: Tree) -> Iterable[MagicLine]:
+    def _list_magic_lines_with_run_command(tree: Tree) -> list[MagicLine]:
+        """List the magic lines with a run command"""
+        run_commands = []
+        magic_lines, _ = MagicLine.extract_from_tree(tree, lambda code, message, node: None)
+        for magic_line in magic_lines:
+            if isinstance(magic_line.as_magic(), RunCommand):
+                run_commands.append(magic_line)
+        return run_commands
 
-        def _ignore_problem(_code: str, _message: str, _node: NodeNG) -> None:
-            return None
+    def _process_code_node(self, node: SysPathChange | MagicLine, *, parent_tree: Tree) -> Failure | None:
+        """Process a code node.
 
-        commands, _ = MagicLine.extract_from_tree(tree, _ignore_problem)
-        for command in commands:
-            if isinstance(command.as_magic(), RunCommand):
-                yield command
-
-    def _load_children_with_base_nodes(self, nodes: list[NodeNG], base_nodes: list[NodeBase]) -> Iterable[Advice]:
-        for base_node in base_nodes:
-            yield from self._load_children_with_base_node(nodes, base_node)
-
-    def _load_children_with_base_node(self, nodes: list[NodeNG], base_node: NodeBase) -> Iterable[Advice]:
-        while len(nodes) > 0:
-            node = nodes.pop(0)
-            self._python_linter.append_nodes([node])
-            if node.lineno < base_node.node.lineno:
-                continue
-            yield from self._load_children_from_base_node(base_node)
-
-    def _load_children_from_base_node(self, base_node: NodeBase) -> Iterable[Advice]:
-        if isinstance(base_node, SysPathChange):
-            yield from self._mutate_path_lookup(base_node)
-            return
-        if isinstance(base_node, MagicLine):
-            magic = base_node.as_magic()
+        1. `SysPathChange` mutate the path lookup.
+        2. `MagicLine` containing a `RunCommand` run other notebooks that should be parsed.
+        """
+        if isinstance(node, SysPathChange):
+            return self._mutate_path_lookup(node)
+        if isinstance(node, MagicLine):
+            magic = node.as_magic()
             assert isinstance(magic, RunCommand)
-            notebook = self._load_source_from_path(magic.notebook_path)
+            notebook = self._resolve_and_parse_notebook_path(magic.notebook_path)
             if notebook is None:
-                yield Advisory.from_node(
+                failure = Failure.from_node(
                     code='dependency-not-found',
                     message=f"Can't locate dependency: {magic.notebook_path}",
-                    node=base_node.node,
+                    node=node.node,
                 )
-                return
-            yield from self._load_tree_from_notebook(notebook, False)
-            return
+                return failure
+            maybe_tree = self._parse_notebook(notebook, parent_tree=parent_tree)
+            if not maybe_tree:
+                return None
+            if maybe_tree.tree:
+                # From the perspective of this node, a run node pulls the globals from the child notebook in
+                parent_tree.extend_globals(maybe_tree.tree.node.globals)
+            return maybe_tree.failure
+        return None
 
-    def _mutate_path_lookup(self, change: SysPathChange) -> Iterable[Advice]:
+    def _mutate_path_lookup(self, change: SysPathChange) -> Failure | None:
+        """Mutate the path lookup."""
         if isinstance(change, UnresolvedPath):
-            yield Advisory.from_node(
+            return Failure.from_node(
                 code='sys-path-cannot-compute-value',
                 message=f"Can't update sys.path from {change.node.as_string()} because the expression cannot be computed",
                 node=change.node,
             )
-            return
         change.apply_to(self._path_lookup)
+        return None
 
-    def _load_tree_from_run_cell(self, run_cell: RunCell) -> Iterable[Advice]:
-        path = run_cell.maybe_notebook_path()
-        if path is None:
-            return  # malformed run cell already reported
-        notebook = self._load_source_from_path(path)
-        if notebook is not None:
-            yield from self._load_tree_from_notebook(notebook, False)
-
-    def _load_source_from_path(self, path: Path | None) -> Notebook | None:
+    def _resolve_and_parse_notebook_path(self, path: Path | None) -> Notebook | None:
+        """Resolve and parse notebook path."""
         if path is None:
             return None  # already reported during dependency building
         resolved = self._path_lookup.resolve(path)
@@ -218,15 +219,6 @@ class NotebookLinter:
         if not source:
             return None
         return Notebook.parse(path, source, language)
-
-    def _linter(self, language: Language) -> Linter:
-        if language is Language.PYTHON:
-            return self._python_linter
-        return self._context.linter(language)
-
-    @staticmethod
-    def name() -> str:
-        return "notebook-linter"
 
 
 class FileLinter:
@@ -334,8 +326,6 @@ class FileLinter:
         else:
             try:
                 linter = self._ctx.linter(language)
-                if self._inherited_tree is not None and isinstance(linter, PythonSequentialLinter):
-                    linter.append_tree(self._inherited_tree)
                 yield from linter.lint(self._content)
             except ValueError as err:
                 failure_message = f"Error while parsing content of {self._path.as_posix()}: {err}"
@@ -349,11 +339,7 @@ class FileLinter:
             return
         notebook = Notebook.parse(self._path, self._content, language)
         notebook_linter = NotebookLinter(
-            self._ctx,
-            self._path_lookup,
-            self._session_state,
-            notebook,
-            self._inherited_tree,
+            self._ctx, self._path_lookup, self._session_state, notebook, self._inherited_tree
         )
         yield from notebook_linter.lint()
 

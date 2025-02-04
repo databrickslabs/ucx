@@ -2,20 +2,15 @@ from __future__ import annotations
 
 import dataclasses
 import logging
-from abc import ABC, abstractmethod
 from collections.abc import Iterable
 from pathlib import Path
 from typing import cast
 
-from astroid import AstroidSyntaxError, ImportFrom, Try, Name, NodeNG  # type: ignore
+from astroid import AstroidSyntaxError, ImportFrom, Try, Name  # type: ignore
 
 from databricks.labs.ucx.source_code.base import (
-    DfsaCollector,
-    TableCollector,
     Advice,
-    DirectFsAccess,
     DirectFsAccessNode,
-    UsedTable,
     UsedTableNode,
 )
 from databricks.labs.ucx.source_code.graph import (
@@ -23,7 +18,7 @@ from databricks.labs.ucx.source_code.graph import (
     DependencyProblem,
     InheritedContext,
 )
-from databricks.labs.ucx.source_code.linters.base import Linter, PythonLinter
+from databricks.labs.ucx.source_code.linters.base import PythonLinter, DfsaPyCollector, TablePyCollector
 from databricks.labs.ucx.source_code.linters.imports import (
     SysPathChange,
     DbutilsPyLinter,
@@ -216,7 +211,8 @@ class PythonCodeAnalyzer:
         change.apply_to(self._context.path_lookup)
 
 
-class PythonSequentialLinter(Linter, DfsaCollector, TableCollector):
+class PythonSequentialLinter(PythonLinter, DfsaPyCollector, TablePyCollector):
+    """A linter for sequencing python linters and collectors."""
 
     def __init__(
         self,
@@ -227,104 +223,15 @@ class PythonSequentialLinter(Linter, DfsaCollector, TableCollector):
         self._linters = linters
         self._dfsa_collectors = dfsa_collectors
         self._table_collectors = table_collectors
-        self._tree: Tree | None = None
-
-    def lint(self, code: str) -> Iterable[Advice]:
-        maybe_tree = self._parse_and_append(code)
-        if maybe_tree.failure:
-            yield maybe_tree.failure
-            return
-        assert maybe_tree.tree is not None
-        yield from self.lint_tree(maybe_tree.tree)
 
     def lint_tree(self, tree: Tree) -> Iterable[Advice]:
         for linter in self._linters:
             yield from linter.lint_tree(tree)
 
-    def _parse_and_append(self, code: str) -> MaybeTree:
-        maybe_tree = MaybeTree.from_source_code(code)
-        if maybe_tree.failure:
-            return maybe_tree
-        assert maybe_tree.tree is not None
-        self.append_tree(maybe_tree.tree)
-        return maybe_tree
-
-    def append_tree(self, tree: Tree) -> None:
-        self._make_tree().attach_child_tree(tree)
-
-    def append_nodes(self, nodes: list[NodeNG]) -> None:
-        self._make_tree().attach_nodes(nodes)
-
-    def append_globals(self, globs: dict) -> None:
-        self._make_tree().extend_globals(globs)
-
-    def process_child_cell(self, code: str) -> None:
-        this_tree = self._make_tree()
-        maybe_tree = MaybeTree.from_source_code(code)
-        if maybe_tree.failure:
-            # TODO: bubble up this error
-            logger.warning(maybe_tree.failure.message)
-            return
-        assert maybe_tree.tree is not None
-        this_tree.attach_child_tree(maybe_tree.tree)
-
-    def collect_dfsas(self, source_code: str) -> Iterable[DirectFsAccess]:
-        maybe_tree = self._parse_and_append(source_code)
-        if maybe_tree.failure:
-            logger.warning(maybe_tree.failure.message)
-            return
-        assert maybe_tree.tree is not None
-        for dfsa_node in self.collect_dfsas_from_tree(maybe_tree.tree):
-            yield dfsa_node.dfsa
-
     def collect_dfsas_from_tree(self, tree: Tree) -> Iterable[DirectFsAccessNode]:
         for collector in self._dfsa_collectors:
             yield from collector.collect_dfsas_from_tree(tree)
 
-    def collect_tables(self, source_code: str) -> Iterable[UsedTable]:
-        maybe_tree = self._parse_and_append(source_code)
-        if maybe_tree.failure:
-            logger.warning(maybe_tree.failure.message)
-            return
-        assert maybe_tree.tree is not None
-        for table_node in self.collect_tables_from_tree(maybe_tree.tree):
-            yield table_node.table
-
     def collect_tables_from_tree(self, tree: Tree) -> Iterable[UsedTableNode]:
         for collector in self._table_collectors:
             yield from collector.collect_tables_from_tree(tree)
-
-    def _make_tree(self) -> Tree:
-        if self._tree is None:
-            self._tree = Tree.new_module()
-        return self._tree
-
-
-class TablePyCollector(TableCollector, ABC):
-
-    def collect_tables(self, source_code: str) -> Iterable[UsedTable]:
-        maybe_tree = MaybeTree.from_source_code(source_code)
-        if maybe_tree.failure:
-            logger.warning(maybe_tree.failure.message)
-            return
-        assert maybe_tree.tree is not None
-        for table_node in self.collect_tables_from_tree(maybe_tree.tree):
-            yield table_node.table
-
-    @abstractmethod
-    def collect_tables_from_tree(self, tree: Tree) -> Iterable[UsedTableNode]: ...
-
-
-class DfsaPyCollector(DfsaCollector, ABC):
-
-    def collect_dfsas(self, source_code: str) -> Iterable[DirectFsAccess]:
-        maybe_tree = MaybeTree.from_source_code(source_code)
-        if maybe_tree.failure:
-            logger.warning(maybe_tree.failure.message)
-            return
-        assert maybe_tree.tree is not None
-        for dfsa_node in self.collect_dfsas_from_tree(maybe_tree.tree):
-            yield dfsa_node.dfsa
-
-    @abstractmethod
-    def collect_dfsas_from_tree(self, tree: Tree) -> Iterable[DirectFsAccessNode]: ...
