@@ -3,27 +3,33 @@ from unittest.mock import Mock, create_autospec
 
 import pytest
 from databricks.labs.blueprint.tui import MockPrompts
-
-from databricks.labs.ucx.source_code.base import CurrentSessionState
-from databricks.labs.ucx.source_code.graph import DependencyResolver, SourceContainer
-from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
-from databricks.labs.ucx.source_code.notebooks.migrator import NotebookMigrator
-from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
-from databricks.labs.ucx.source_code.known import KnownList
-
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
-from databricks.labs.ucx.source_code.linters.files import (
-    LocalFileMigrator,
-    FileLoader,
-    LocalCodeLinter,
-    FolderLoader,
-    ImportFileResolver,
-    Folder,
+from databricks.labs.ucx.source_code.base import CurrentSessionState
+from databricks.labs.ucx.source_code.graph import (
+    DependencyGraph,
+    DependencyProblem,
+    DependencyResolver,
+    SourceContainer,
 )
+from databricks.labs.ucx.source_code.known import KnownList
 from databricks.labs.ucx.source_code.linters.context import LinterContext
+from databricks.labs.ucx.source_code.linters.files import (
+    FileLoader,
+    Folder,
+    FolderLoader,
+    LocalCodeLinter,
+    LocalFileMigrator,
+    ImportFileResolver,
+    KnownContainer,
+    KnownDependency,
+)
+from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
+from databricks.labs.ucx.source_code.notebooks.migrator import NotebookMigrator
+from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
+
 from tests.unit import locate_site_packages, _samples_path
 
 
@@ -181,6 +187,16 @@ def test_folder_has_repr() -> None:
     file_loader = FileLoader()
     folder = Folder(Path("test"), notebook_loader, file_loader, FolderLoader(notebook_loader, file_loader))
     assert len(repr(folder)) > 0
+
+
+@pytest.mark.parametrize("problems", [[], [DependencyProblem("test", "test")]])
+def test_known_container_loads_problems_during_dependency_graph_building(simple_dependency_resolver, problems: list[DependencyProblem]) -> None:
+    path_lookup = create_autospec(PathLookup)
+    dependency = KnownDependency("test", problems)
+    graph = DependencyGraph(dependency, None, simple_dependency_resolver, path_lookup, CurrentSessionState())
+    container = KnownContainer(Path("test.py"), problems)
+    assert container.build_dependency_graph(graph) == problems
+    path_lookup.assert_not_called()
 
 
 site_packages = locate_site_packages()
