@@ -114,7 +114,7 @@ def test_dependency_resolver_visits_file_dependencies(simple_dependency_resolver
 
 def test_dependency_resolver_skips_standard_library_dependencies(simple_dependency_resolver) -> None:
     maybe = simple_dependency_resolver.build_local_file_dependency_graph(
-        Path("python_builtins.py"), CurrentSessionState()
+        Path("standard_libraries.py"), CurrentSessionState()
     )
     assert not maybe.failed
     graph = maybe.graph
@@ -126,7 +126,7 @@ def test_dependency_resolver_skips_standard_library_dependencies(simple_dependen
 
 def test_dependency_resolver_ignores_known_dependencies(simple_dependency_resolver) -> None:
     maybe = simple_dependency_resolver.build_local_file_dependency_graph(
-        Path("python_builtins.py"), CurrentSessionState()
+        Path("standard_libraries.py"), CurrentSessionState()
     )
     assert maybe.graph
     graph = maybe.graph
