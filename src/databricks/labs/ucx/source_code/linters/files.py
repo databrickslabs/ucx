@@ -299,7 +299,7 @@ class StandardLibraryModuleDependency(Dependency):
     def __init__(self, module_name: str):
         if module_name not in sys.stdlib_module_names:
             raise ValueError(f"Not a builtin module: {module_name}")
-        super().__init__(StubLoader(), Path(f"/python/builtins/{module_name}"), inherits_context=False)
+        super().__init__(StubLoader(), Path(f"/python/stdlib/{module_name}"), inherits_context=False)
         self.module_name = module_name
 
 
