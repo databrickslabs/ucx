@@ -316,7 +316,7 @@ class KnownDependency(Dependency):
         known_url = "https://github.com/databrickslabs/ucx/blob/main/src/databricks/labs/ucx/source_code/known.json"
         super().__init__(KnownLoader(), Path(f"{known_url}#{module_name}"), inherits_context=False)
         self.problems = problems
-        self.module_name = module_name
+        self._module_name = module_name
 
 
 class ImportFileResolver(BaseImportResolver, BaseFileResolver):
