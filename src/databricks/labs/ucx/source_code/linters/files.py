@@ -348,7 +348,7 @@ class ImportFileResolver(BaseImportResolver, BaseFileResolver):
             logger.debug(f"Resolving unknown import: {name}")
             return None
         dependency = KnownDependency(name, compatibility.problems)
-        return MaybeDependency(dependency, [])  # Problems are surfaced during dependency graph building
+        return MaybeDependency(dependency, [])
 
     def _resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency | None:
         if not name:
