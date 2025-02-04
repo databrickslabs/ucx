@@ -212,7 +212,7 @@ def test_known_loader_loads_known_container_with_problems(
     graph = DependencyGraph(dependency, None, simple_dependency_resolver, path_lookup, CurrentSessionState())
     container = loader.load_dependency(path_lookup, dependency)
     assert container.build_dependency_graph(graph) == problems
-    path_lookup.resolve.assert_called_once_with(dependency.path)
+    path_lookup.resolve.assert_not_called()
 
 
 @pytest.mark.parametrize("problems", [[], [DependencyProblem("test", "test")]])
