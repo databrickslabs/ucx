@@ -288,6 +288,8 @@ class KnownContainer(SourceContainer):
         self._problems = problems
 
     def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
+        """Return the known problems."""
+        _ = parent
         return self._problems
 
 
