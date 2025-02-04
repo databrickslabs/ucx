@@ -328,7 +328,8 @@ class KnownLoader(DependencyLoader):
         absolute_path = path_lookup.resolve(dependency.path)
         if absolute_path:
             return KnownContainer(absolute_path, dependency.problems)
-        # For testing performance, the sys paths are not in the PathLookup
+        # We do not mind if the path of a known dependency cannot be resolved.
+        # An example situation would be in testing, where the sys paths are not in the PathLookup for speeding up.
         return KnownContainer(dependency.path, dependency.problems)
 
 
