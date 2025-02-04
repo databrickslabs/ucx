@@ -299,13 +299,10 @@ class KnownLoader(DependencyLoader):
 
     def load_dependency(self, path_lookup: PathLookup, dependency: Dependency) -> KnownContainer:
         """Load the dependency."""
+        _ = path_lookup
         if not isinstance(dependency, KnownDependency):
             raise RuntimeError("Only KnownDependency is supported")
-        absolute_path = path_lookup.resolve(dependency.path)
-        if absolute_path:
-            return KnownContainer(absolute_path, dependency.problems)
-        # We do not mind if the path of a known dependency cannot be resolved.
-        # An example situation would be in testing, where the sys paths are not in the PathLookup for speeding up.
+        # Known library paths do not need to be resolved
         return KnownContainer(dependency.path, dependency.problems)
 
 
