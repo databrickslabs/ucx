@@ -237,7 +237,7 @@ def test_notebook_builds_python_dependency_graph_with_loop(mock_path_lookup) -> 
     assert container is not None
     container.build_dependency_graph(graph)
     all_paths = set(d.path for d in graph.all_dependencies)
-    assert not len(expected_path - all_paths)
+    assert not expected_path - all_paths
 
 
 def test_notebook_builds_python_dependency_graph_with_fstring_loop(mock_path_lookup) -> None:
@@ -251,7 +251,7 @@ def test_notebook_builds_python_dependency_graph_with_fstring_loop(mock_path_loo
     assert container is not None
     container.build_dependency_graph(graph)
     all_paths = set(d.path for d in graph.all_dependencies)
-    assert not len(expected_path - all_paths)
+    assert not expected_path - all_paths
 
 
 def test_detects_multiple_calls_to_dbutils_notebook_run_in_python_code() -> None:
