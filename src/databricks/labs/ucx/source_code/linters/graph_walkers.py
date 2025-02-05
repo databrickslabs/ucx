@@ -37,11 +37,12 @@ T = TypeVar("T")
 
 class DependencyGraphWalker(abc.ABC, Generic[T]):
 
-    def __init__(self, graph: DependencyGraph, walked_paths: set[Path], path_lookup: PathLookup):
+    def __init__(self, graph: DependencyGraph, path_lookup: PathLookup):
         self._graph = graph
-        self._walked_paths = walked_paths
         self._path_lookup = path_lookup
-        self._lineage: list[Dependency] = []
+
+        self._walked_paths = set[Path]()
+        self._lineage = list[Dependency]()
 
     def __iter__(self) -> Iterator[T]:
         for dependency in self._graph.root_dependencies:
@@ -95,7 +96,7 @@ class LintingWalker(DependencyGraphWalker[LocatedAdvice]):
         key: str,
         context_factory: Callable[[], LinterContext],
     ):
-        super().__init__(graph, walked_paths, path_lookup)
+        super().__init__(graph, path_lookup)
         self._key = key
         self._context_factory = context_factory
 
@@ -127,7 +128,7 @@ class _CollectorWalker(DependencyGraphWalker[S], abc.ABC):
         session_state: CurrentSessionState,
         migration_index: TableMigrationIndex,
     ):
-        super().__init__(graph, walked_paths, path_lookup)
+        super().__init__(graph, path_lookup)
         self._linter_context = LinterContext(migration_index, session_state)
 
     def _process_dependency(

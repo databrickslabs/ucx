@@ -130,19 +130,17 @@ def local_code_linter(mock_path_lookup, migration_index):
 def test_linter_walks_directory(mock_path_lookup, local_code_linter) -> None:
     mock_path_lookup.append_path(Path(_samples_path(SourceContainer)))
     path = Path(__file__).parent / "../samples" / "simulate-sys-path"
-    paths: set[Path] = set()
-    advices = list(local_code_linter.lint_path(path, paths))
-    assert len(paths) > 10
+    advices = list(local_code_linter.lint_path(path))
     assert not advices
+    assert len(mock_path_lookup.successfully_resolved_paths) > 10
 
 
 def test_linter_lints_children_in_context(mock_path_lookup, local_code_linter) -> None:
     mock_path_lookup.append_path(Path(_samples_path(SourceContainer)))
     path = Path(__file__).parent.parent / "samples" / "parent-child-context"
-    paths: set[Path] = set()
-    advices = list(local_code_linter.lint_path(path, paths))
-    assert len(paths) == 3
+    advices = list(local_code_linter.lint_path(path))
     assert not advices
+    assert mock_path_lookup.successfully_resolved_paths == {path, Path("parent.py"), Path("child.py")}
 
 
 def test_triple_dot_import() -> None:
