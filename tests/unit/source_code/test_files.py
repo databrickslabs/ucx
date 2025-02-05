@@ -62,3 +62,35 @@ def test_local_file_builds_inherited_context_without_tree_found_and_problems_ind
     assert not inherited_context.tree
     assert not inherited_context.found
     assert not inherited_context.problems
+
+
+def test_local_file_builds_inherited_context_with_tree_without_found_and_problems(
+    simple_dependency_resolver, mock_path_lookup
+) -> None:
+    """A tree should be yielded, but the child nor problems are found."""
+    dependency = Dependency(FileLoader(), Path("test.py"))
+    graph = DependencyGraph(dependency, None, simple_dependency_resolver, mock_path_lookup, CurrentSessionState())
+    local_file = LocalFile(Path("test.py"), "print(1)", Language.PYTHON)
+    inherited_context = local_file.build_inherited_context(graph, Path("child.py"))
+    assert inherited_context.tree
+    assert not inherited_context.found
+    assert not inherited_context.problems
+
+
+def test_local_file_builds_inherited_context_with_python_parse_error_problem(
+    simple_dependency_resolver, mock_path_lookup
+) -> None:
+    """Problems should be yielded for the python source code"""
+    dependency = Dependency(FileLoader(), Path("test.py"))
+    graph = DependencyGraph(dependency, None, simple_dependency_resolver, mock_path_lookup, CurrentSessionState())
+    local_file = LocalFile(Path("test.py"), "print(1", Language.PYTHON)  # Missing parenthesis is on purpose
+    inherited_context = local_file.build_inherited_context(graph, Path("child.py"))
+    assert not inherited_context.tree
+    assert not inherited_context.found
+    assert inherited_context.problems == [
+        DependencyProblem(
+            "python-parse-error",
+            "Failed to parse code due to invalid syntax: print(1",
+            Path("test.py"),
+        )
+    ]
