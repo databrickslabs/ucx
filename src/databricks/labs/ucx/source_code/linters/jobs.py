@@ -186,7 +186,7 @@ class WorkflowLinter:
         # need to add lineage for job/task because walker doesn't register them
         job_id = str(job.job_id)
         job_name = job.settings.name if job.settings and job.settings.name else "<anonymous>"
-        for dfsa in DfsaCollectorWalker(graph, set(), self._path_lookup, session_state, self._migration_index):
+        for dfsa in DfsaCollectorWalker(graph, self._path_lookup, session_state, self._migration_index):
             atoms = [
                 LineageAtom(object_type="WORKFLOW", object_id=job_id, other={"name": job_name}),
                 LineageAtom(object_type="TASK", object_id=f"{job_id}/{task.task_key}"),
@@ -203,7 +203,7 @@ class WorkflowLinter:
         # need to add lineage for job/task because walker doesn't register them
         job_id = str(job.job_id)
         job_name = job.settings.name if job.settings and job.settings.name else "<anonymous>"
-        for used_table in TablesCollectorWalker(graph, set(), self._path_lookup, session_state, self._migration_index):
+        for used_table in TablesCollectorWalker(graph, self._path_lookup, session_state, self._migration_index):
             atoms = [
                 LineageAtom(object_type="WORKFLOW", object_id=job_id, other={"name": job_name}),
                 LineageAtom(object_type="TASK", object_id=f"{job_id}/{task.task_key}"),
