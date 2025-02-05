@@ -106,7 +106,7 @@ def local_code_linter(mock_path_lookup, migration_index):
     file_loader = FileLoader()
     folder_loader = FolderLoader(notebook_loader, file_loader)
     allow_list = KnownList()
-    pip_resolver = PythonLibraryResolver(allow_list)
+    pip_resolver = PythonLibraryResolver(allow_list=allow_list)
     session_state = CurrentSessionState()
     import_file_resolver = ImportFileResolver(file_loader, allow_list=allow_list)
     resolver = DependencyResolver(
@@ -195,7 +195,7 @@ def test_known_issues(path: Path, migration_index) -> None:
     allow_list = KnownList()
     notebook_resolver = NotebookResolver(NotebookLoader())
     import_resolver = ImportFileResolver(file_loader, allow_list=allow_list)
-    pip_resolver = PythonLibraryResolver(allow_list)
+    pip_resolver = PythonLibraryResolver(allow_list=allow_list)
     resolver = DependencyResolver(pip_resolver, notebook_resolver, import_resolver, import_resolver, path_lookup)
     linter = LocalCodeLinter(
         notebook_loader,

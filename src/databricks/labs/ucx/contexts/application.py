@@ -538,7 +538,7 @@ class GlobalContext(abc.ABC):
 
     @cached_property
     def pip_resolver(self) -> PythonLibraryResolver:
-        return PythonLibraryResolver(self.allow_list)
+        return PythonLibraryResolver(allow_list=self.allow_list)
 
     @cached_property
     def notebook_loader(self) -> NotebookLoader:

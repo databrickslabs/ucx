@@ -48,7 +48,7 @@ def dependency_resolver(mock_path_lookup) -> DependencyResolver:
     allow_list = KnownList()
     import_file_resolver = ImportFileResolver(file_loader, allow_list=allow_list)
     resolver = DependencyResolver(
-        PythonLibraryResolver(allow_list),
+        PythonLibraryResolver(allow_list=allow_list),
         NotebookResolver(NotebookLoader()),
         import_file_resolver,
         import_file_resolver,

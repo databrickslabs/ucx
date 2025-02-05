@@ -253,7 +253,7 @@ def simple_dependency_resolver(mock_path_lookup: PathLookup) -> DependencyResolv
         return 0, "", ""
 
     allow_list = KnownList()
-    library_resolver = PythonLibraryResolver(allow_list, mock_pip_install_always_successful)
+    library_resolver = PythonLibraryResolver(allow_list=allow_list, runner=mock_pip_install_always_successful)
     notebook_resolver = NotebookResolver(NotebookLoader())
     import_resolver = ImportFileResolver(FileLoader(), allow_list=allow_list)
     return DependencyResolver(library_resolver, notebook_resolver, import_resolver, import_resolver, mock_path_lookup)
