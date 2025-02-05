@@ -39,6 +39,11 @@ class LocalFile(SourceContainer):
     def path(self) -> Path:
         return self._path
 
+    @property
+    def content(self) -> str:
+        """The file content"""
+        return self._original_code
+
     def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
         if self._language is CellLanguage.PYTHON:
             context = parent.new_dependency_graph_context()

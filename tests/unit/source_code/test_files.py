@@ -3,10 +3,16 @@ from pathlib import Path
 from unittest.mock import create_autospec
 
 import pytest
+from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.source_code.files import FileLoader, LocalFile
 from databricks.labs.ucx.source_code.graph import Dependency
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
+
+
+def test_local_file_content_is_accessible() -> None:
+    local_file = LocalFile(Path("test.py"), "print(1)", Language.PYTHON)
+    assert local_file.content == "print(1)"
 
 
 def test_file_loader_loads_non_ascii_file(mock_path_lookup) -> None:
