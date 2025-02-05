@@ -1,3 +1,4 @@
+import logging
 from collections.abc import Iterable
 from pathlib import Path
 from unittest.mock import create_autospec
@@ -69,6 +70,21 @@ def test_graph_walker_captures_walked_paths(mock_path_lookup, grand_parent_graph
 
     walker = _TestWalker(grand_parent_graph, mock_path_lookup)
     list(walker)
+
+
+def test_graph_walker_logs_analyzing_dependency_in_debug(caplog, mock_path_lookup, grand_parent_graph: DependencyGraph) -> None:
+
+    class _TestWalker(DependencyGraphWalker):
+
+        def _process_dependency(
+            self, dependency: Dependency, path_lookup: PathLookup, inherited_tree: Tree | None
+        ) -> Iterable[None]:
+            return []
+
+    walker = _TestWalker(grand_parent_graph, mock_path_lookup)
+    with caplog.at_level(logging.DEBUG, logger="databricks.labs.ucx.source_code.linters.graph_walkers"):
+        list(walker)
+    assert f"Analyzing dependency: {grand_parent_graph.dependency}" in caplog.messages
 
 
 def test_linting_walker_populates_paths(simple_dependency_resolver, mock_path_lookup, migration_index) -> None:
