@@ -136,6 +136,12 @@ class Functional:
         assert no_errors, "\n".join(errors)
         # TODO: output annotated file with comments for quick fixing
 
+    def _make_dependency(self, path: Path) -> Dependency:
+        """Make a dependency given a path."""
+        loader = NotebookLoader() if is_a_notebook(path) else FileLoader()
+        dependency = Dependency(loader, path)
+        return dependency
+
     def _lint(
         self,
         path_lookup: PathLookup,
@@ -145,20 +151,18 @@ class Functional:
         session_state = self._test_session_state()
         print(str(session_state))
         session_state.named_parameters = {"my-widget": "my-path.py"}
-        ctx = LinterContext(migration_index, session_state)
-        if self.parent is None:
-            linter = FileLinter(self.path, path_lookup, ctx)
-            return linter.lint()
-        # use dependency graph built from parent
-        is_notebook = is_a_notebook(self.parent)
-        loader = NotebookLoader() if is_notebook else FileLoader()
-        root_dependency = Dependency(loader, self.parent)
-        root_graph = DependencyGraph(root_dependency, None, dependency_resolver, path_lookup, session_state)
-        container = root_dependency.load(path_lookup)
-        assert container is not None
-        container.build_dependency_graph(root_graph)
-        inherited_tree = root_graph.build_inherited_tree(self.parent, self.path)
-        linter = FileLinter(self.path, path_lookup, ctx, inherited_tree)
+        inherited_tree = None
+        if self.parent:
+            # use dependency graph built from parent
+            root_dependency = self._make_dependency(self.parent)
+            root_graph = DependencyGraph(root_dependency, None, dependency_resolver, path_lookup, session_state)
+            container = root_dependency.load(path_lookup)
+            assert container is not None
+            container.build_dependency_graph(root_graph)
+            inherited_tree = root_graph.build_inherited_tree(self.parent, self.path)
+        dependency = self._make_dependency(self.path)
+        context = LinterContext(migration_index, session_state)
+        linter = FileLinter(dependency, path_lookup, context, inherited_tree=inherited_tree)
         return linter.lint()
 
     def _regex_match(self, regex: re.Pattern[str]) -> Generator[tuple[Comment, dict[str, Any]], None, None]:
