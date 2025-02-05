@@ -175,7 +175,7 @@ def _lint_dir(solacc: _SolaccContext, soldir: Path):
     linted_files = set(files_to_skip)
     # lint solution
     start_timestamp = datetime.now(timezone.utc)
-    advices = list(ctx.local_code_linter.lint_path(soldir, linted_files))
+    advices = list(ctx.local_code_linter.lint_path(soldir))
     end_timestamp = datetime.now(timezone.utc)
     # record stats
     stats = _SolaccStats(

@@ -62,7 +62,7 @@ class LocalCodeLinter:
             stdout.write(f"{located_advice}\n")
         return located_advices
 
-    def lint_path(self, path: Path, linted_paths: set[Path] | None = None) -> Iterable[LocatedAdvice]:
+    def lint_path(self, path: Path) -> Iterable[LocatedAdvice]:
         is_dir = path.is_dir()
         loader: DependencyLoader
         if is_a_notebook(path):
@@ -79,8 +79,6 @@ class LocalCodeLinter:
         problems = container.build_dependency_graph(graph)
         for problem in problems:
             yield problem.as_located_advice()
-        if linted_paths is None:
-            linted_paths = set()
         walker = LintingWalker(graph, self._path_lookup, self._context_factory)
         yield from walker
 
