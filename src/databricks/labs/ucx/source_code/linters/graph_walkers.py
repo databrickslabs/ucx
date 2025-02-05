@@ -136,7 +136,6 @@ class _CollectorWalker(DependencyGraphWalker[S], abc.ABC):
     def __init__(
         self,
         graph: DependencyGraph,
-        walked_paths: set[Path],
         path_lookup: PathLookup,
         session_state: CurrentSessionState,
         migration_index: TableMigrationIndex,
