@@ -36,6 +36,15 @@ T = TypeVar("T")
 
 
 class DependencyGraphWalker(abc.ABC, Generic[T]):
+    """Walks over the dependencies in a graph starting from the root dependencies going depth first.
+
+    Intended as an object to iterate over, for example:
+    ``` python
+    walker = DependencyGraphWalker()
+    for processed_dependency_output in walker:
+        # Do somthing with output
+    ```
+    """
 
     def __init__(self, graph: DependencyGraph, path_lookup: PathLookup):
         self._graph = graph
@@ -45,13 +54,14 @@ class DependencyGraphWalker(abc.ABC, Generic[T]):
         self._lineage = list[Dependency]()
 
     def __iter__(self) -> Iterator[T]:
+        """Iterate over the dependencies starting from the root."""
         for dependency in self._graph.root_dependencies:
             # the dependency is a root, so its path is the one to use
             # for computing lineage and building python global context
-            root_path = dependency.path
-            yield from self._iter_one(dependency, self._graph, root_path)
+            yield from self._iter_one(dependency, self._graph, dependency.path)
 
     def _iter_one(self, dependency: Dependency, graph: DependencyGraph, root_path: Path) -> Iterable[T]:
+        """Iterate over a single dependency going depth first."""
         if dependency.path in self._walked_paths:
             return
         self._lineage.append(dependency)
@@ -65,11 +75,13 @@ class DependencyGraphWalker(abc.ABC, Generic[T]):
             # missing graph problems have already been reported while building the graph
             if maybe_graph.graph:
                 child_graph = maybe_graph.graph
+                # This makes the implementation depth first
                 for child_dependency in child_graph.local_dependencies:
                     yield from self._iter_one(child_dependency, child_graph, root_path)
         self._lineage.pop()
 
     def _log_walk_one(self, dependency: Dependency) -> None:
+        """Possibly overwrite this method in a subclass for more specific logging"""
         logger.debug(f'Analyzing dependency: {dependency}')
 
     @abc.abstractmethod
@@ -78,7 +90,8 @@ class DependencyGraphWalker(abc.ABC, Generic[T]):
         dependency: Dependency,
         path_lookup: PathLookup,
         inherited_tree: Tree | None,
-    ) -> Iterable[T]: ...
+    ) -> Iterable[T]:
+        """Process a dependency."""
 
     @property
     def lineage(self) -> list[LineageAtom]:
