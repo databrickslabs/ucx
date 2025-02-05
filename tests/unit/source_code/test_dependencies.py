@@ -170,7 +170,7 @@ def test_dependency_resolver_raises_problem_with_unresolved_root_notebook(simple
 def test_dependency_resolver_raises_problem_with_unloadable_root_file(mock_path_lookup, mock_notebook_resolver) -> None:
 
     class FailingFileLoader(FileLoader):
-        def load_dependency(self, path_lookup: PathLookup, dependency: Dependency) -> SourceContainer | None:
+        def load_dependency(self, path_lookup: PathLookup, dependency: Dependency) -> None:
             return None
 
     file_loader = FailingFileLoader()

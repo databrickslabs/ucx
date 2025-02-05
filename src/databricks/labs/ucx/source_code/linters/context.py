@@ -37,13 +37,19 @@ from databricks.labs.ucx.source_code.linters.from_table import FromTableSqlLinte
 
 
 class LinterContext:
+    """The context with UCX's linters.
+
+    Use this context outside the `linters` module as an entrypoint to the
+    linters in the `linters' module.
+    """
+
     def __init__(
         self,
         index: TableMigrationIndex | None = None,
         session_state: CurrentSessionState | None = None,
     ):
         self._index = index
-        session_state = CurrentSessionState() if not session_state else session_state
+        self.session_state = CurrentSessionState() if not session_state else session_state
 
         python_linters: list[PythonLinter] = []
         python_fixers: list[Fixer] = []
@@ -55,8 +61,8 @@ class LinterContext:
         sql_dfsa_collectors: list[DfsaSqlCollector] = []
         sql_table_collectors: list[TableSqlCollector] = []
 
-        if index is not None:
-            from_table = FromTableSqlLinter(index, session_state=session_state)
+        if self._index is not None:
+            from_table = FromTableSqlLinter(self._index, session_state=self.session_state)
             sql_linters.append(from_table)
             sql_fixers.append(from_table)
             sql_table_collectors.append(from_table)
@@ -64,7 +70,7 @@ class LinterContext:
             python_linters.append(spark_sql)
             python_fixers.append(spark_sql)
             python_table_collectors.append(SparkSqlTablePyCollector(from_table))
-            spark_table = SparkTableNamePyLinter(from_table, index, session_state)
+            spark_table = SparkTableNamePyLinter(from_table, self._index, self.session_state)
             python_linters.append(spark_table)
             python_fixers.append(spark_table)
             python_table_collectors.append(spark_table)
@@ -74,14 +80,14 @@ class LinterContext:
         sql_dfsa_collectors.append(sql_direct_fs)
 
         python_linters += [
-            DirectFsAccessPyLinter(session_state),
-            DBRv8d0PyLinter(dbr_version=session_state.dbr_version),
-            SparkConnectPyLinter(session_state),
-            DbutilsPyLinter(session_state),
+            DirectFsAccessPyLinter(self.session_state),
+            DBRv8d0PyLinter(dbr_version=self.session_state.dbr_version),
+            SparkConnectPyLinter(self.session_state),
+            DbutilsPyLinter(self.session_state),
             DirectFsAccessSqlPylinter(sql_direct_fs),
         ]
 
-        python_dfsa_collectors += [DirectFsAccessPyLinter(session_state, prevent_spark_duplicates=False)]
+        python_dfsa_collectors += [DirectFsAccessPyLinter(self.session_state, prevent_spark_duplicates=False)]
 
         self._linters: dict[Language, list[SqlLinter] | list[PythonLinter]] = {
             Language.PYTHON: python_linters,
