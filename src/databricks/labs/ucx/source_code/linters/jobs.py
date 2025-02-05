@@ -180,9 +180,7 @@ class WorkflowLinter:
         session_state: CurrentSessionState,
         linted_paths: set[Path],
     ) -> Iterable[LocatedAdvice]:
-        walker = LintingWalker(
-            graph, self._path_lookup, task.task_key, lambda: LinterContext(self._migration_index, session_state)
-        )
+        walker = LintingWalker(graph, self._path_lookup, lambda: LinterContext(self._migration_index, session_state))
         yield from walker
 
     def _collect_task_dfsas(

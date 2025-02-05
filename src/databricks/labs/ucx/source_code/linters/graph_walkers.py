@@ -107,15 +107,13 @@ class DependencyGraphWalker(abc.ABC, Generic[T]):
 class LintingWalker(DependencyGraphWalker[LocatedAdvice]):
     """Lint the dependencies in the graph."""
 
-    def __init__(
-        self, graph: DependencyGraph, path_lookup: PathLookup, key: str, context_factory: Callable[[], LinterContext]
-    ):
+    def __init__(self, graph: DependencyGraph, path_lookup: PathLookup, context_factory: Callable[[], LinterContext]):
         super().__init__(graph, path_lookup)
-        self._key = key
         self._context_factory = context_factory
 
     def _log_walk_one(self, dependency: Dependency) -> None:
-        logger.info(f'Linting {self._key} dependency: {dependency}')
+        """Log linting a dependency"""
+        logger.info(f"Linting dependency: {dependency}")
 
     def _process_dependency(
         self,
