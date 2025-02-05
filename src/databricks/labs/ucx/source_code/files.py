@@ -28,6 +28,7 @@ logger = logging.getLogger(__name__)
 
 
 class LocalFile(SourceContainer):
+    """A container for accessing local files."""
 
     def __init__(self, path: Path, source: str, language: Language):
         self._path = path
@@ -39,6 +40,7 @@ class LocalFile(SourceContainer):
         return self._path
 
     def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
+        """The dependency graph for the local file."""
         if self._language == Language.PYTHON:
             context = parent.new_dependency_graph_context()
             analyzer = PythonCodeAnalyzer(context, self._original_code)
@@ -47,8 +49,7 @@ class LocalFile(SourceContainer):
                 if problem.has_missing_path():
                     problems[idx] = dataclasses.replace(problem, source_path=self._path)
             return problems
-        # supported language that does not generate dependencies
-        if self._language == Language.SQL:
+        if self._language == Language.SQL:  # SQL cannot refer other dependencies
             return []
         logger.warning(f"Unsupported language: {self._language}")
         return []
