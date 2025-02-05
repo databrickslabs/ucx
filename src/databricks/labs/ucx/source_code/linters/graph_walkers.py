@@ -99,6 +99,7 @@ class DependencyGraphWalker(abc.ABC, Generic[T]):
 
     @property
     def lineage(self) -> list[LineageAtom]:
+        """The lineage for getting to the dependency."""
         lists: list[list[LineageAtom]] = [dependency.lineage for dependency in self._lineage]
         return list(itertools.chain(*lists))
 
