@@ -111,7 +111,7 @@ class LintingWalker(DependencyGraphWalker[LocatedAdvice]):
         inherited_tree: Tree | None,
     ) -> Iterable[LocatedAdvice]:
         # FileLinter determines which file/notebook linter to use
-        linter = FileLinter(self._context_factory(), path_lookup, self._session_state, dependency.path, inherited_tree)
+        linter = FileLinter(self._context_factory(), path_lookup, dependency.path, inherited_tree)
         for advice in linter.lint():
             yield LocatedAdvice(advice, dependency.path)
 
