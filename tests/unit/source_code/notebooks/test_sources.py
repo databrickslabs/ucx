@@ -7,7 +7,7 @@ import pytest
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
-from databricks.labs.ucx.source_code.base import CurrentSessionState, Deprecation, Failure
+from databricks.labs.ucx.source_code.base import Deprecation, Failure
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.linters.files import FileLinter, NotebookLinter
 from databricks.labs.ucx.source_code.notebooks.sources import Notebook
@@ -16,9 +16,7 @@ from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 @pytest.mark.parametrize("path, content", [("xyz.py", "a = 3"), ("xyz.sql", "select * from dual")])
 def test_file_linter_lints_supported_language(path, content, migration_index, mock_path_lookup) -> None:
-    linter = FileLinter(
-        LinterContext(migration_index), mock_path_lookup, CurrentSessionState(), Path(path), None, content
-    )
+    linter = FileLinter(LinterContext(migration_index), mock_path_lookup, Path(path), None, content)
     advices = list(linter.lint())
     assert not advices
 
@@ -38,7 +36,7 @@ def test_file_linter_lints_supported_language_encoded_file_with_bom(
 ) -> None:
     path = tmp_path / "file.py"
     path.write_bytes(bom + "a = 12".encode(encoding))
-    linter = FileLinter(LinterContext(migration_index), mock_path_lookup, CurrentSessionState(), path, None)
+    linter = FileLinter(LinterContext(migration_index), mock_path_lookup, path, None)
 
     advices = list(linter.lint())
 
@@ -49,7 +47,7 @@ def test_file_linter_lints_supported_language_encoded_file_with_bom(
 def test_file_linter_lints_not_yet_supported_language(tmp_path, path, migration_index, mock_path_lookup) -> None:
     path = tmp_path / path
     path.touch()
-    linter = FileLinter(LinterContext(migration_index), mock_path_lookup, CurrentSessionState(), Path(path), None, "")
+    linter = FileLinter(LinterContext(migration_index), mock_path_lookup, Path(path), None, "")
     advices = list(linter.lint())
     assert [advice.code for advice in advices] == ["unsupported-language"]
 
@@ -76,7 +74,7 @@ def test_file_linter_lints_not_yet_supported_language(tmp_path, path, migration_
 def test_file_linter_lints_ignorable_language(tmp_path, path, migration_index, mock_path_lookup) -> None:
     path = tmp_path / path
     path.touch()
-    linter = FileLinter(LinterContext(migration_index), mock_path_lookup, CurrentSessionState(), Path(path), None)
+    linter = FileLinter(LinterContext(migration_index), mock_path_lookup, Path(path), None)
     advices = list(linter.lint())
     assert not advices
 
@@ -84,7 +82,7 @@ def test_file_linter_lints_ignorable_language(tmp_path, path, migration_index, m
 def test_file_linter_lints_non_ascii_encoded_file(migration_index, mock_path_lookup) -> None:
     preferred_encoding = locale.getpreferredencoding(False)
     non_ascii_encoded_file = Path(__file__).parent.parent / "samples" / "nonascii.py"
-    linter = FileLinter(LinterContext(migration_index), mock_path_lookup, CurrentSessionState(), non_ascii_encoded_file)
+    linter = FileLinter(LinterContext(migration_index), mock_path_lookup, non_ascii_encoded_file)
 
     advices = list(linter.lint())
 
@@ -97,7 +95,7 @@ def test_file_linter_lints_file_with_missing_file(migration_index, mock_path_loo
     path = create_autospec(Path)
     path.suffix = ".py"
     path.open.side_effect = FileNotFoundError("No such file or directory: 'test.py'")
-    linter = FileLinter(LinterContext(migration_index), mock_path_lookup, CurrentSessionState(), path)
+    linter = FileLinter(LinterContext(migration_index), mock_path_lookup, path)
 
     advices = list(linter.lint())
 
@@ -110,7 +108,7 @@ def test_file_linter_lints_file_with_missing_read_permission(migration_index, mo
     path = create_autospec(Path)
     path.suffix = ".py"
     path.open.side_effect = PermissionError("Permission denied")
-    linter = FileLinter(LinterContext(migration_index), mock_path_lookup, CurrentSessionState(), path)
+    linter = FileLinter(LinterContext(migration_index), mock_path_lookup, path)
 
     advices = list(linter.lint())
 
@@ -124,26 +122,17 @@ class _NotebookLinter(NotebookLinter):
 
     @classmethod
     def from_source_code(
-        cls,
-        index: TableMigrationIndex,
-        path_lookup: PathLookup,
-        session_state: CurrentSessionState,
-        source: str,
-        default_language: Language,
+        cls, index: TableMigrationIndex, path_lookup: PathLookup, source: str, default_language: Language
     ) -> NotebookLinter:
-        ctx = LinterContext(index)
+        context = LinterContext(index)
         notebook = Notebook.parse(Path(""), source, default_language)
         assert notebook is not None
-        return cls(ctx, path_lookup, session_state, notebook)
+        return cls(context, path_lookup, notebook)
 
 
 def test_notebook_linter_lints_source_yielding_no_advices(migration_index, mock_path_lookup) -> None:
     linter = _NotebookLinter.from_source_code(
-        migration_index,
-        mock_path_lookup,
-        CurrentSessionState(),
-        "# Databricks notebook source\nprint(1)\n",
-        Language.PYTHON,
+        migration_index, mock_path_lookup, "# Databricks notebook source\nprint(1)\n", Language.PYTHON
     )
 
     advices = list(linter.lint())
@@ -153,11 +142,7 @@ def test_notebook_linter_lints_source_yielding_no_advices(migration_index, mock_
 
 def test_notebook_linter_lints_source_yielding_parse_failure(migration_index, mock_path_lookup) -> None:
     linter = _NotebookLinter.from_source_code(
-        migration_index,
-        mock_path_lookup,
-        CurrentSessionState(),
-        "# Databricks notebook source\nprint(1\n",  # Missing parenthesis is on purpose
-        Language.PYTHON,
+        migration_index, mock_path_lookup, "# Databricks notebook source\nprint(1\n", Language.PYTHON
     )
 
     advices = list(linter.lint())
@@ -185,13 +170,7 @@ print(1
 
 print(2
 """.lstrip()  # Missing parentheses is on purpose
-    linter = _NotebookLinter.from_source_code(
-        migration_index,
-        mock_path_lookup,
-        CurrentSessionState(),
-        source,
-        Language.PYTHON,
-    )
+    linter = _NotebookLinter.from_source_code(migration_index, mock_path_lookup, source, Language.PYTHON)
 
     advices = list(linter.lint())
 
@@ -219,12 +198,7 @@ def test_notebook_linter_lints_parent_child_context_from_grand_parent(migration_
     """Verify the NotebookLinter can resolve %run"""
     path = Path(__file__).parent.parent / "samples" / "parent-child-context" / "grand_parent.py"
     notebook = Notebook.parse(path, path.read_text(), Language.PYTHON)
-    linter = NotebookLinter(
-        LinterContext(migration_index),
-        mock_path_lookup.change_directory(path.parent),
-        CurrentSessionState(),
-        notebook,
-    )
+    linter = NotebookLinter(LinterContext(migration_index), mock_path_lookup.change_directory(path.parent), notebook)
 
     advices = list(linter.lint())
 
@@ -242,13 +216,7 @@ table_name = "old.things"  # Migrated table according to the migration index
 
 spark.table(table_name)
 """.lstrip()
-    linter = _NotebookLinter.from_source_code(
-        migration_index,
-        mock_path_lookup,
-        CurrentSessionState(),
-        source,
-        Language.PYTHON,
-    )
+    linter = _NotebookLinter.from_source_code(migration_index, mock_path_lookup, source, Language.PYTHON)
 
     advices = list(linter.lint())
 
@@ -274,13 +242,7 @@ table_name = "not_migrated.table"  # NOT a migrated table according to the migra
 
 spark.table(table_name)
 """.lstrip()
-    linter = _NotebookLinter.from_source_code(
-        migration_index,
-        mock_path_lookup,
-        CurrentSessionState(),
-        source,
-        Language.PYTHON,
-    )
+    linter = _NotebookLinter.from_source_code(migration_index, mock_path_lookup, source, Language.PYTHON)
 
     advices = list(linter.lint())
 
@@ -305,13 +267,7 @@ spark.table(table_name)
 
 table_name = "not_migrated.table"  # NOT a migrated table according to the migration index
 """.lstrip()
-    linter = _NotebookLinter.from_source_code(
-        migration_index,
-        mock_path_lookup,
-        CurrentSessionState(),
-        source,
-        Language.PYTHON,
-    )
+    linter = _NotebookLinter.from_source_code(migration_index, mock_path_lookup, source, Language.PYTHON)
 
     first_advice = next(iter(linter.lint()))
 
@@ -343,13 +299,7 @@ spark.table(table_name)
 
 table_name = "old.things"  # Migrated table according to the migration index
 """.lstrip()
-    linter = _NotebookLinter.from_source_code(
-        migration_index,
-        mock_path_lookup,
-        CurrentSessionState(),
-        source,
-        Language.PYTHON,
-    )
+    linter = _NotebookLinter.from_source_code(migration_index, mock_path_lookup, source, Language.PYTHON)
 
     advices = list(linter.lint())
 
