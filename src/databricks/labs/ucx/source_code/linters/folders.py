@@ -81,9 +81,7 @@ class LocalCodeLinter:
             yield problem.as_located_advice()
         if linted_paths is None:
             linted_paths = set()
-        walker = LintingWalker(
-            graph, linted_paths, self._path_lookup, path.name, self._session_state, self._context_factory
-        )
+        walker = LintingWalker(graph, linted_paths, self._path_lookup, path.name, self._context_factory)
         yield from walker
 
 
