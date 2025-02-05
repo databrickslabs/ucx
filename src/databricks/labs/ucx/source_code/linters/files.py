@@ -267,14 +267,14 @@ class FileLinter:
 
     def __init__(
         self,
-        ctx: LinterContext,
+        context: LinterContext,
         path_lookup: PathLookup,
         session_state: CurrentSessionState,
         path: Path,
         inherited_tree: Tree | None = None,
         content: str | None = None,
     ):
-        self._ctx: LinterContext = ctx
+        self._context = context
         self._path_lookup = path_lookup
         self._session_state = session_state
         self._path = path
@@ -325,7 +325,7 @@ class FileLinter:
                 yield Failure("unknown-language", f"Cannot detect language for {self._path}", 0, 0, 1, 1)
         else:
             try:
-                linter = self._ctx.linter(language)
+                linter = self._context.linter(language)
                 yield from linter.lint(self._content)
             except ValueError as err:
                 failure_message = f"Error while parsing content of {self._path.as_posix()}: {err}"
@@ -339,7 +339,7 @@ class FileLinter:
             return
         notebook = Notebook.parse(self._path, self._content, language)
         notebook_linter = NotebookLinter(
-            self._ctx, self._path_lookup, self._session_state, notebook, self._inherited_tree
+            self._context, self._path_lookup, self._session_state, notebook, self._inherited_tree
         )
         yield from notebook_linter.lint()
 
