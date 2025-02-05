@@ -93,12 +93,10 @@ class LintingWalker(DependencyGraphWalker[LocatedAdvice]):
         walked_paths: set[Path],
         path_lookup: PathLookup,
         key: str,
-        session_state: CurrentSessionState,
         context_factory: Callable[[], LinterContext],
     ):
         super().__init__(graph, walked_paths, path_lookup)
         self._key = key
-        self._session_state = session_state
         self._context_factory = context_factory
 
     def _log_walk_one(self, dependency: Dependency) -> None:
@@ -130,7 +128,6 @@ class _CollectorWalker(DependencyGraphWalker[S], abc.ABC):
         migration_index: TableMigrationIndex,
     ):
         super().__init__(graph, walked_paths, path_lookup)
-        self._session_state = session_state
         self._linter_context = LinterContext(migration_index, session_state)
 
     def _process_dependency(
