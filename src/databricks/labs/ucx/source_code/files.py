@@ -6,7 +6,7 @@ from pathlib import Path
 
 from databricks.sdk.service.workspace import Language
 
-from databricks.labs.ucx.source_code.base import file_language
+from databricks.labs.ucx.source_code.base import file_language, safe_read_text
 from databricks.labs.ucx.source_code.graph import (
     SourceContainer,
     DependencyGraph,
@@ -33,6 +33,11 @@ class LocalFile(SourceContainer):
         self._path = path
         self._original_code = source
         self._language = language
+
+    @property
+    def content(self) -> str:
+        """The file content"""
+        return self._original_code
 
     def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
         """The dependency graph for the local file."""
@@ -76,23 +81,20 @@ class StubContainer(SourceContainer):
 
 
 class FileLoader(DependencyLoader):
-    def load_dependency(self, path_lookup: PathLookup, dependency: Dependency) -> SourceContainer | None:
-        absolute_path = path_lookup.resolve(dependency.path)
-        if not absolute_path:
-            return None
-        language = file_language(absolute_path)
-        if not language:
-            return StubContainer(absolute_path)
-        for encoding in ("utf-8", "ascii"):
-            try:
-                code = absolute_path.read_text(encoding)
-                return LocalFile(absolute_path, code, language)
-            except UnicodeDecodeError:
-                pass
-        return None
+    """Loader for a file dependency."""
 
-    def exists(self, path: Path) -> bool:
-        return path.exists()
+    def load_dependency(self, path_lookup: PathLookup, dependency: Dependency) -> LocalFile | StubContainer | None:
+        """Load the dependency."""
+        resolved_path = path_lookup.resolve(dependency.path)
+        if not resolved_path:
+            return None
+        language = file_language(resolved_path)
+        if not language:
+            return StubContainer(resolved_path)
+        content = safe_read_text(resolved_path)
+        if content is None:
+            return None
+        return LocalFile(resolved_path, content, language)
 
     def __repr__(self):
         return "FileLoader()"
