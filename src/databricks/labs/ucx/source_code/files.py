@@ -96,9 +96,6 @@ class FileLoader(DependencyLoader):
                 pass
         return None
 
-    def exists(self, path: Path) -> bool:
-        return path.exists()
-
     def __repr__(self):
         return "FileLoader()"
 
