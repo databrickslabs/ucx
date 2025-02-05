@@ -72,7 +72,9 @@ def test_graph_walker_captures_walked_paths(mock_path_lookup, grand_parent_graph
     list(walker)
 
 
-def test_graph_walker_logs_analyzing_dependency_in_debug(caplog, mock_path_lookup, grand_parent_graph: DependencyGraph) -> None:
+def test_graph_walker_logs_analyzing_dependency_in_debug(
+    caplog, mock_path_lookup, grand_parent_graph: DependencyGraph
+) -> None:
 
     class _TestWalker(DependencyGraphWalker):
 
