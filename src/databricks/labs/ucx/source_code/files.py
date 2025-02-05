@@ -34,6 +34,11 @@ class LocalFile(SourceContainer):
         self._original_code = source
         self.language = language
 
+    @property
+    def content(self) -> str:
+        """The local file content"""
+        return self._original_code
+
     def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
         """The dependency graph for the local file."""
         if self.language == Language.PYTHON:
