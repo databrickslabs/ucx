@@ -1,8 +1,12 @@
 import pytest
 import astroid  # type: ignore
-from astroid import Assign, AssignName, Attribute, Call, Const, Expr, Module, Name  # type: ignore
+from astroid import Assign, AssignName, Attribute, Call, Const, Expr, JoinedStr, Module, Name  # type: ignore
 
-from databricks.labs.ucx.source_code.python.python_ast import MaybeTree, Tree, TreeHelper
+from databricks.labs.ucx.source_code.python.python_ast import (
+    MaybeTree,
+    Tree,
+    TreeHelper,
+)
 from databricks.labs.ucx.source_code.python.python_infer import InferredValue
 
 
@@ -134,16 +138,124 @@ def test_tree_attach_child_tree_infers_value() -> None:
     assert parent_maybe_tree.tree is not None, parent_maybe_tree.failure
     assert child_maybe_tree.tree is not None, child_maybe_tree.failure
 
-    parent_maybe_tree.tree.attach_child_tree(child_maybe_tree.tree)
-
-    nodes = parent_maybe_tree.tree.locate(Assign, [])
-    tree = Tree(nodes[1].value)  # Starting from the parent, we are looking for the last assign
-    strings = [value.as_string() for value in InferredValue.infer_from_node(tree.node)]
-    assert strings == [inferred_string]
+    child_maybe_tree.tree.extend_globals(parent_maybe_tree.tree.node.globals)
 
     nodes = child_maybe_tree.tree.locate(Assign, [])
     tree = Tree(nodes[0].value)  # Starting from child, we are looking for the first assign
     strings = [value.as_string() for value in InferredValue.infer_from_node(tree.node)]
+    assert strings == [inferred_string]
+
+
+def test_tree_extend_globals_infers_value_from_grand_parent() -> None:
+    inferred_string = "Hello John!"
+    grand_parent_source, parent_source, child_source = "name = 'John'", "greeting = 'Hello'", 'say = f"Hello {name}!"'
+    grand_parent_maybe_tree = MaybeTree.from_source_code(grand_parent_source)
+    parent_maybe_tree = MaybeTree.from_source_code(parent_source)
+    child_maybe_tree = MaybeTree.from_source_code(child_source)
+
+    assert grand_parent_maybe_tree.tree is not None, grand_parent_maybe_tree.failure
+    assert parent_maybe_tree.tree is not None, parent_maybe_tree.failure
+    assert child_maybe_tree.tree is not None, child_maybe_tree.failure
+
+    parent_maybe_tree.tree.extend_globals(grand_parent_maybe_tree.tree.node.globals)
+    child_maybe_tree.tree.extend_globals(parent_maybe_tree.tree.node.globals)
+
+    nodes = child_maybe_tree.tree.locate(Assign, [])
+    tree = Tree(nodes[0].value)  # Starting from child, we are looking for the first assign
+    strings = [value.as_string() for value in InferredValue.infer_from_node(tree.node)]
+    assert strings == [inferred_string]
+
+
+def test_tree_extend_globals_for_parent_with_children_cannot_infer_value() -> None:
+    """A tree cannot infer the value from its parent's child (aka sibling tree)."""
+    inferred_string = ""  # Nothing inferred
+    parent_source, child_a_source, child_b_source = "name = 'John'", "greeting = 'Hello'", 'say = f"{greeting} {name}!"'
+    parent_maybe_tree = MaybeTree.from_source_code(parent_source)
+    child_a_maybe_tree = MaybeTree.from_source_code(child_a_source)
+    child_b_maybe_tree = MaybeTree.from_source_code(child_b_source)
+
+    assert parent_maybe_tree.tree is not None, parent_maybe_tree.failure
+    assert child_a_maybe_tree.tree is not None, child_a_maybe_tree.failure
+    assert child_b_maybe_tree.tree is not None, child_b_maybe_tree.failure
+
+    child_a_maybe_tree.tree.extend_globals(parent_maybe_tree.tree.node.globals)
+    child_b_maybe_tree.tree.extend_globals(parent_maybe_tree.tree.node.globals)
+
+    nodes = child_b_maybe_tree.tree.locate(Assign, [])
+    tree = Tree(nodes[0].value)  # Starting from child, we are looking for the first assign
+    strings = [value.as_string() for value in InferredValue.infer_from_node(tree.node)]
+    assert strings == [inferred_string]
+
+
+def test_tree_extend_globals_for_unresolvable_parent_cannot_infer_value() -> None:
+    """A tree cannot infer the value from a parent that has an unresolvable node.
+
+    This test shows a learning when working with Astroid. The unresolvable variable is irrelevant for the variable we
+    are trying to resolve, still, the unresolvable variable makes that we cannot resolve to searched value.
+    """
+    inferred_string = ""  # Nothing inferred
+    grand_parent_source = "name = 'John'"
+    parent_source = "print(unknown)\ngreeting = 'Hello'"  # Unresolvable variable `unknown`
+    child_source = "say = f'{greeting} {name}!'"
+    grand_parent_maybe_tree = MaybeTree.from_source_code(grand_parent_source)
+    parent_maybe_tree = MaybeTree.from_source_code(parent_source)
+    child_maybe_tree = MaybeTree.from_source_code(child_source)
+
+    assert grand_parent_maybe_tree.tree is not None, grand_parent_maybe_tree.failure
+    assert parent_maybe_tree.tree is not None, parent_maybe_tree.failure
+    assert child_maybe_tree.tree is not None, child_maybe_tree.failure
+
+    parent_maybe_tree.tree.extend_globals(grand_parent_maybe_tree.tree.node.globals)
+    child_maybe_tree.tree.extend_globals(parent_maybe_tree.tree.node.globals)
+
+    nodes = child_maybe_tree.tree.locate(Assign, [])
+    tree = Tree(nodes[0].value)  # Starting from child, we are looking for the first assign
+    strings = [value.as_string() for value in InferredValue.infer_from_node(tree.node)]
+    assert strings == [inferred_string]
+
+
+def test_tree_extend_globals_with_notebook_using_variable_from_other_notebook() -> None:
+    """Simulating a notebook where it uses a variable from another notebook."""
+    inferred_string = "catalog.schema.table"
+    child_source = "table_name = 'schema.table'"
+    parent_cell_1_source = "%run ./child"
+    parent_cell_2_source = "spark.table(f'catalog.{table_name}')"
+    child_maybe_tree = MaybeTree.from_source_code(child_source)
+    parent_cell_1_maybe_tree = MaybeTree.from_source_code(parent_cell_1_source)
+    parent_cell_2_maybe_tree = MaybeTree.from_source_code(parent_cell_2_source)
+
+    assert child_maybe_tree.tree is not None, child_maybe_tree.failure
+    assert parent_cell_1_maybe_tree.tree is not None, parent_cell_1_maybe_tree.failure
+    assert parent_cell_2_maybe_tree.tree is not None, parent_cell_2_maybe_tree.failure
+
+    parent_cell_1_maybe_tree.tree.extend_globals(child_maybe_tree.tree.node.globals)
+    # Subsequent notebook cell gets globals from previous cell
+    parent_cell_2_maybe_tree.tree.extend_globals(parent_cell_1_maybe_tree.tree.node.globals)
+
+    nodes = parent_cell_2_maybe_tree.tree.locate(JoinedStr, [])
+    strings = [value.as_string() for value in InferredValue.infer_from_node(nodes[0])]
+    assert strings == [inferred_string]
+
+
+def test_tree_extend_globals_with_notebook_using_variable_from_parent_notebook() -> None:
+    """Simulating a notebook where it uses a variable from its parent notebook."""
+    inferred_string = "catalog.schema.table"
+    child_source = "spark.table(f'catalog.{table_name}')"
+    parent_cell_1_source = "table_name = 'schema.table'"
+    parent_cell_2_source = "%run ./child"
+    child_maybe_tree = MaybeTree.from_source_code(child_source)
+    parent_cell_1_maybe_tree = MaybeTree.from_source_code(parent_cell_1_source)
+    parent_cell_2_maybe_tree = MaybeTree.from_source_code(parent_cell_2_source)
+
+    assert child_maybe_tree.tree is not None, child_maybe_tree.failure
+    assert parent_cell_1_maybe_tree.tree is not None, parent_cell_1_maybe_tree.failure
+    assert parent_cell_2_maybe_tree.tree is not None, parent_cell_2_maybe_tree.failure
+
+    parent_cell_2_maybe_tree.tree.extend_globals(parent_cell_1_maybe_tree.tree.node.globals)
+    child_maybe_tree.tree.extend_globals(parent_cell_2_maybe_tree.tree.node.globals)
+
+    nodes = child_maybe_tree.tree.locate(JoinedStr, [])
+    strings = [value.as_string() for value in InferredValue.infer_from_node(nodes[0])]
     assert strings == [inferred_string]
 
 
@@ -185,7 +297,7 @@ def test_is_instance_of(source, name, class_name) -> None:
     assert Tree(var[0]).is_instance_of(class_name)
 
 
-def test_tree_attach_child_tree_propagates_module_reference() -> None:
+def test_tree_extend_globals_propagates_module_reference() -> None:
     """The spark module should propagate from the parent tree."""
     source_1 = "df = spark.read.csv('hi')"
     source_2 = "df = df.withColumn(stuff)"
@@ -198,8 +310,8 @@ def test_tree_attach_child_tree_propagates_module_reference() -> None:
     assert second_line_maybe_tree.tree, second_line_maybe_tree.failure
     assert third_line_maybe_tree.tree, third_line_maybe_tree.failure
 
-    first_line_maybe_tree.tree.attach_child_tree(second_line_maybe_tree.tree)
-    first_line_maybe_tree.tree.attach_child_tree(third_line_maybe_tree.tree)
+    second_line_maybe_tree.tree.extend_globals(first_line_maybe_tree.tree.node.globals)
+    third_line_maybe_tree.tree.extend_globals(second_line_maybe_tree.tree.node.globals)
 
     assign = third_line_maybe_tree.tree.locate(Assign, [])[0]
     assert Tree(assign.value).is_from_module("spark")
@@ -288,24 +400,14 @@ def test_is_builtin(source, name, is_builtin) -> None:
     assert False  # could not locate call
 
 
-def test_tree_attach_nodes_sets_parent() -> None:
+def test_tree_attach_child_nodes_sets_parent() -> None:
     node = astroid.extract_node("b = a + 2")
     maybe_tree = MaybeTree.from_source_code("a = 1")
     assert maybe_tree.tree, maybe_tree.failure
 
-    maybe_tree.tree.attach_nodes([node])
+    maybe_tree.tree.attach_child_nodes([node])
 
     assert node.parent == maybe_tree.tree.node
-
-
-def test_tree_attach_nodes_adds_node_to_body() -> None:
-    node = astroid.extract_node("b = a + 2")
-    maybe_tree = MaybeTree.from_source_code("a = 1")
-    assert maybe_tree.tree, maybe_tree.failure
-
-    maybe_tree.tree.attach_nodes([node])
-
-    assert maybe_tree.tree.node.body[-1] == node
 
 
 def test_tree_extend_globals_adds_assign_name_to_tree() -> None:
@@ -349,9 +451,9 @@ def test_tree_attach_child_tree_raises_not_implemented_error_for_constant_node()
         Tree(Const("xyz")).attach_child_tree(Tree(Const("xyz")))
 
 
-def test_tree_attach_nodes_raises_not_implemented_error_for_constant_node() -> None:
+def test_tree_attach_child_nodes_raises_not_implemented_error_for_constant_node() -> None:
     with pytest.raises(NotImplementedError, match="Cannot attach nodes to: .*"):
-        Tree(Const("xyz")).attach_nodes([])
+        Tree(Const("xyz")).attach_child_nodes([])
 
 
 def test_extend_globals_raises_not_implemented_error_for_constant_node() -> None:

@@ -20,13 +20,14 @@ from databricks.sdk.errors import NotFound
 from databricks.sdk.service import compute, jobs, pipelines
 from databricks.sdk.service.workspace import ExportFormat, ObjectInfo, Language
 
-from databricks.labs.ucx.source_code.linters.files import FileLoader, ImportFileResolver
+from databricks.labs.ucx.source_code.files import FileLoader, ImportFileResolver
 from databricks.labs.ucx.source_code.graph import (
     Dependency,
     DependencyGraph,
     DependencyResolver,
 )
-from databricks.labs.ucx.source_code.jobs import JobProblem, WorkflowLinter, WorkflowTaskContainer
+from databricks.labs.ucx.source_code.jobs import JobProblem, WorkflowTaskContainer
+from databricks.labs.ucx.source_code.linters.jobs import WorkflowLinter
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
 from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
 

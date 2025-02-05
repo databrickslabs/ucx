@@ -4,20 +4,22 @@ from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.source_code.base import (
-    Fixer,
-    Linter,
-    SqlSequentialLinter,
     CurrentSessionState,
-    SqlLinter,
     TableSqlCollector,
     TableCollector,
     DfsaCollector,
     DfsaSqlCollector,
 )
-from databricks.labs.ucx.source_code.python.python_ast import (
+from databricks.labs.ucx.source_code.linters.base import (
+    Linter,
+    SqlLinter,
+    Fixer,
+    SqlSequentialLinter,
     PythonLinter,
-    TablePyCollector,
     DfsaPyCollector,
+    TablePyCollector,
+)
+from databricks.labs.ucx.source_code.linters.python import (
     PythonSequentialLinter,
 )
 from databricks.labs.ucx.source_code.linters.directfs import DirectFsAccessPyLinter, DirectFsAccessSqlLinter

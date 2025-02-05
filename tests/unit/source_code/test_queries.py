@@ -7,7 +7,7 @@ from databricks.sdk.service.sql import LegacyQuery
 
 from databricks.labs.ucx.assessment.dashboards import Dashboard, RedashDashboardCrawler, Query
 from databricks.labs.ucx.source_code.directfs_access import DirectFsAccessCrawler
-from databricks.labs.ucx.source_code.queries import QueryLinter
+from databricks.labs.ucx.source_code.linters.queries import QueryLinter
 from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
 
 

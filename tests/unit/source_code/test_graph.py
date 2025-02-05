@@ -3,7 +3,8 @@ from pathlib import Path
 import pytest
 
 from databricks.labs.ucx.source_code.base import Advisory, CurrentSessionState, LocatedAdvice
-from databricks.labs.ucx.source_code.linters.files import FileLoader, FolderLoader
+from databricks.labs.ucx.source_code.folders import FolderLoader
+from databricks.labs.ucx.source_code.files import FileLoader
 from databricks.labs.ucx.source_code.graph import (
     Dependency,
     DependencyGraph,

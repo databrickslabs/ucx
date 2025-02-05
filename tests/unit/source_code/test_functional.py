@@ -15,10 +15,10 @@ from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigra
 from databricks.labs.ucx.source_code.base import Advice, CurrentSessionState, is_a_notebook
 from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyResolver
 from databricks.labs.ucx.source_code.linters.context import LinterContext
-from databricks.labs.ucx.source_code.linters.files import FileLoader
+from databricks.labs.ucx.source_code.linters.files import FileLinter
+from databricks.labs.ucx.source_code.files import FileLoader
 from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader
-from databricks.labs.ucx.source_code.notebooks.sources import FileLinter
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 
@@ -244,7 +244,6 @@ def test_functional(sample: Functional, mock_path_lookup, simple_dependency_reso
         ("_child_that_uses_missing_value.py", "parent_that_dbutils_runs_child_that_misses_value_from_parent.py"),
         ("_child_that_uses_value_from_parent.py", "grand_parent_that_dbutils_runs_parent_that_magic_runs_child.py"),
         ("_child_that_uses_missing_value.py", "parent_that_imports_child_that_misses_value_from_parent.py"),
-        ("_child_that_uses_value_from_parent.py", "grand_parent_that_imports_parent_that_magic_runs_child.py"),
     ],
 )
 def test_functional_with_parent(

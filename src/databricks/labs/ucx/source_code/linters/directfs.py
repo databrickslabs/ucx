@@ -9,17 +9,15 @@ from databricks.labs.ucx.source_code.base import (
     Advice,
     Deprecation,
     CurrentSessionState,
-    SqlLinter,
     DirectFsAccessNode,
     DfsaSqlCollector,
     DirectFsAccess,
 )
+from databricks.labs.ucx.source_code.linters.base import SqlLinter, PythonLinter, DfsaPyCollector
 from databricks.labs.ucx.source_code.python.python_ast import (
     Tree,
     TreeVisitor,
     TreeHelper,
-    PythonLinter,
-    DfsaPyCollector,
 )
 from databricks.labs.ucx.source_code.python.python_infer import InferredValue
 from databricks.labs.ucx.source_code.sql.sql_parser import SqlParser, SqlExpression

@@ -7,7 +7,7 @@ from databricks.sdk.service.workspace import Language, ObjectType, ObjectInfo
 from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.graph import DependencyGraph, DependencyResolver
 from databricks.labs.ucx.source_code.known import KnownList
-from databricks.labs.ucx.source_code.linters.files import ImportFileResolver, FileLoader
+from databricks.labs.ucx.source_code.files import FileLoader, ImportFileResolver
 from databricks.labs.ucx.source_code.linters.imports import DbutilsPyLinter
 from databricks.labs.ucx.source_code.python.python_ast import MaybeTree
 from databricks.labs.ucx.source_code.notebooks.sources import Notebook

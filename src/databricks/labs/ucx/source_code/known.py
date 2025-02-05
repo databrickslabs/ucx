@@ -17,8 +17,6 @@ from databricks.labs.blueprint.entrypoint import get_logger
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.graph import DependencyProblem
-from databricks.labs.ucx.source_code.linters.context import LinterContext
-from databricks.labs.ucx.source_code.notebooks.sources import FileLinter
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 logger = logging.getLogger(__name__)
@@ -173,6 +171,15 @@ class KnownList:
 
     @classmethod
     def _analyze_file(cls, known_distributions, library_root, dist_info, module_path) -> None:
+        # Avoiding circular import when rebuilding KnownList as FileLinter and its dependencies expect KnownList to
+        # exist, while KnownList needs FileLinter to analyze the source code. Given that building KnownList falls
+        # outside the normal execution path, we can safely import FileLinter here.
+        # pylint: disable-next=import-outside-toplevel,cyclic-import
+        from databricks.labs.ucx.source_code.linters.files import FileLinter
+
+        # pylint: disable-next=import-outside-toplevel,cyclic-import
+        from databricks.labs.ucx.source_code.linters.context import LinterContext
+
         empty_index = TableMigrationIndex([])
         relative_path = module_path.relative_to(library_root)
         module_ref = relative_path.as_posix().replace('/', '.')

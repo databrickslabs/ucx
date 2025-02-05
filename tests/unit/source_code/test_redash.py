@@ -6,7 +6,7 @@ from databricks.sdk.errors import PermissionDenied
 from databricks.sdk.service.sql import LegacyQuery, UpdateQueryRequestQuery
 
 from databricks.labs.ucx.assessment.dashboards import Dashboard, Query, RedashDashboardCrawler
-from databricks.labs.ucx.source_code.redash import Redash
+from databricks.labs.ucx.source_code.linters.redash import Redash
 
 
 @pytest.fixture

@@ -2,7 +2,7 @@ import datetime as dt
 
 from databricks.sdk.retries import retried
 
-from databricks.labs.ucx.source_code.redash import Redash
+from databricks.labs.ucx.source_code.linters.redash import Redash
 from databricks.sdk.service.sql import Dashboard
 
 

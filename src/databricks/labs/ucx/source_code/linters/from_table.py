@@ -7,11 +7,10 @@ from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigra
 from databricks.labs.ucx.source_code.base import (
     Deprecation,
     CurrentSessionState,
-    SqlLinter,
-    Fixer,
     UsedTable,
     TableSqlCollector,
 )
+from databricks.labs.ucx.source_code.linters.base import SqlLinter, Fixer
 from databricks.labs.ucx.source_code.linters.directfs import DIRECT_FS_ACCESS_PATTERNS
 from databricks.labs.ucx.source_code.sql.sql_parser import SqlExpression, SqlParser
 
