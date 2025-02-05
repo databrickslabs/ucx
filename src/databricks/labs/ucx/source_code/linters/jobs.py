@@ -121,7 +121,7 @@ class WorkflowLinter:
         for task in job.settings.tasks:
             graph, advices, session_state = self._build_task_dependency_graph(task, job)
             if not advices:
-                advices = self._lint_task(task, graph, session_state)
+                advices = self._lint_task(graph, session_state)
             for advice in advices:
                 absolute_path = "UNKNOWN" if advice.has_missing_path() else advice.path.absolute().as_posix()
                 job_problem = JobProblem(
@@ -173,9 +173,7 @@ class WorkflowLinter:
         located_advices = [problem.as_located_advice() for problem in problems]
         return graph, located_advices, session_state
 
-    def _lint_task(
-        self, task: jobs.Task, graph: DependencyGraph, session_state: CurrentSessionState
-    ) -> Iterable[LocatedAdvice]:
+    def _lint_task(self, graph: DependencyGraph, session_state: CurrentSessionState) -> Iterable[LocatedAdvice]:
         walker = LintingWalker(graph, self._path_lookup, lambda: LinterContext(self._migration_index, session_state))
         yield from walker
 
