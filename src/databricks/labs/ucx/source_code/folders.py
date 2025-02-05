@@ -5,7 +5,13 @@ from collections.abc import Iterable
 
 from databricks.labs.ucx.source_code.base import is_a_notebook
 from databricks.labs.ucx.source_code.files import FileLoader
-from databricks.labs.ucx.source_code.graph import SourceContainer, DependencyGraph, DependencyProblem, Dependency
+from databricks.labs.ucx.source_code.graph import (
+    Dependency,
+    DependencyGraph,
+    DependencyLoader,
+    DependencyProblem,
+    SourceContainer,
+)
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
@@ -46,13 +52,14 @@ class Folder(SourceContainer):
         return f"<Folder {self._path}>"
 
 
-class FolderLoader(FileLoader):
+class FolderLoader(DependencyLoader):
+    """Load a folder."""
 
     def __init__(self, notebook_loader: NotebookLoader, file_loader: FileLoader):
         self._notebook_loader = notebook_loader
         self._file_loader = file_loader
 
-    def load_dependency(self, path_lookup: PathLookup, dependency: Dependency) -> SourceContainer | None:
+    def load_dependency(self, path_lookup: PathLookup, dependency: Dependency) -> Folder | None:
         absolute_path = path_lookup.resolve(dependency.path)
         if not absolute_path:
             return None
