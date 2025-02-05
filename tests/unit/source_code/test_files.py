@@ -5,7 +5,7 @@ from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.files import FileLoader, LocalFile
-from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph
+from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyProblem
 
 
 def test_local_file_path_is_accessible() -> None:
@@ -22,3 +22,29 @@ def test_local_file_builds_dependency_graph_without_problems_independent_from_so
     graph = DependencyGraph(dependency, None, simple_dependency_resolver, mock_path_lookup, CurrentSessionState())
     local_file = LocalFile(Path("test.py"), "does not matter", language)
     assert not local_file.build_dependency_graph(graph)
+
+
+def test_local_file_builds_dependency_graph_without_problems_for_python(
+    simple_dependency_resolver, mock_path_lookup
+) -> None:
+    """No problems should be yielded for the python source code"""
+    dependency = Dependency(FileLoader(), Path("test.py"))
+    graph = DependencyGraph(dependency, None, simple_dependency_resolver, mock_path_lookup, CurrentSessionState())
+    local_file = LocalFile(Path("test.py"), "print(1)", Language.PYTHON)
+    assert not local_file.build_dependency_graph(graph)
+
+
+def test_local_file_builds_dependency_graph_with_problems_for_python(
+    simple_dependency_resolver, mock_path_lookup
+) -> None:
+    """Problems should be yielded for the python source code"""
+    dependency = Dependency(FileLoader(), Path("test.py"))
+    graph = DependencyGraph(dependency, None, simple_dependency_resolver, mock_path_lookup, CurrentSessionState())
+    local_file = LocalFile(Path("test.py"), "print(1", Language.PYTHON)  # Missing parenthesis is on purpose
+    assert local_file.build_dependency_graph(graph) == [
+        DependencyProblem(
+            "python-parse-error",
+            "Failed to parse code due to invalid syntax: print(1",
+            Path("test.py"),
+        )
+    ]
