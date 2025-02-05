@@ -19,7 +19,6 @@ from databricks.labs.ucx.source_code.graph import (
     MaybeDependency,
 )
 from databricks.labs.ucx.source_code.known import KnownDependency, KnownList
-from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.linters.python import PythonCodeAnalyzer
 
@@ -28,19 +27,16 @@ logger = logging.getLogger(__name__)
 
 
 class LocalFile(SourceContainer):
+    """A container for accessing local files."""
 
     def __init__(self, path: Path, source: str, language: Language):
         self._path = path
         self._original_code = source
-        # using CellLanguage so we can reuse the facilities it provides
-        self._language = CellLanguage.of_language(language)
-
-    @property
-    def path(self) -> Path:
-        return self._path
+        self._language = language
 
     def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
-        if self._language is CellLanguage.PYTHON:
+        """The dependency graph for the local file."""
+        if self._language == Language.PYTHON:
             context = parent.new_dependency_graph_context()
             analyzer = PythonCodeAnalyzer(context, self._original_code)
             problems = analyzer.build_graph()
@@ -48,14 +44,13 @@ class LocalFile(SourceContainer):
                 if problem.has_missing_path():
                     problems[idx] = dataclasses.replace(problem, source_path=self._path)
             return problems
-        # supported language that does not generate dependencies
-        if self._language is CellLanguage.SQL:
+        if self._language == Language.SQL:  # SQL cannot refer other dependencies
             return []
-        logger.warning(f"Unsupported language: {self._language.language}")
+        logger.warning(f"Unsupported language: {self._language}")
         return []
 
     def build_inherited_context(self, graph: DependencyGraph, child_path: Path) -> InheritedContext:
-        if self._language is CellLanguage.PYTHON:
+        if self._language == Language.PYTHON:
             context = graph.new_dependency_graph_context()
             analyzer = PythonCodeAnalyzer(context, self._original_code)
             inherited = analyzer.build_inherited_context(child_path)
