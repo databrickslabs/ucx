@@ -55,8 +55,8 @@ class LinterContext:
         sql_dfsa_collectors: list[DfsaSqlCollector] = []
         sql_table_collectors: list[TableSqlCollector] = []
 
-        if index is not None:
-            from_table = FromTableSqlLinter(index, session_state=self.session_state)
+        if self._index is not None:
+            from_table = FromTableSqlLinter(self._index, session_state=self.session_state)
             sql_linters.append(from_table)
             sql_fixers.append(from_table)
             sql_table_collectors.append(from_table)
@@ -64,7 +64,7 @@ class LinterContext:
             python_linters.append(spark_sql)
             python_fixers.append(spark_sql)
             python_table_collectors.append(SparkSqlTablePyCollector(from_table))
-            spark_table = SparkTableNamePyLinter(from_table, index, self.session_state)
+            spark_table = SparkTableNamePyLinter(from_table, self._index, self.session_state)
             python_linters.append(spark_table)
             python_fixers.append(spark_table)
             python_table_collectors.append(spark_table)
