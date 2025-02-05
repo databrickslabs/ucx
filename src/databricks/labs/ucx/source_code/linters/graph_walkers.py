@@ -108,12 +108,7 @@ class LintingWalker(DependencyGraphWalker[LocatedAdvice]):
     """Lint the dependencies in the graph."""
 
     def __init__(
-        self,
-        graph: DependencyGraph,
-        walked_paths: set[Path],
-        path_lookup: PathLookup,
-        key: str,
-        context_factory: Callable[[], LinterContext],
+        self, graph: DependencyGraph, path_lookup: PathLookup, key: str, context_factory: Callable[[], LinterContext]
     ):
         super().__init__(graph, path_lookup)
         self._key = key

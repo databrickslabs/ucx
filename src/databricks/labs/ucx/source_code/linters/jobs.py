@@ -181,11 +181,7 @@ class WorkflowLinter:
         linted_paths: set[Path],
     ) -> Iterable[LocatedAdvice]:
         walker = LintingWalker(
-            graph,
-            linted_paths,
-            self._path_lookup,
-            task.task_key,
-            lambda: LinterContext(self._migration_index, session_state),
+            graph, self._path_lookup, task.task_key, lambda: LinterContext(self._migration_index, session_state)
         )
         yield from walker
 
