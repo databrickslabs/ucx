@@ -49,7 +49,7 @@ def test_linting_walker_populates_paths(simple_dependency_resolver, mock_path_lo
     xgraph = DependencyGraph(root, None, simple_dependency_resolver, mock_path_lookup, CurrentSessionState())
     current_session = CurrentSessionState()
     walker = LintingWalker(
-        xgraph, set(), mock_path_lookup, "key", current_session, lambda: LinterContext(migration_index, current_session)
+        xgraph, set(), mock_path_lookup, "key", lambda: LinterContext(migration_index, current_session)
     )
     advices = 0
     for advice in walker:

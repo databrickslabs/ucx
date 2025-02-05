@@ -185,7 +185,6 @@ class WorkflowLinter:
             linted_paths,
             self._path_lookup,
             task.task_key,
-            session_state,
             lambda: LinterContext(self._migration_index, session_state),
         )
         yield from walker
