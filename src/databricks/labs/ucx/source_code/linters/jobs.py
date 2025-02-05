@@ -117,7 +117,6 @@ class WorkflowLinter:
         assert job.settings is not None
         assert job.settings.name is not None
         assert job.settings.tasks is not None
-        linted_paths: set[Path] = set()
         for task in job.settings.tasks:
             graph, advices, session_state = self._build_task_dependency_graph(task, job)
             if not advices:
