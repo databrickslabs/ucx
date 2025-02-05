@@ -43,7 +43,7 @@ class NotebookLinter:
     """
 
     def __init__(
-        self, context: LinterContext, path_lookup: PathLookup, notebook: Notebook, parent_tree: Tree | None = None
+        self, notebook: Notebook, path_lookup: PathLookup, context: LinterContext, parent_tree: Tree | None = None
     ):
         self._context: LinterContext = context
         self._path_lookup = path_lookup
@@ -260,9 +260,9 @@ class FileLinter:
 
     def __init__(
         self,
-        context: LinterContext,
-        path_lookup: PathLookup,
         path: Path,
+        path_lookup: PathLookup,
+        context: LinterContext,
         inherited_tree: Tree | None = None,
         content: str | None = None,
     ):
@@ -329,7 +329,7 @@ class FileLinter:
             yield Failure("unknown-language", f"Cannot detect language for {self._path}", 0, 0, 1, 1)
             return
         notebook = Notebook.parse(self._path, self._content, language)
-        notebook_linter = NotebookLinter(self._context, self._path_lookup, notebook, self._inherited_tree)
+        notebook_linter = NotebookLinter(notebook, self._path_lookup, self._context, self._inherited_tree)
         yield from notebook_linter.lint()
 
 

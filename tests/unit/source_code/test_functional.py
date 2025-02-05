@@ -147,7 +147,7 @@ class Functional:
         session_state.named_parameters = {"my-widget": "my-path.py"}
         ctx = LinterContext(migration_index, session_state)
         if self.parent is None:
-            linter = FileLinter(ctx, path_lookup, self.path)
+            linter = FileLinter(self.path, path_lookup, ctx)
             return linter.lint()
         # use dependency graph built from parent
         is_notebook = is_a_notebook(self.parent)
@@ -158,7 +158,7 @@ class Functional:
         assert container is not None
         container.build_dependency_graph(root_graph)
         inherited_tree = root_graph.build_inherited_tree(self.parent, self.path)
-        linter = FileLinter(ctx, path_lookup, self.path, inherited_tree)
+        linter = FileLinter(self.path, path_lookup, ctx, inherited_tree)
         return linter.lint()
 
     def _regex_match(self, regex: re.Pattern[str]) -> Generator[tuple[Comment, dict[str, Any]], None, None]:
