@@ -11,12 +11,10 @@ from pathlib import Path
 from databricks.labs.blueprint.entrypoint import is_in_debug
 
 from databricks.labs.ucx.framework.utils import run_command
-from databricks.labs.ucx.source_code.graph import (
-    LibraryResolver,
-    DependencyProblem,
-)
-from databricks.labs.ucx.source_code.path_lookup import PathLookup
+from databricks.labs.ucx.source_code.graph import DependencyProblem, LibraryResolver
 from databricks.labs.ucx.source_code.known import KnownList
+from databricks.labs.ucx.source_code.path_lookup import PathLookup
+
 
 logger = logging.getLogger(__name__)
 
