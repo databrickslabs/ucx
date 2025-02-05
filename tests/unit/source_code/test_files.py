@@ -8,11 +8,6 @@ from databricks.labs.ucx.source_code.files import FileLoader, LocalFile
 from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyProblem
 
 
-def test_local_file_path_is_accessible() -> None:
-    local_file = LocalFile(Path("test.py"), "print(1)", Language.PYTHON)
-    assert local_file.path == Path("test.py")
-
-
 @pytest.mark.parametrize("language", [Language.SQL, Language.SCALA, Language.R])
 def test_local_file_builds_dependency_graph_without_problems_independent_from_source(
     simple_dependency_resolver, mock_path_lookup, language: Language
