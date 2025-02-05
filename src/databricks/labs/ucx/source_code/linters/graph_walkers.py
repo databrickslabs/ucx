@@ -38,11 +38,11 @@ T = TypeVar("T")
 class DependencyGraphWalker(abc.ABC, Generic[T]):
     """Walks over the dependencies in a graph starting from the root dependencies going depth first.
 
-    Intended as an object to iterate over, for example:
+    Implemented as an object to iterate over, for example:
     ``` python
     walker = DependencyGraphWalker()
     for processed_dependency_output in walker:
-        # Do somthing with output
+        # Do something with output
     ```
     """
 
