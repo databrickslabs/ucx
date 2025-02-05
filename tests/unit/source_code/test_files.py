@@ -6,10 +6,9 @@ import pytest
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.source_code.base import CurrentSessionState
+from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyProblem
 from databricks.labs.ucx.source_code.files import FileLoader, LocalFile
-from databricks.labs.ucx.source_code.graph import Dependency
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
-from databricks.labs.ucx.source_code.graph import DependencyGraph, DependencyProblem
 
 
 def test_local_file_content_is_accessible() -> None:
