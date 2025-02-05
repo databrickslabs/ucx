@@ -18,7 +18,7 @@ from databricks.labs.ucx.source_code.graph import (
     BaseFileResolver,
     MaybeDependency,
 )
-from databricks.labs.ucx.source_code.known import KnownList
+from databricks.labs.ucx.source_code.known import KnownDependency, KnownList
 from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.linters.python import PythonCodeAnalyzer
@@ -101,47 +101,6 @@ class FileLoader(DependencyLoader):
 
     def __repr__(self):
         return "FileLoader()"
-
-
-class KnownContainer(SourceContainer):
-    """A container for known libraries."""
-
-    def __init__(self, path: Path, problems: list[DependencyProblem]):
-        super().__init__()
-        self._path = path
-        self._problems = problems
-
-    def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
-        """Return the known problems."""
-        _ = parent
-        return self._problems
-
-
-class KnownLoader(DependencyLoader):
-    """Always load as `KnownContainer`.
-
-    This loader is used in combination with the KnownList to load known dependencies and their known problems.
-    """
-
-    def load_dependency(self, path_lookup: PathLookup, dependency: Dependency) -> KnownContainer:
-        """Load the dependency."""
-        _ = path_lookup
-        if not isinstance(dependency, KnownDependency):
-            raise RuntimeError("Only KnownDependency is supported")
-        # Known library paths do not need to be resolved
-        return KnownContainer(dependency.path, dependency.problems)
-
-
-class KnownDependency(Dependency):
-    """A dependency for known libraries, see :class:KnownList."""
-
-    def __init__(self, module_name: str, problems: list[DependencyProblem]):
-        known_url = "https://github.com/databrickslabs/ucx/blob/main/src/databricks/labs/ucx/source_code/known.json"
-        # Note that Github does not support navigating JSON files, hence the #<module_name> does nothing.
-        # https://docs.github.com/en/repositories/working-with-files/using-files/navigating-code-on-github
-        super().__init__(KnownLoader(), Path(f"{known_url}#{module_name}"), inherits_context=False)
-        self._module_name = module_name
-        self.problems = problems
 
 
 class ImportFileResolver(BaseImportResolver, BaseFileResolver):
