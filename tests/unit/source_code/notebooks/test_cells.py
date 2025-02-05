@@ -129,7 +129,7 @@ def test_pip_cell_build_dependency_graph_reports_unknown_library(mock_path_looku
     notebook_resolver = NotebookResolver(notebook_loader)
     allow_list = KnownList()
     pip_resolver = PythonLibraryResolver(allow_list)
-    file_resolver = ImportFileResolver(FileLoader(), allow_list)
+    file_resolver = ImportFileResolver(FileLoader(), allow_list=allow_list)
     dependency_resolver = DependencyResolver(
         pip_resolver, notebook_resolver, file_resolver, file_resolver, mock_path_lookup
     )
@@ -152,7 +152,7 @@ def test_pip_cell_build_dependency_graph_resolves_installed_library(mock_path_lo
     allow_list = KnownList()
     file_loader = FileLoader()
     pip_resolver = PythonLibraryResolver(allow_list)
-    import_resolver = ImportFileResolver(file_loader, allow_list)
+    import_resolver = ImportFileResolver(file_loader, allow_list=allow_list)
     dependency_resolver = DependencyResolver(
         pip_resolver, notebook_resolver, import_resolver, import_resolver, mock_path_lookup
     )

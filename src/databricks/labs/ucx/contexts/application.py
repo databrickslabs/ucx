@@ -572,7 +572,7 @@ class GlobalContext(abc.ABC):
 
     @cached_property
     def file_resolver(self) -> ImportFileResolver:
-        return ImportFileResolver(self.file_loader, self.allow_list)
+        return ImportFileResolver(self.file_loader, allow_list=self.allow_list)
 
     @cached_property
     def dependency_resolver(self) -> DependencyResolver:

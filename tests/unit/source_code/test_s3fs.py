@@ -123,7 +123,7 @@ def test_detect_s3fs_import(
     notebook_loader = NotebookLoader()
     file_loader = FileLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
-    import_resolver = ImportFileResolver(file_loader, allow_list)
+    import_resolver = ImportFileResolver(file_loader, allow_list=allow_list)
     pip_resolver = PythonLibraryResolver(allow_list)
     dependency_resolver = DependencyResolver(
         pip_resolver, notebook_resolver, import_resolver, import_resolver, mock_path_lookup
@@ -155,7 +155,7 @@ def test_detect_s3fs_import_in_dependencies(
 ) -> None:
     file_loader = FileLoader()
     allow_list = KnownList()
-    import_resolver = ImportFileResolver(file_loader, allow_list)
+    import_resolver = ImportFileResolver(file_loader, allow_list=allow_list)
     pip_resolver = PythonLibraryResolver(allow_list)
     dependency_resolver = DependencyResolver(
         pip_resolver, mock_notebook_resolver, import_resolver, import_resolver, mock_path_lookup

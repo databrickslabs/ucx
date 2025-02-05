@@ -102,10 +102,10 @@ class FileLoader(DependencyLoader):
 
 class ImportFileResolver(BaseImportResolver, BaseFileResolver):
 
-    def __init__(self, file_loader: FileLoader, allow_list: KnownList):
+    def __init__(self, file_loader: FileLoader, *, allow_list: KnownList | None = None):
         super().__init__()
-        self._allow_list = allow_list
         self._file_loader = file_loader
+        self._allow_list = allow_list or KnownList()
 
     def resolve_file(self, path_lookup, path: Path) -> MaybeDependency:
         absolute_path = path_lookup.resolve(path)
