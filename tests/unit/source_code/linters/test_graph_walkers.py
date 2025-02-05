@@ -113,5 +113,5 @@ class _TestCollectorWalker(DfsaCollectorWalker):
 def test_collector_supports_all_cell_languages(language, mock_path_lookup, migration_index):
     graph = create_autospec(DependencyGraph)
     graph.assert_not_called()
-    collector = _TestCollectorWalker(graph, set(), mock_path_lookup, CurrentSessionState(), migration_index)
+    collector = _TestCollectorWalker(graph, mock_path_lookup, CurrentSessionState(), migration_index)
     list(collector.collect_from_source(language))
