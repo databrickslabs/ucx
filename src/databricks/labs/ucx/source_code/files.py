@@ -32,16 +32,16 @@ class LocalFile(SourceContainer):
     def __init__(self, path: Path, source: str, language: Language):
         self._path = path
         self._original_code = source
-        self._language = language
+        self.language = language
 
     @property
     def content(self) -> str:
-        """The file content"""
+        """The local file content"""
         return self._original_code
 
     def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
         """The dependency graph for the local file."""
-        if self._language == Language.PYTHON:
+        if self.language == Language.PYTHON:
             context = parent.new_dependency_graph_context()
             analyzer = PythonCodeAnalyzer(context, self._original_code)
             problems = analyzer.build_graph()
@@ -49,13 +49,13 @@ class LocalFile(SourceContainer):
                 if problem.has_missing_path():
                     problems[idx] = dataclasses.replace(problem, source_path=self._path)
             return problems
-        if self._language == Language.SQL:  # SQL cannot refer other dependencies
+        if self.language == Language.SQL:  # SQL cannot refer other dependencies
             return []
-        logger.warning(f"Unsupported language: {self._language}")
+        logger.warning(f"Unsupported language: {self.language}")
         return []
 
     def build_inherited_context(self, graph: DependencyGraph, child_path: Path) -> InheritedContext:
-        if self._language == Language.PYTHON:
+        if self.language == Language.PYTHON:
             context = graph.new_dependency_graph_context()
             analyzer = PythonCodeAnalyzer(context, self._original_code)
             inherited = analyzer.build_inherited_context(child_path)
