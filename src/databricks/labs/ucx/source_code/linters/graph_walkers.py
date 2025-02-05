@@ -105,6 +105,7 @@ class DependencyGraphWalker(abc.ABC, Generic[T]):
 
 
 class LintingWalker(DependencyGraphWalker[LocatedAdvice]):
+    """Lint the dependencies in the graph."""
 
     def __init__(
         self,
@@ -127,6 +128,7 @@ class LintingWalker(DependencyGraphWalker[LocatedAdvice]):
         path_lookup: PathLookup,
         inherited_tree: Tree | None,
     ) -> Iterable[LocatedAdvice]:
+        """Lint the dependency and yield the located advices."""
         # FileLinter determines which file/notebook linter to use
         linter = FileLinter(dependency, path_lookup, self._context_factory(), inherited_tree)
         for advice in linter.lint():
