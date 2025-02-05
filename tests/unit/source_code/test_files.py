@@ -48,3 +48,17 @@ def test_local_file_builds_dependency_graph_with_problems_for_python(
             Path("test.py"),
         )
     ]
+
+
+@pytest.mark.parametrize("language", [Language.SQL, Language.SCALA, Language.R])
+def test_local_file_builds_inherited_context_without_tree_found_and_problems_independent_from_source(
+    simple_dependency_resolver, mock_path_lookup, language: Language
+) -> None:
+    """Unsupported language and SQL builds an inherited context without a tree, found flag and problems"""
+    dependency = Dependency(FileLoader(), Path("test"))
+    graph = DependencyGraph(dependency, None, simple_dependency_resolver, mock_path_lookup, CurrentSessionState())
+    local_file = LocalFile(Path("test"), "does not matter", language)
+    inherited_context = local_file.build_inherited_context(graph, Path("child"))
+    assert not inherited_context.tree
+    assert not inherited_context.found
+    assert not inherited_context.problems
