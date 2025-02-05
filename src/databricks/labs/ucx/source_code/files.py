@@ -19,7 +19,6 @@ from databricks.labs.ucx.source_code.graph import (
     MaybeDependency,
 )
 from databricks.labs.ucx.source_code.known import KnownList
-from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.linters.python import PythonCodeAnalyzer
 
