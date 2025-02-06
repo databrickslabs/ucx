@@ -75,7 +75,7 @@ class NotebookLoader(DependencyLoader, abc.ABC):
             return a_path
         return None
 
-    def load_dependency(self, path_lookup: PathLookup, dependency: Dependency) -> SourceContainer | None:
+    def load_dependency(self, path_lookup: PathLookup, dependency: Dependency) -> Notebook | StubContainer | None:
         """Load the notebook dependency."""
         resolved_path = self.resolve(path_lookup, dependency.path)
         if not resolved_path:
