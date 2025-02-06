@@ -13,9 +13,8 @@ from databricks.labs.ucx.source_code.graph import (
     Dependency,
     DependencyLoader,
     MaybeDependency,
-    SourceContainer,
+    StubContainer,
 )
-from databricks.labs.ucx.source_code.files import StubContainer
 from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage
 from databricks.labs.ucx.source_code.notebooks.sources import Notebook
 from databricks.labs.ucx.source_code.path_lookup import PathLookup

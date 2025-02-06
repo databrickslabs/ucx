@@ -600,3 +600,13 @@ class InheritedContext:
             return self
         tree = self.tree.renumber(-1)
         return InheritedContext(tree, self.found, [])
+
+
+class StubContainer(SourceContainer):
+
+    def __init__(self, path: Path):
+        super().__init__()
+        self._path = path
+
+    def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
+        return []

@@ -7,8 +7,7 @@ import pytest
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.source_code.base import NOTEBOOK_HEADER
-from databricks.labs.ucx.source_code.graph import Dependency
-from databricks.labs.ucx.source_code.files import StubContainer
+from databricks.labs.ucx.source_code.graph import Dependency, StubContainer
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader
 from databricks.labs.ucx.source_code.notebooks.sources import Notebook
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
