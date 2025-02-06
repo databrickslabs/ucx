@@ -79,6 +79,7 @@ class LocalCodeLinter:
         problems = container.build_dependency_graph(graph)
         for problem in problems:
             yield problem.as_located_advice()
+            return
         if linted_paths is None:
             linted_paths = set()
         walker = LintingWalker(graph, linted_paths, self._path_lookup, path.name, self._context_factory)
