@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from databricks.labs.ucx.source_code.base import CurrentSessionState
+from databricks.labs.ucx.source_code.base import CurrentSessionState, Failure, LocatedAdvice
 from databricks.labs.ucx.source_code.files import FileLoader, ImportFileResolver
 from databricks.labs.ucx.source_code.folders import FolderLoader
 from databricks.labs.ucx.source_code.graph import DependencyResolver, SourceContainer
@@ -59,3 +59,29 @@ def test_local_code_linter_lints_children_in_context(mock_path_lookup, local_cod
     advices = list(local_code_linter.lint_path(path, paths))
     assert len(paths) == 3
     assert not advices
+
+
+def test_local_code_linter_lints_import_from_known_list(tmp_path, mock_path_lookup, local_code_linter) -> None:
+    expected_failures = [
+        Failure(
+            "jvm-access-in-shared-clusters", "Cannot access Spark Driver JVM on UC Shared Clusters", -1, -1, -1, -1
+        ),
+        Failure(
+            "legacy-context-in-shared-clusters",
+            "sc is not supported on UC Shared Clusters. Rewrite it using spark",
+            -1,
+            -1,
+            -1,
+            -1,
+        ),
+    ]
+    ucx_known_url = "https:/github.com/databrickslabs/ucx/blob/main/src/databricks/labs/ucx/source_code/known.json"
+    expected_path = Path(f"{ucx_known_url}#pyspark.sql.functions")
+    expected_located_advices = [LocatedAdvice(failure, expected_path) for failure in expected_failures]
+
+    content = "import pyspark.sql.functions"  # Has known issues
+    path = tmp_path / "file.py"
+    path.write_text(content)
+    located_advices = list(local_code_linter.lint_path(path))
+
+    assert located_advices == expected_located_advices
