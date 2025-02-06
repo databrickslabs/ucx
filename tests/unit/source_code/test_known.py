@@ -9,7 +9,7 @@ import pytest
 from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.graph import DependencyProblem, DependencyGraph
 
-from databricks.labs.ucx.source_code.known import KnownList, KnownDependency, KnownContainer, KnownLoader
+from databricks.labs.ucx.source_code.known import KnownList, KnownDependency, KnownLoader
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 
@@ -99,18 +99,6 @@ def test_analyze_dist_info() -> None:
                         return
 
     TestKnownList.analyze_cachetools_dist_info()
-
-
-@pytest.mark.parametrize("problems", [[], [DependencyProblem("test", "test")]])
-def test_known_container_loads_problems_during_dependency_graph_building(
-    simple_dependency_resolver, problems: list[DependencyProblem]
-) -> None:
-    path_lookup = create_autospec(PathLookup)
-    dependency = KnownDependency("test", problems)
-    graph = DependencyGraph(dependency, None, simple_dependency_resolver, path_lookup, CurrentSessionState())
-    container = KnownContainer(Path("test.py"), problems)
-    assert container.build_dependency_graph(graph) == problems
-    path_lookup.assert_not_called()
 
 
 @pytest.mark.parametrize("problems", [[], [DependencyProblem("test", "test")]])

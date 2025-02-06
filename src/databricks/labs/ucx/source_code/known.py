@@ -18,10 +18,9 @@ from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigra
 from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.graph import (
     Dependency,
-    DependencyGraph,
     DependencyLoader,
     DependencyProblem,
-    SourceContainer,
+    StubContainer,
 )
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
@@ -261,33 +260,19 @@ class DistInfo:
         return f"<DistInfoPackage {self._path}>"
 
 
-class KnownContainer(SourceContainer):
-    """A container for known libraries."""
-
-    def __init__(self, path: Path, problems: list[DependencyProblem]):
-        super().__init__()
-        self._path = path
-        self._problems = problems
-
-    def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
-        """Return the known problems."""
-        _ = parent
-        return self._problems
-
-
 class KnownLoader(DependencyLoader):
-    """Always load as `KnownContainer`.
+    """Always load as `StubContainer`.
 
     This loader is used in combination with the KnownList to load known dependencies and their known problems.
     """
 
-    def load_dependency(self, path_lookup: PathLookup, dependency: Dependency) -> KnownContainer:
+    def load_dependency(self, path_lookup: PathLookup, dependency: Dependency) -> StubContainer:
         """Load the dependency."""
         _ = path_lookup
         if not isinstance(dependency, KnownDependency):
             raise RuntimeError("Only KnownDependency is supported")
         # Known library paths do not need to be resolved
-        return KnownContainer(dependency.path, dependency.problems)
+        return StubContainer(dependency.path)
 
 
 class KnownDependency(Dependency):

@@ -17,6 +17,7 @@ from databricks.labs.ucx.source_code.graph import (
     BaseImportResolver,
     BaseFileResolver,
     MaybeDependency,
+    StubContainer,
 )
 from databricks.labs.ucx.source_code.known import KnownDependency, KnownList
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
@@ -68,16 +69,6 @@ class LocalFile(SourceContainer):
 
     def __repr__(self):
         return f"<LocalFile {self._path}>"
-
-
-class StubContainer(SourceContainer):
-
-    def __init__(self, path: Path):
-        super().__init__()
-        self._path = path
-
-    def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
-        return []
 
 
 class FileLoader(DependencyLoader):
