@@ -115,13 +115,13 @@ def test_file_loader_loads_file_without_permission() -> None:
     path_lookup.resolve.assert_called_once_with(path)
 
 
-def test_file_loader_loads_non_ascii_file(mock_path_lookup) -> None:
+def test_file_loader_ignores_loading_non_ascii_file(mock_path_lookup) -> None:
     dependency = Dependency(FileLoader(), Path("nonascii.py"))
 
     local_file = dependency.load(mock_path_lookup)
 
     # TODO: Test specific error while loading: https://github.com/databrickslabs/ucx/issues/3584
-    assert local_file is None
+    assert not local_file
     assert Path("nonascii.py") in mock_path_lookup.successfully_resolved_paths
 
 
