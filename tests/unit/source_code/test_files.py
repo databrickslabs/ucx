@@ -180,7 +180,18 @@ def test_file_loader_loads_empty_file(tmp_path) -> None:
     path_lookup.resolve.assert_called_once_with(path)
 
 
-def test_import_resolver_resolves_import_from_known_list_with_known_problems() -> None:
+def test_import_resolver_resolves_import_from_known_list_without_problems() -> None:
+    import_file_resolver = ImportFileResolver(FileLoader(), KnownList())
+    path_lookup = create_autospec(PathLookup)
+
+    maybe_dependency = import_file_resolver.resolve_import(path_lookup, "aiohttp")
+    assert not maybe_dependency.problems
+    assert isinstance(maybe_dependency.dependency, KnownDependency)
+    assert not maybe_dependency.dependency.problems
+    path_lookup.resolve.assert_not_called()
+
+
+def test_import_resolver_resolves_import_from_known_list_with_problems() -> None:
     import_file_resolver = ImportFileResolver(FileLoader(), KnownList())
     path_lookup = create_autospec(PathLookup)
 
