@@ -27,6 +27,12 @@ def test_job_crawler(ws, make_job, inventory_schema, sql_backend):
     assert len(results) >= 1
     assert int(results[0].job_id) == new_job.job_id
 
+    make_job(spark_conf=_SPARK_CONF)
+    ws.config.include_job_ids = [new_job.job_id]
+    jobs = job_crawler.snapshot(force_refresh=True)
+    assert len(jobs) == 1
+
+
 
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))
 def test_job_run_crawler(ws, env_or_skip, inventory_schema, sql_backend):
