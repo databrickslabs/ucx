@@ -272,7 +272,7 @@ class FileLinter:
     def lint(self) -> Iterable[Advice]:
         """Lint the file."""
         if isinstance(self._dependency, KnownDependency):
-            failures = [Failure(p.code, p.message, -1, -1, -1, -1) for p in self._dependency.problems]
+            failures = [problem.as_failure() for problem in self._dependency.problems]
             yield from failures
             return
         if self._dependency.path.suffix.lower() in self._IGNORED_SUFFIXES:

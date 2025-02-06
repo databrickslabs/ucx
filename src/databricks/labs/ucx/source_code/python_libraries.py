@@ -36,12 +36,16 @@ class PythonLibraryResolver(LibraryResolver):
         """We delegate to pip to install the library and augment the path look-up to resolve the library at import.
         This gives us the flexibility to install any library that is not in the allow-list, and we don't have to
         bother about parsing cross-version dependencies in our code."""
+        known_url = "https://github.com/databrickslabs/ucx/blob/main/src/databricks/labs/ucx/source_code/known.json"
         if len(libraries) == 0:
             return []
         if len(libraries) == 1:  # Multiple libraries might be installation flags
-            compatibility = self._allow_list.distribution_compatibility(libraries[0])
+            library = libraries[0]
+            compatibility = self._allow_list.distribution_compatibility(library)
             if compatibility.known:
-                return compatibility.problems
+                path = Path(f"{known_url}#{library}")
+                problems = [DependencyProblem(p.code, p.message, path) for p in compatibility.problems]
+                return problems
         return self._install_library(path_lookup, *libraries)
 
     @cached_property
