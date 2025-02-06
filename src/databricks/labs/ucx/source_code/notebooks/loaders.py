@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import abc
 import logging
 from pathlib import Path
 from typing import TypeVar
@@ -39,7 +38,7 @@ class NotebookResolver(BaseNotebookResolver):
         return MaybeDependency(dependency, [])
 
 
-class NotebookLoader(DependencyLoader, abc.ABC):
+class NotebookLoader(DependencyLoader):
     """Load a notebook.
 
     Args:
@@ -49,6 +48,11 @@ class NotebookLoader(DependencyLoader, abc.ABC):
             Note: The exclude paths are loaded as `StubContainer` to
             signal that the path is found, however, it should not be
             processed.
+
+    TODO:
+        Let `NotebookLoader` inherit from `FileLoader` and reuse the
+        implementation of `load_dependency` to first load the file, then
+        convert it to a `Notebook` if it is a notebook source.
     """
 
     def __init__(self, *, exclude_paths: set[Path] | None = None):
