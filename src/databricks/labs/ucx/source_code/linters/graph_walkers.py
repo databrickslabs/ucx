@@ -63,10 +63,11 @@ class DependencyGraphWalker(abc.ABC, Generic[T]):
     def _iter_one(self, dependency: Dependency, graph: DependencyGraph, root_path: Path) -> Iterable[T]:
         """Iterate over a single dependency going depth first."""
         if dependency.path in self._walked_paths:
-            # TODO:
-            # Should this come before or after the lineage logging?
-            # When do we reach this? Also, it could mean that is coming from a different root,
-            # which maybe needs to be processed.
+            # TODO: Decide to not skip dependencies that have been walked already.
+            # Open questions:
+            # - Should this come before or after the lineage logging?
+            # - When do we reach this? Also, it could mean that is coming from a different root,
+            #   which maybe needs to be processed.
             return
         self._lineage.append(dependency)
         self._walked_paths.add(dependency.path)
