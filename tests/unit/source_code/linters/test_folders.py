@@ -1,3 +1,4 @@
+import dataclasses
 from pathlib import Path
 
 import pytest
@@ -5,7 +6,7 @@ import pytest
 from databricks.labs.ucx.source_code.base import CurrentSessionState, Failure, LocatedAdvice
 from databricks.labs.ucx.source_code.files import FileLoader, ImportFileResolver
 from databricks.labs.ucx.source_code.folders import FolderLoader
-from databricks.labs.ucx.source_code.graph import DependencyResolver, SourceContainer
+from databricks.labs.ucx.source_code.graph import DependencyResolver, SourceContainer, DependencyProblem
 from databricks.labs.ucx.source_code.known import KnownList
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.linters.folders import LocalCodeLinter
@@ -85,3 +86,20 @@ def test_local_code_linter_lints_import_from_known_list(tmp_path, mock_path_look
     located_advices = list(local_code_linter.lint_path(path))
 
     assert located_advices == expected_located_advices
+
+
+def test_local_code_linter_lints_known_s3fs_problems(local_code_linter, mock_path_lookup) -> None:
+    known_url = "https://github.com/databrickslabs/ucx/blob/main/src/databricks/labs/ucx/source_code/known.json"
+    expected = Failure(
+        "direct-filesystem-access",
+        "S3fs library assumes AWS IAM Instance Profile to work with S3, "
+        "which is not compatible with Databricks Unity Catalog, that "
+        "routes access through Storage Credentials.",
+        -1,
+        -1,
+        -1,
+        -1
+    )
+    path = mock_path_lookup.resolve(Path("leaf9.py"))
+    located_advices = list(local_code_linter.lint_path(path))
+    assert located_advices == [LocatedAdvice(expected, Path(known_url + "#s3fs") )]

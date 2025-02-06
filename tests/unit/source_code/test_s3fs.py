@@ -136,36 +136,3 @@ def test_detect_s3fs_import(
     assert maybe.problems == [dataclasses.replace(_, source_path=expected_path) for _ in expected]
 
 
-@pytest.mark.parametrize(
-    "expected",
-    (
-        [
-            DependencyProblem(
-                code='direct-filesystem-access',
-                message='S3fs library assumes AWS IAM Instance Profile to work with '
-                'S3, which is not compatible with Databricks Unity Catalog, '
-                'that routes access through Storage Credentials.',
-                source_path=Path('leaf9.py'),
-                start_line=0,
-                start_col=0,
-                end_line=0,
-                end_col=12,
-            ),
-        ],
-    ),
-)
-def test_detect_s3fs_import_in_dependencies(
-    empty_index, expected: list[DependencyProblem], mock_path_lookup, mock_notebook_resolver
-) -> None:
-    known_url = "https://github.com/databrickslabs/ucx/blob/main/src/databricks/labs/ucx/source_code/known.json"
-    expected_path = Path(f"{known_url}#s3fs")
-    file_loader = FileLoader()
-    allow_list = KnownList()
-    import_resolver = ImportFileResolver(file_loader, allow_list)
-    pip_resolver = PythonLibraryResolver(allow_list)
-    dependency_resolver = DependencyResolver(
-        pip_resolver, mock_notebook_resolver, import_resolver, import_resolver, mock_path_lookup
-    )
-    sample = mock_path_lookup.cwd / "root9.py"
-    maybe = dependency_resolver.build_local_file_dependency_graph(sample, CurrentSessionState())
-    assert maybe.problems == [dataclasses.replace(p, source_path=expected_path) for p in expected]
