@@ -8,6 +8,7 @@ from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.source_code.base import NOTEBOOK_HEADER
 from databricks.labs.ucx.source_code.graph import Dependency
+from databricks.labs.ucx.source_code.files import StubContainer
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader
 from databricks.labs.ucx.source_code.notebooks.sources import Notebook
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
@@ -98,4 +99,16 @@ def test_notebook_loader_cannot_load_empty_file(tmp_path) -> None:
 
     # TODO: Test specific error while loading: https://github.com/databrickslabs/ucx/issues/3584
     assert not notebook
+    path_lookup.resolve.assert_called_once_with(path)
+
+
+def test_notebook_loader_ignores_path_by_loading_it_as_stub_container(tmp_path) -> None:
+    path = tmp_path / "path.py"
+    dependency = Dependency(NotebookLoader(exclude_paths={path}), path)
+    path_lookup = create_autospec(PathLookup)
+    path_lookup.resolve.return_value = path
+
+    stub = dependency.load(path_lookup)
+
+    assert isinstance(stub, StubContainer)
     path_lookup.resolve.assert_called_once_with(path)

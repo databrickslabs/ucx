@@ -15,6 +15,7 @@ from databricks.labs.ucx.source_code.graph import (
     MaybeDependency,
     SourceContainer,
 )
+from databricks.labs.ucx.source_code.files import StubContainer
 from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage
 from databricks.labs.ucx.source_code.notebooks.sources import Notebook
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
@@ -40,7 +41,19 @@ class NotebookResolver(BaseNotebookResolver):
 
 
 class NotebookLoader(DependencyLoader, abc.ABC):
-    """Load a notebook."""
+    """Load a notebook.
+
+    Args:
+        exclude_paths (set[Path] | None) : A set of paths to load as
+            class:`StubContainer`. If None, no paths are excluded.
+
+            Note: The exclude paths are loaded as `StubContainer` to
+            signal that the path is found, however, it should not be
+            processed.
+    """
+
+    def __init__(self, *, exclude_paths: set[Path] | None = None):
+        self._exclude_paths = exclude_paths or set[Path]()
 
     def resolve(self, path_lookup: PathLookup, path: Path) -> Path | None:
         """Resolve the notebook path.
@@ -67,6 +80,10 @@ class NotebookLoader(DependencyLoader, abc.ABC):
         resolved_path = self.resolve(path_lookup, dependency.path)
         if not resolved_path:
             return None
+        if resolved_path in self._exclude_paths:
+            # Paths are excluded from further processing by loading them as stub container.
+            # Note we don't return `None`, as the path is found.
+            return StubContainer(resolved_path)
         content = safe_read_text(resolved_path)
         if content is None:
             return None
