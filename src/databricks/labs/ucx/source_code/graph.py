@@ -66,17 +66,19 @@ class DependencyGraph:
     def register_import(self, name: str) -> list[DependencyProblem]:
         if not name:
             return [DependencyProblem('import-empty', 'Empty import name')]
-        maybe = self._resolver.resolve_import(self.path_lookup, name)
-        if not maybe.dependency:
-            return maybe.problems
-        maybe_graph = self.register_dependency(maybe.dependency)
+        maybe_dependency = self._resolver.resolve_import(self.path_lookup, name)
+        if maybe_dependency.problems:
+            return maybe_dependency.problems
+        assert maybe_dependency.dependency
+        maybe_graph = self.register_dependency(maybe_dependency.dependency)
         return maybe_graph.problems
 
     def register_file(self, path: Path) -> list[DependencyProblem]:
-        maybe = self._resolver.resolve_file(self.path_lookup, path)
-        if not maybe.dependency:
-            return maybe.problems
-        maybe_graph = self.register_dependency(maybe.dependency)
+        maybe_dependency = self._resolver.resolve_file(self.path_lookup, path)
+        if maybe_dependency.problems:
+            return maybe_dependency.problems
+        assert maybe_dependency.dependency
+        maybe_graph = self.register_dependency(maybe_dependency.dependency)
         return maybe_graph.problems
 
     def register_dependency(self, dependency: Dependency) -> MaybeGraph:
