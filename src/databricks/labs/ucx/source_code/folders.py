@@ -63,6 +63,7 @@ class FolderLoader(DependencyLoader):
         self._file_loader = file_loader
 
     def load_dependency(self, path_lookup: PathLookup, dependency: Dependency) -> Folder | None:
+        """Load the folder as a dependency."""
         absolute_path = path_lookup.resolve(dependency.path)
         if not absolute_path:
             return None
