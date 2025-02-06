@@ -190,6 +190,13 @@ def test_import_resolver_resolves_import_from_known_list_without_problems() -> N
     assert not maybe_dependency.dependency.problems
     path_lookup.resolve.assert_not_called()
 
+    # Regression checks for KnownContainer to not yield the known problems
+    # The known problems should be surfaced during linting
+    graph = create_autospec(DependencyGraph)
+    container = maybe_dependency.dependency.load(path_lookup)
+    assert not container.build_dependency_graph(graph)
+    graph.assert_not_called()
+
 
 def test_import_resolver_resolves_import_from_known_list_with_problems() -> None:
     import_file_resolver = ImportFileResolver(FileLoader(), KnownList())
@@ -200,3 +207,10 @@ def test_import_resolver_resolves_import_from_known_list_with_problems() -> None
     assert isinstance(maybe_dependency.dependency, KnownDependency)
     assert maybe_dependency.dependency.problems
     path_lookup.resolve.assert_not_called()
+
+    # Regression checks for KnownContainer to not yield the known problems
+    # The known problems should be surfaced during linting
+    graph = create_autospec(DependencyGraph)
+    container = maybe_dependency.dependency.load(path_lookup)
+    assert not container.build_dependency_graph(graph)
+    graph.assert_not_called()
