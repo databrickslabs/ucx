@@ -94,9 +94,10 @@ class JobsMixin:
 
 
 class JobsCrawler(CrawlerBase[JobInfo], JobsMixin, CheckClusterMixin):
-    def __init__(self, ws: WorkspaceClient, sql_backend: SqlBackend, schema):
+    def __init__(self, ws: WorkspaceClient, sql_backend: SqlBackend, schema, include_job_ids: list[int] | None = None):
         super().__init__(sql_backend, "hive_metastore", schema, "jobs", JobInfo)
         self._ws = ws
+        self._include_job_ids = include_job_ids
 
     def _crawl(self) -> Iterable[JobInfo]:
         all_jobs = list(self._ws.jobs.list(expand_tasks=True))
@@ -108,6 +109,9 @@ class JobsCrawler(CrawlerBase[JobInfo], JobsMixin, CheckClusterMixin):
         for job, cluster_config in self._get_cluster_configs_from_all_jobs(all_jobs, all_clusters_by_id):
             job_id = job.job_id
             if not job_id:
+                continue
+            if self._include_job_ids is not None and job_id not in self._include_job_ids:
+                logger.info(f"Skipping job_id={job_id}")
                 continue
             cluster_details = ClusterDetails.from_dict(cluster_config.as_dict())
             cluster_failures = self._check_cluster_failures(cluster_details, "Job cluster")

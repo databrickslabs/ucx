@@ -70,7 +70,9 @@ class RuntimeContext(GlobalContext):
 
     @cached_property
     def jobs_crawler(self) -> JobsCrawler:
-        return JobsCrawler(self.workspace_client, self.sql_backend, self.inventory_database)
+        return JobsCrawler(
+            self.workspace_client, self.sql_backend, self.inventory_database, self.config.include_job_ids
+        )
 
     @cached_property
     def job_ownership(self) -> JobOwnership:
