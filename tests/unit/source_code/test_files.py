@@ -194,6 +194,7 @@ def test_import_resolver_resolves_import_from_known_list_without_problems() -> N
     # The known problems should be surfaced during linting
     graph = create_autospec(DependencyGraph)
     container = maybe_dependency.dependency.load(path_lookup)
+    assert container
     assert not container.build_dependency_graph(graph)
     graph.assert_not_called()
 
@@ -212,5 +213,6 @@ def test_import_resolver_resolves_import_from_known_list_with_problems() -> None
     # The known problems should be surfaced during linting
     graph = create_autospec(DependencyGraph)
     container = maybe_dependency.dependency.load(path_lookup)
+    assert container
     assert not container.build_dependency_graph(graph)
     graph.assert_not_called()
