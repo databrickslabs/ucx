@@ -43,6 +43,7 @@ class PythonLibraryResolver(LibraryResolver):
             library = libraries[0]
             compatibility = self._allow_list.distribution_compatibility(library)
             if compatibility.known:
+                # TODO: Pass in the line number and column number https://github.com/databrickslabs/ucx/issues/3625
                 path = Path(f"{known_url}#{library}")
                 problems = [DependencyProblem(p.code, p.message, path) for p in compatibility.problems]
                 return problems
