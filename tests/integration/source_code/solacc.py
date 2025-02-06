@@ -189,7 +189,7 @@ def _lint_dir(solacc: _SolaccContext, soldir: Path):
     solacc.stats.append(stats)
     # collect unparseable files
     unparseables = _collect_unparseable(advices)
-    solacc.unparseable_count = len(files_to_skip) + len(set(advice.path for advice in unparseables))
+    solacc.unparseable_count += len(files_to_skip) + len(set(advice.path for advice in unparseables))
     if solacc.unparsed_files_path:
         for unparseable in unparseables:
             logger.error(f"Error during parsing of {unparseable.path}: {unparseable.advice.message}".replace("\n", " "))
