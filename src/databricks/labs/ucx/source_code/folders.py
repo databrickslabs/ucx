@@ -30,10 +30,6 @@ class Folder(SourceContainer):
         self._file_loader = file_loader
         self._folder_loader = folder_loader
 
-    @property
-    def path(self) -> Path:
-        return self._path
-
     def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
         # don't directly scan non-source directories, let it be done for relevant imports only
         if self._path.name in {"__pycache__", ".git", ".github", ".venv", ".mypy_cache", "site-packages"}:
