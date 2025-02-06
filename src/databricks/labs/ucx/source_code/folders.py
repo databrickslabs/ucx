@@ -17,6 +17,7 @@ from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 
 class Folder(SourceContainer):
+    """A source container that represents a folder."""
 
     def __init__(
         self,
@@ -31,12 +32,18 @@ class Folder(SourceContainer):
         self._folder_loader = folder_loader
 
     def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
+        """Build the dependency graph for the folder.
+
+        Here we skip certain directories, like:
+        - the ones that are not source code.
+        """
         # don't directly scan non-source directories, let it be done for relevant imports only
         if self._path.name in {"__pycache__", ".git", ".github", ".venv", ".mypy_cache", "site-packages"}:
             return []
         return list(self._build_dependency_graph(parent))
 
     def _build_dependency_graph(self, parent: DependencyGraph) -> Iterable[DependencyProblem]:
+        """Build the dependency graph for the contents of the folder."""
         for child_path in self._path.iterdir():
             is_file = child_path.is_file()
             is_notebook = is_a_notebook(child_path)
