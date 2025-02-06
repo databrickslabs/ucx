@@ -1,4 +1,5 @@
 from pathlib import Path
+from unittest.mock import create_autospec
 
 import pytest
 
@@ -7,6 +8,7 @@ from databricks.labs.ucx.source_code.files import FileLoader
 from databricks.labs.ucx.source_code.folders import FolderLoader, Folder
 from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader
+from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 
 def test_folder_has_repr() -> None:
@@ -50,3 +52,12 @@ def test_folder_loads_content(mock_path_lookup, graph_parent_child_context) -> N
     folder.build_dependency_graph(graph_parent_child_context)
 
     assert graph_parent_child_context.all_dependencies == expected_dependencies
+
+
+def test_folder_cannot_load_unresolved_path(graph_parent_child_context) -> None:
+    """An unresolved path cannot be loaded."""
+    path_lookup = create_autospec(PathLookup)
+    path_lookup.resolve.return_value = None
+    folder = graph_parent_child_context.dependency.load(path_lookup)
+    assert folder is None
+    path_lookup.resolve.assert_called_once_with(graph_parent_child_context.dependency.path)
