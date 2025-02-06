@@ -15,7 +15,10 @@ from .test_assessment import _SPARK_CONF
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
 def test_job_crawler(ws, make_job, inventory_schema, sql_backend):
     new_job = make_job(spark_conf=_SPARK_CONF)
-    job_crawler = JobsCrawler(ws=ws, sql_backend=sql_backend, schema=inventory_schema)
+    skip_job = make_job(spark_conf=_SPARK_CONF)
+
+    ws.config.include_job_ids = [new_job.job_id]
+    job_crawler = JobsCrawler(ws=ws, sql_backend=sql_backend, schema=inventory_schema, include_job_ids=[new_job.job_id])
     jobs = job_crawler.snapshot()
     results = []
     for job in jobs:
@@ -23,6 +26,8 @@ def test_job_crawler(ws, make_job, inventory_schema, sql_backend):
             continue
         if int(job.job_id) == new_job.job_id:
             results.append(job)
+        if int(job.job_id) == skip_job.job_id:
+            assert False, "Job should have been skipped"
 
     assert len(results) >= 1
     assert int(results[0].job_id) == new_job.job_id
