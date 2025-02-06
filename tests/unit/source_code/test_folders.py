@@ -29,6 +29,14 @@ def graph_parent_child_context(mock_path_lookup, simple_dependency_resolver) -> 
     return graph
 
 
+def test_folder_build_dependency_graph_without_problems(mock_path_lookup, graph_parent_child_context) -> None:
+    """No problems should arise form building the dependency graph for the sample folder """
+    folder = graph_parent_child_context.dependency.load(mock_path_lookup)
+    assert folder is not None
+    problems = folder.build_dependency_graph(graph_parent_child_context)
+    assert not problems
+
+
 def test_folder_loads_content(mock_path_lookup, graph_parent_child_context) -> None:
     """The files in the folder should be added to the dependency graph after building."""
     expected_dependencies = {graph_parent_child_context.dependency}
@@ -37,8 +45,8 @@ def test_folder_loads_content(mock_path_lookup, graph_parent_child_context) -> N
         dependency = Dependency(FileLoader(), path)
         expected_dependencies.add(dependency)
 
-    container = graph_parent_child_context.dependency.load(mock_path_lookup)
-    assert container is not None
-    container.build_dependency_graph(graph_parent_child_context)
+    folder = graph_parent_child_context.dependency.load(mock_path_lookup)
+    assert folder is not None
+    folder.build_dependency_graph(graph_parent_child_context)
 
     assert graph_parent_child_context.all_dependencies == expected_dependencies
