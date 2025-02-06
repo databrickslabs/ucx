@@ -42,6 +42,7 @@ def local_code_linter(mock_path_lookup, migration_index):
 
 
 def test_local_code_linter_walks_directory(mock_path_lookup, local_code_linter) -> None:
+    # TODO remove sample paths and clean up test when the paths is no longer needed
     mock_path_lookup.append_path(Path(_samples_path(SourceContainer)))
     path = Path(__file__).parent / "../samples" / "simulate-sys-path"
     paths: set[Path] = set()
@@ -51,6 +52,7 @@ def test_local_code_linter_walks_directory(mock_path_lookup, local_code_linter) 
 
 
 def test_local_code_linter_lints_children_in_context(mock_path_lookup, local_code_linter) -> None:
+    # TODO remove sample paths and clean up test when the paths is no longer needed
     mock_path_lookup.append_path(Path(_samples_path(SourceContainer)))
     path = Path(__file__).parent.parent / "samples" / "parent-child-context"
     paths: set[Path] = set()
