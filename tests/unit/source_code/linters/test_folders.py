@@ -1,4 +1,3 @@
-import dataclasses
 from pathlib import Path
 
 import pytest
@@ -6,7 +5,7 @@ import pytest
 from databricks.labs.ucx.source_code.base import CurrentSessionState, Failure, LocatedAdvice
 from databricks.labs.ucx.source_code.files import FileLoader, ImportFileResolver
 from databricks.labs.ucx.source_code.folders import FolderLoader
-from databricks.labs.ucx.source_code.graph import DependencyResolver, SourceContainer, DependencyProblem
+from databricks.labs.ucx.source_code.graph import DependencyResolver, SourceContainer
 from databricks.labs.ucx.source_code.known import KnownList
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.linters.folders import LocalCodeLinter
@@ -98,8 +97,49 @@ def test_local_code_linter_lints_known_s3fs_problems(local_code_linter, mock_pat
         -1,
         -1,
         -1,
-        -1
+        -1,
     )
     path = mock_path_lookup.resolve(Path("leaf9.py"))
     located_advices = list(local_code_linter.lint_path(path))
-    assert located_advices == [LocatedAdvice(expected, Path(known_url + "#s3fs") )]
+    assert located_advices == [LocatedAdvice(expected, Path(known_url + "#s3fs"))]
+
+
+S3FS_DEPRECATION_MESSAGE = (
+    'S3fs library assumes AWS IAM Instance Profile to work with '
+    'S3, which is not compatible with Databricks Unity Catalog, '
+    'that routes access through Storage Credentials.'
+)
+
+
+@pytest.mark.parametrize(
+    "source_code, failure",
+    [
+        ("import s3fs", Failure('direct-filesystem-access', S3FS_DEPRECATION_MESSAGE, -1, -1, -1, -1)),
+        ("from s3fs import something", Failure('direct-filesystem-access', S3FS_DEPRECATION_MESSAGE, -1, -1, -1, -1)),
+        ("import certifi", None),
+        ("from certifi import core", None),
+        ("import s3fs, certifi", Failure('direct-filesystem-access', S3FS_DEPRECATION_MESSAGE, -1, -1, -1, -1)),
+        ("from certifi import core, s3fs", None),
+        ("def func():\n    import s3fs", Failure('direct-filesystem-access', S3FS_DEPRECATION_MESSAGE, -1, -1, -1, -1)),
+        ("import s3fs as s", Failure('direct-filesystem-access', S3FS_DEPRECATION_MESSAGE, -1, -1, -1, -1)),
+        (
+            "from s3fs.subpackage import something",
+            Failure('direct-filesystem-access', S3FS_DEPRECATION_MESSAGE, -1, -1, -1, -1),
+        ),
+        ("", None),
+    ],
+)
+def test_local_code_linter_lints_known_s3fs_problems_from_source_code(
+    tmp_path,
+    mock_path_lookup,
+    local_code_linter,
+    source_code: str,
+    failure: Failure | None,
+) -> None:
+    known_url = "https://github.com/databrickslabs/ucx/blob/main/src/databricks/labs/ucx/source_code/known.json"
+    module_name = "s3fs.subpackage" if "subpackage" in source_code else "s3fs"
+    expected = [LocatedAdvice(failure, Path(f"{known_url}#{module_name}"))] if failure else []
+    path = tmp_path / "file.py"
+    path.write_text(source_code)
+    located_advices = list(local_code_linter.lint_path(path))
+    assert located_advices == expected
