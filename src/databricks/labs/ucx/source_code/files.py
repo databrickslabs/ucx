@@ -115,6 +115,11 @@ class ImportFileResolver(BaseImportResolver, BaseFileResolver):
         return MaybeDependency(None, [problem])
 
     def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
+        """Resolve an import by name.
+
+        1. Check the known modules.
+        2. Check the import on the path lookup.
+        """
         maybe = self._resolve_allow_list(name)
         if maybe is not None:
             return maybe
