@@ -19,6 +19,17 @@ from databricks.labs.ucx.source_code.path_lookup import PathLookup
 class Folder(SourceContainer):
     """A source container that represents a folder."""
 
+    # The following paths names are ignore as they do not contain source code
+    _IGNORE_PATH_NAMES = {
+        "__pycache__",
+        ".mypy_cache",
+        ".git",
+        ".github",
+        # Code from libraries are accessed through `imports`, not directly via the folder
+        ".venv",
+        "site-packages",
+    }
+
     def __init__(
         self,
         path: Path,
@@ -37,8 +48,7 @@ class Folder(SourceContainer):
         Here we skip certain directories, like:
         - the ones that are not source code.
         """
-        # don't directly scan non-source directories, let it be done for relevant imports only
-        if self._path.name in {"__pycache__", ".git", ".github", ".venv", ".mypy_cache", "site-packages"}:
+        if self._path.name in self._IGNORE_PATH_NAMES:
             return []
         return list(self._build_dependency_graph(parent))
 
