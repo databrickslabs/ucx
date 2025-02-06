@@ -5,10 +5,9 @@ import logging
 from pathlib import Path
 from typing import TypeVar
 
-from databricks.sdk.errors import NotFound
 from databricks.sdk.service.workspace import Language
 
-from databricks.labs.ucx.source_code.base import is_a_notebook, file_language
+from databricks.labs.ucx.source_code.base import is_a_notebook, file_language, safe_read_text
 from databricks.labs.ucx.source_code.graph import (
     BaseNotebookResolver,
     Dependency,
@@ -41,9 +40,14 @@ class NotebookResolver(BaseNotebookResolver):
 
 
 class NotebookLoader(DependencyLoader, abc.ABC):
+    """Load a notebook."""
+
     def resolve(self, path_lookup: PathLookup, path: Path) -> Path | None:
-        """If the path is a Python file, return the path to the Python file. If the path is neither,
-        return None."""
+        """Resolve the notebook path.
+
+        If the path is a Python file, return the path to the Python file. If the path is neither,
+        return None.
+        """
         # check current working directory first
         absolute_path = path_lookup.cwd / path
         absolute_path = absolute_path.resolve()
@@ -59,28 +63,22 @@ class NotebookLoader(DependencyLoader, abc.ABC):
         return None
 
     def load_dependency(self, path_lookup: PathLookup, dependency: Dependency) -> SourceContainer | None:
-        absolute_path = self.resolve(path_lookup, dependency.path)
-        if not absolute_path:
+        """Load the notebook dependency."""
+        resolved_path = self.resolve(path_lookup, dependency.path)
+        if not resolved_path:
+            return None
+        content = safe_read_text(resolved_path)
+        if content is None:
+            return None
+        language = self._detect_language(resolved_path, content)
+        if not language:
+            logger.warning(f"Could not detect language for {resolved_path}")
             return None
         try:
-            content = absolute_path.read_text("utf-8")
-        except NotFound:
-            logger.warning(f"Path not found trying to read notebook from workspace: {absolute_path}")
+            return Notebook.parse(resolved_path, content, language)
+        except ValueError as e:
+            logger.warning(f"Could not parse notebook for {resolved_path}", exc_info=e)
             return None
-        except PermissionError:
-            logger.warning(
-                f"Permission error while reading notebook from workspace: {absolute_path}",
-                exc_info=True,
-            )
-            return None
-        except UnicodeDecodeError:
-            logger.warning(f"Cannot decode non-UTF-8 encoded notebook from workspace: {absolute_path}")
-            return None
-        language = self._detect_language(absolute_path, content)
-        if not language:
-            logger.warning(f"Could not detect language for {absolute_path}")
-            return None
-        return Notebook.parse(absolute_path, content, language)
 
     @staticmethod
     def _detect_language(path: Path, content: str) -> Language | None:
