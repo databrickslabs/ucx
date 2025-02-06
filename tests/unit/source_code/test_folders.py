@@ -32,7 +32,7 @@ def graph_parent_child_context(mock_path_lookup, simple_dependency_resolver) -> 
 
 
 def test_folder_build_dependency_graph_without_problems(mock_path_lookup, graph_parent_child_context) -> None:
-    """No problems should arise form building the dependency graph for the sample folder """
+    """No problems should arise form building the dependency graph for the sample folder"""
     folder = graph_parent_child_context.dependency.load(mock_path_lookup)
     assert folder is not None
     problems = folder.build_dependency_graph(graph_parent_child_context)
@@ -61,3 +61,28 @@ def test_folder_cannot_load_unresolved_path(graph_parent_child_context) -> None:
     folder = graph_parent_child_context.dependency.load(path_lookup)
     assert folder is None
     path_lookup.resolve.assert_called_once_with(graph_parent_child_context.dependency.path)
+
+
+def test_folder_ignores_child_path(mock_path_lookup, simple_dependency_resolver) -> None:
+    expected_dependencies = set[Dependency]()
+    # The grand_parent.py is left out intentionally if that is kept in,
+    # the dependencies for all files are still added to the graph as the
+    # grand_parent **import**s the other files, thus circumventing the
+    # ignore on the `FolderLoader`
+    for relative_path in "parent.py", "child.py":
+        path = mock_path_lookup.resolve(Path("parent-child-context") / relative_path)
+        dependency = Dependency(FileLoader(), path)
+        expected_dependencies.add(dependency)
+
+    path = mock_path_lookup.resolve(Path("parent-child-context/"))
+    dependency = Dependency(
+        FolderLoader(NotebookLoader(), FileLoader(), ignore_relative_child_paths={Path("grand_parent.py")}), path, False
+    )
+    graph = DependencyGraph(dependency, None, simple_dependency_resolver, mock_path_lookup, CurrentSessionState())
+    expected_dependencies.add(dependency)
+
+    folder = graph.dependency.load(mock_path_lookup)
+    assert folder is not None
+    folder.build_dependency_graph(graph)
+
+    assert graph.all_dependencies == expected_dependencies
