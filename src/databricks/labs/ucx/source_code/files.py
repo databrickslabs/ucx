@@ -81,13 +81,29 @@ class StubContainer(SourceContainer):
 
 
 class FileLoader(DependencyLoader):
-    """Loader for a file dependency."""
+    """Loader for a file dependency.
+
+    Args:
+        exclude_paths (set[Path] | None) : A set of paths to load as
+            class:`StubContainer`. If None, no paths are excluded.
+
+            Note: The exclude paths are loaded as `StubContainer` to
+            signal that the path is found, however, it should not be
+            processed.
+    """
+
+    def __init__(self, *, exclude_paths: set[Path] | None = None):
+        self._exclude_paths = exclude_paths or set[Path]()
 
     def load_dependency(self, path_lookup: PathLookup, dependency: Dependency) -> LocalFile | StubContainer | None:
         """Load the dependency."""
         resolved_path = path_lookup.resolve(dependency.path)
         if not resolved_path:
             return None
+        if resolved_path in self._exclude_paths:
+            # Paths are excluded from further processing by loading them as stub container.
+            # Note we don't return `None`, as the path is found.
+            return StubContainer(resolved_path)
         language = file_language(resolved_path)
         if not language:
             return StubContainer(resolved_path)

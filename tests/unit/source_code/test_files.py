@@ -7,7 +7,7 @@ from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyProblem
-from databricks.labs.ucx.source_code.files import FileLoader, LocalFile
+from databricks.labs.ucx.source_code.files import FileLoader, LocalFile, StubContainer
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 
@@ -176,4 +176,16 @@ def test_file_loader_loads_empty_file(tmp_path) -> None:
 
     # TODO: Test specific error while loading: https://github.com/databrickslabs/ucx/issues/3584
     assert local_file
+    path_lookup.resolve.assert_called_once_with(path)
+
+
+def test_file_loader_ignores_path_by_loading_it_as_stub_container(tmp_path) -> None:
+    path = tmp_path / "path.py"
+    dependency = Dependency(FileLoader(exclude_paths={path}), path)
+    path_lookup = create_autospec(PathLookup)
+    path_lookup.resolve.return_value = path
+
+    stub = dependency.load(path_lookup)
+
+    assert isinstance(stub, StubContainer)
     path_lookup.resolve.assert_called_once_with(path)
