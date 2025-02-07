@@ -117,6 +117,16 @@ def test_write_text_to_non_existing_file(tmp_path) -> None:
     assert path.read_text() == "content"
 
 
+def test_write_text_to_existing_file(tmp_path) -> None:
+    path = tmp_path / "file.txt"
+    path.touch()
+
+    write_text(path, "content")
+
+    assert path.exists()
+    assert path.read_text() == "content"
+
+
 def test_back_up_path(tmp_path) -> None:
     path = tmp_path / "file.txt"
     path.touch()
