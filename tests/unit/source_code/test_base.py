@@ -159,3 +159,16 @@ def test_revert_back_up_without_backup_file(tmp_path, caplog) -> None:
     assert is_successfully_reverted_backup is None
     assert f"Backup is missing: {path.with_suffix('.txt.bak')}"
     assert path.exists()
+
+
+def test_revert_back_up_with_permission_error(caplog) -> None:
+    path = create_autospec(Path)
+
+    with (
+        patch("shutil.copyfile", side_effect=PermissionError("Permission denied")),
+        caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.source_code.base"),
+    ):
+        is_successfully_reverted_backup = revert_back_up_path(path)
+
+    assert not is_successfully_reverted_backup
+    assert f"Cannot revert backup: {path}"
