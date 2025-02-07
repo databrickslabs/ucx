@@ -116,6 +116,13 @@ def test_back_up_path(tmp_path) -> None:
     assert path.exists()
 
 
+def test_back_up_non_existing_file_path(tmp_path) -> None:
+    path = tmp_path / "file.txt"
+    path_backed_up = back_up_path(path)
+    assert not path_backed_up
+    assert not path.exists()
+
+
 def test_back_up_path_with_permission_error(caplog) -> None:
     path = create_autospec(Path)
     with (
