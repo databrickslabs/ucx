@@ -96,6 +96,24 @@ def test_file_linter_lints_notebook() -> None:
     context.assert_not_called()
 
 
+def test_file_linter_lints_unsupported_file() -> None:
+    source_container = create_autospec(SourceContainer)
+    dependency = create_autospec(Dependency)
+    dependency.path.suffix.lower.return_value = ".py"
+    dependency.load.return_value = source_container
+    path_lookup = create_autospec(PathLookup)
+    context = create_autospec(LinterContext)
+    linter = FileLinter(dependency, path_lookup, context)
+
+    advices = list(linter.lint())
+
+    assert advices == [Failure("unsupported-file", "Unsupported file", -1, -1, -1, -1)]
+    source_container.assert_not_called()
+    dependency.load.assert_called_once_with(path_lookup)
+    path_lookup.assert_not_called()  # not used as the `load` method is mocked
+    context.assert_not_called()
+
+
 def test_file_linter_lints_this_file(mock_path_lookup) -> None:
     """This test does not mock to test closer to reality."""
     dependency = Dependency(FileLoader(), Path(__file__), inherits_context=False)
