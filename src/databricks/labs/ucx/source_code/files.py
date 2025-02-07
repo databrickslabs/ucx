@@ -6,7 +6,7 @@ from pathlib import Path
 
 from databricks.sdk.service.workspace import Language
 
-from databricks.labs.ucx.source_code.base import file_language, safe_read_text
+from databricks.labs.ucx.source_code.base import file_language, safe_read_text, safe_write_text
 from databricks.labs.ucx.source_code.graph import (
     SourceContainer,
     DependencyGraph,
@@ -31,19 +31,34 @@ class LocalFile(SourceContainer):
 
     def __init__(self, path: Path, source: str, language: Language):
         self._path = path
-        self._original_code = source
+        self._source = source
         self.language = language
 
     @property
     def content(self) -> str:
         """The local file content"""
-        return self._original_code
+        return self._source
+
+    def write_text(self, contents: str) -> int | None:
+        """Write content to the local file.
+
+        Mimics the behavior of Path.write_text.
+
+        Returns :
+            int : The number of characters written. If None, nothing is written to the file.
+        """
+        if self._source == contents:
+            return None  # Avoiding unnecessary write
+        number_of_characters_written = safe_write_text(self._path, contents)
+        if number_of_characters_written is not None:
+            self._source = contents
+        return number_of_characters_written
 
     def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
         """The dependency graph for the local file."""
         if self.language == Language.PYTHON:
             context = parent.new_dependency_graph_context()
-            analyzer = PythonCodeAnalyzer(context, self._original_code)
+            analyzer = PythonCodeAnalyzer(context, self._source)
             problems = analyzer.build_graph()
             for idx, problem in enumerate(problems):
                 if problem.has_missing_path():
@@ -57,7 +72,7 @@ class LocalFile(SourceContainer):
     def build_inherited_context(self, graph: DependencyGraph, child_path: Path) -> InheritedContext:
         if self.language == Language.PYTHON:
             context = graph.new_dependency_graph_context()
-            analyzer = PythonCodeAnalyzer(context, self._original_code)
+            analyzer = PythonCodeAnalyzer(context, self._source)
             inherited = analyzer.build_inherited_context(child_path)
             problems = list(inherited.problems)
             for idx, problem in enumerate(problems):

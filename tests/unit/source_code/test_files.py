@@ -16,6 +16,29 @@ def test_local_file_content_is_accessible() -> None:
     assert local_file.content == "print(1)"
 
 
+def test_local_file_write_text_existing_file(tmp_path) -> None:
+    path = tmp_path / "test.py"
+    path.touch()
+    local_file = LocalFile(path, "print(1)", Language.PYTHON)
+
+    number_of_characters_written = local_file.write_text("print(2)")
+
+    assert number_of_characters_written == len("print(2)")
+    assert local_file.content == "print(2)"
+    assert path.read_text() == "print(2)"
+
+
+def test_local_file_write_text_non_existing_file(tmp_path) -> None:
+    path = tmp_path / "test.py"
+    local_file = LocalFile(path, "print(1)", Language.PYTHON)
+
+    number_of_characters_written = local_file.write_text("print(2)")
+
+    assert number_of_characters_written == len("print(2)")
+    assert local_file.content == "print(2)"
+    assert path.read_text() == "print(2)"
+
+
 @pytest.mark.parametrize("language", [Language.SQL, Language.SCALA, Language.R])
 def test_local_file_builds_dependency_graph_without_problems_independent_from_source(
     simple_dependency_resolver, mock_path_lookup, language: Language
