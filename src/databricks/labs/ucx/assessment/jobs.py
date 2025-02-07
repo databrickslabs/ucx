@@ -94,7 +94,9 @@ class JobsMixin:
 
 
 class JobsCrawler(CrawlerBase[JobInfo], JobsMixin, CheckClusterMixin):
-    def __init__(self, ws: WorkspaceClient, sql_backend: SqlBackend, schema, include_job_ids: list[int] | None = None):
+    def __init__(
+        self, ws: WorkspaceClient, sql_backend: SqlBackend, schema, *, include_job_ids: list[int] | None = None
+    ):
         super().__init__(sql_backend, "hive_metastore", schema, "jobs", JobInfo)
         self._ws = ws
         self._include_job_ids = include_job_ids
