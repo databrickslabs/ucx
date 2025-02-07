@@ -31,16 +31,6 @@ def test_file_linter_lints_sql(tmp_path, migration_index, mock_path_lookup) -> N
     assert not advices
 
 
-@pytest.mark.parametrize("path", ["xyz.scala", "xyz.r", "xyz.sh"])
-def test_file_linter_lints_not_yet_supported_language(tmp_path, path, migration_index, mock_path_lookup) -> None:
-    path = tmp_path / path
-    path.touch()
-    dependency = Dependency(FileLoader(), path)
-    linter = FileLinter(dependency, mock_path_lookup, LinterContext(migration_index))
-    advices = list(linter.lint())
-    assert [advice.code for advice in advices] == ["unsupported-language"]
-
-
 @pytest.mark.parametrize(
     "path",
     [

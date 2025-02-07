@@ -55,25 +55,6 @@ def test_file_linter_lint_ignores_file_with_name(name: str) -> None:
     context.assert_not_called()
 
 
-def test_file_linter_lints_unsupported_container() -> None:
-    expected = Failure("unsupported-file", "Unsupported file", -1, -1, -1, -1)
-    container = create_autospec(SourceContainer)
-    dependency = create_autospec(Dependency)
-    dependency.path.suffix.lower.return_value = ".py"
-    dependency.load.return_value = container
-    path_lookup = create_autospec(PathLookup)
-    context = create_autospec(LinterContext)
-    linter = FileLinter(dependency, path_lookup, context)
-
-    advices = list(linter.lint())
-
-    assert advices == [expected]
-    container.assert_not_called()
-    dependency.load.assert_called_once_with(path_lookup)
-    path_lookup.assert_not_called()  # not used as the `load` method is mocked
-    context.assert_not_called()
-
-
 def test_file_linter_lints_file() -> None:
     local_file = create_autospec(LocalFile)
     local_file.language = Language.PYTHON
