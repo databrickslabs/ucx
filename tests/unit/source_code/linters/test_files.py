@@ -22,13 +22,6 @@ from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from tests.unit import locate_site_packages, _samples_path
 
 
-def test_notebook_migrator_ignores_unsupported_extensions() -> None:
-    languages = LinterContext(TableMigrationIndex([]))
-    migrator = NotebookMigrator(languages)
-    path = Path('unsupported.ext')
-    assert not migrator.apply(path)
-
-
 def test_file_migrator_fix_ignores_unsupported_extensions() -> None:
     languages = LinterContext(TableMigrationIndex([]))
     migrator = LocalFileMigrator(lambda: languages)
@@ -61,13 +54,6 @@ def test_file_migrator_supported_language_no_diagnostics() -> None:
     languages.fixer.assert_not_called()
 
 
-def test_notebook_migrator_supported_language_no_diagnostics(mock_path_lookup) -> None:
-    languages = LinterContext(TableMigrationIndex([]))
-    migrator = NotebookMigrator(languages)
-    path = mock_path_lookup.resolve(Path("root1.run.py"))
-    assert not migrator.apply(path)
-
-
 def test_migrator_supported_language_no_fixer() -> None:
     languages = create_autospec(LinterContext)
     languages.linter(Language.PYTHON).lint.return_value = [Mock(code='some-code')]
@@ -98,6 +84,20 @@ def test_migrator_walks_directory() -> None:
     migrator.apply(path)
     languages.fixer.assert_called_with(Language.PYTHON, 'some-code')
     assert languages.fixer.call_count > 1
+
+
+def test_notebook_migrator_ignores_unsupported_extensions() -> None:
+    languages = LinterContext(TableMigrationIndex([]))
+    migrator = NotebookMigrator(languages)
+    path = Path('unsupported.ext')
+    assert not migrator.apply(path)
+
+
+def test_notebook_migrator_supported_language_no_diagnostics(mock_path_lookup) -> None:
+    languages = LinterContext(TableMigrationIndex([]))
+    migrator = NotebookMigrator(languages)
+    path = mock_path_lookup.resolve(Path("root1.run.py"))
+    assert not migrator.apply(path)
 
 
 @pytest.fixture()
