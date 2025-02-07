@@ -127,6 +127,17 @@ def test_write_text_to_existing_file(tmp_path) -> None:
     assert path.read_text() == "content"
 
 
+def test_write_text_with_permission_error(tmp_path) -> None:
+    path = create_autospec(Path)
+    path.write_text.side_effect = PermissionError("Permission denied")
+
+    # func:`safe_write_text` handles the errors
+    with pytest.raises(PermissionError, match="Permission denied"):
+        write_text(path, "content", encoding="utf-8")
+
+    path.write_text.assert_called_once_with("content", encoding="utf-8")
+
+
 def test_back_up_path(tmp_path) -> None:
     path = tmp_path / "file.txt"
     path.touch()
