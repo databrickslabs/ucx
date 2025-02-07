@@ -425,15 +425,19 @@ def is_a_notebook(path: Path, content: str | None = None) -> bool:
     return file_header == magic_header
 
 
-def back_up_path(path: Path) -> Path:
+def back_up_path(path: Path) -> Path | None:
     """Back up a path.
 
     The backed up path is the same as the original path with an additional
     `.bak` appended to the suffix.
 
     Returns :
-        path : The backed up path.
+        path | None : The backed up path. If None, the backup failed.
     """
     path_backed_up = path.with_suffix(path.suffix + ".bak")
-    shutil.copyfile(path, path_backed_up)
+    try:
+        shutil.copyfile(path, path_backed_up)
+    except OSError:
+        logger.warning(f"Cannot back up file: {path}", exc_info=True)
+        return None
     return path_backed_up

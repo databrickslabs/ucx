@@ -1,5 +1,7 @@
 import dataclasses
+import logging
 from pathlib import Path
+from unittest.mock import create_autospec, patch
 
 import pytest
 
@@ -111,4 +113,16 @@ def test_back_up_path(tmp_path) -> None:
 
     assert path_backed_up.as_posix().endswith("file.txt.bak")
     assert path_backed_up.exists()
+    assert path.exists()
+
+
+def test_back_up_path_with_permission_error(caplog) -> None:
+    path = create_autospec(Path)
+    with (
+        patch("shutil.copyfile", side_effect=PermissionError("Permission denied")),
+        caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.source_code.base"),
+    ):
+        path_backed_up = back_up_path(path)
+    assert not path_backed_up
+    assert f"Cannot back up file: {path}" in caplog.messages
     assert path.exists()
