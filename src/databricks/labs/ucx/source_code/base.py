@@ -480,11 +480,9 @@ def revert_back_up_path(path: Path) -> bool | None:
     except OSError as e:
         logger.warning(f"Cannot revert backup: {path}", exc_info=e)
         return False
-    is_same_file = filecmp.cmp(path, path_backed_up, shallow=True)
-    if is_same_file:
-        try:
-            os.unlink(path_backed_up)
-        except OSError as e:
-            logger.warning(f"Cannot remove backup: {path_backed_up}", exc_info=e)
-            return False
-    return is_same_file
+    try:
+        os.unlink(path_backed_up)
+    except OSError as e:
+        # The backup revert is successful, but the backup file cannot be removed
+        logger.warning(f"Cannot remove backup file: {path_backed_up}", exc_info=e)
+    return True

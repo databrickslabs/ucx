@@ -1,5 +1,6 @@
 import dataclasses
 import logging
+import os
 from pathlib import Path
 from unittest.mock import create_autospec, patch
 
@@ -172,3 +173,21 @@ def test_revert_back_up_with_permission_error(caplog) -> None:
 
     assert not is_successfully_reverted_backup
     assert f"Cannot revert backup: {path}"
+
+
+def test_revert_back_up_when_backup_file_cannot_be_deleted(caplog) -> None:
+    path = create_autospec(Path)
+    path_backed_up = create_autospec(Path)
+    path.with_suffix.return_value = path_backed_up
+
+    with (
+        patch("shutil.copyfile") as copyfile,
+        patch("os.unlink", side_effect=PermissionError("Permission denied")) as unlink,
+        caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.source_code.base"),
+    ):
+        is_successfully_reverted_backup = revert_back_up_path(path)
+
+        copyfile.assert_called_once_with(path_backed_up, path)
+        unlink.assert_called_once_with(path_backed_up)
+    assert is_successfully_reverted_backup
+    assert f"Cannot remove backup file: {path_backed_up}"
