@@ -15,6 +15,7 @@ from databricks.labs.ucx.source_code.base import (
     UsedTable,
     back_up_path,
     revert_back_up_path,
+    write_text,
 )
 from databricks.labs.ucx.source_code.linters.base import Fixer
 
@@ -105,6 +106,15 @@ def test_fixer_is_never_supported_for_diagnostic_empty_code() -> None:
 
     assert not fixer.is_supported("test")
     assert not fixer.is_supported("other-code")
+
+
+def test_write_text_to_non_existing_file(tmp_path) -> None:
+    path = tmp_path / "file.txt"
+
+    write_text(path, "content")
+
+    assert path.exists()
+    assert path.read_text() == "content"
 
 
 def test_back_up_path(tmp_path) -> None:

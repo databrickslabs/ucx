@@ -406,6 +406,27 @@ def safe_read_text(path: Path, size: int = -1) -> str | None:
         return None
 
 
+def write_text(path: Path, content: str, *, encoding: str | None = None) -> int:
+    """Write content to a file as text, encode according to the BOM marker if that is present.
+
+    This differs to the normal `.read_text()` method on path which does not support BOM markers.
+
+    Arguments:
+        path (Path): The file path to write text to.
+        content (str) : The content to write to the file.
+        encoding (str) : Force encoding with a specific locale. If not present the file BOM and
+            system locale are used.
+
+    Returns:
+        int : The number of characters written to the file.
+    """
+    if not encoding and path.exists():
+        with path.open("rb") as binary_io:
+            encoding = _detect_encoding_bom(binary_io, preserve_position=False)
+    # If encoding=None, the system locale is used for encoding (as per open()).
+    return path.write_text(content, encoding=encoding)
+
+
 # duplicated from CellLanguage to prevent cyclic import
 LANGUAGE_COMMENT_PREFIXES = {Language.PYTHON: '#', Language.SCALA: '//', Language.SQL: '--'}
 NOTEBOOK_HEADER = "Databricks notebook source"
