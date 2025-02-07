@@ -111,20 +111,22 @@ def test_fixer_is_never_supported_for_diagnostic_empty_code() -> None:
 def test_write_text_to_non_existing_file(tmp_path) -> None:
     path = tmp_path / "file.txt"
 
-    write_text(path, "content")
+    number_of_characters_written = write_text(path, "content")
 
     assert path.exists()
     assert path.read_text() == "content"
+    assert number_of_characters_written == len("content")
 
 
 def test_write_text_to_existing_file(tmp_path) -> None:
     path = tmp_path / "file.txt"
     path.touch()
 
-    write_text(path, "content")
+    number_of_characters_written = write_text(path, "content")
 
     assert path.exists()
     assert path.read_text() == "content"
+    assert number_of_characters_written == len("content")
 
 
 def test_write_text_with_permission_error(tmp_path) -> None:
