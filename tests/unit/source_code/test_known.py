@@ -102,15 +102,16 @@ def test_analyze_dist_info() -> None:
 
 
 @pytest.mark.parametrize("problems", [[], [KnownProblem("test", "test")]])
-def test_known_loader_loads_known_container_with_problems(
+def test_known_loader_loads_known_container_without_problems(
     simple_dependency_resolver, problems: list[KnownProblem]
 ) -> None:
+    """The known problems are surfaced during linting not dependency graph building."""
     path_lookup = create_autospec(PathLookup)
     loader = KnownLoader()
     dependency = KnownDependency("test", problems)
     graph = DependencyGraph(dependency, None, simple_dependency_resolver, path_lookup, CurrentSessionState())
     container = loader.load_dependency(path_lookup, dependency)
-    assert container.build_dependency_graph(graph) == problems
+    assert not container.build_dependency_graph(graph)
     path_lookup.resolve.assert_not_called()
 
 
