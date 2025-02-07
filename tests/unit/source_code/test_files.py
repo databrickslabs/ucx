@@ -1,5 +1,4 @@
 import codecs
-import logging
 from pathlib import Path
 from unittest.mock import create_autospec, patch
 
