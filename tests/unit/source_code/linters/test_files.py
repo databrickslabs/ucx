@@ -3,87 +3,133 @@ from unittest.mock import Mock, create_autospec
 
 import pytest
 from databricks.labs.blueprint.tui import MockPrompts
-
-from databricks.labs.ucx.source_code.base import CurrentSessionState
-from databricks.labs.ucx.source_code.graph import DependencyResolver, SourceContainer
-from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
-from databricks.labs.ucx.source_code.linters.files import NotebookMigrator
-from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
-from databricks.labs.ucx.source_code.known import KnownList
-
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
+from databricks.labs.ucx.source_code.base import CurrentSessionState, Failure
+from databricks.labs.ucx.source_code.files import FileLoader, LocalFile, ImportFileResolver
 from databricks.labs.ucx.source_code.folders import Folder, FolderLoader
-from databricks.labs.ucx.source_code.files import FileLoader, ImportFileResolver
-from databricks.labs.ucx.source_code.linters.folders import LocalCodeLinter, LocalFileMigrator
+from databricks.labs.ucx.source_code.graph import Dependency, DependencyResolver, SourceContainer
+from databricks.labs.ucx.source_code.known import KnownList
+from databricks.labs.ucx.source_code.linters.base import PythonLinter
 from databricks.labs.ucx.source_code.linters.context import LinterContext
+from databricks.labs.ucx.source_code.linters.files import FileLinter, NotebookMigrator
+from databricks.labs.ucx.source_code.linters.folders import LocalCodeLinter, LocalFileMigrator
+from databricks.labs.ucx.source_code.notebooks.sources import Notebook
+from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader, NotebookResolver
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
+from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
+
 from tests.unit import locate_site_packages, _samples_path
 
 
-def test_file_migrator_fix_ignores_unsupported_extensions() -> None:
-    languages = LinterContext(TableMigrationIndex([]))
-    migrator = LocalFileMigrator(lambda: languages)
-    path = Path('unsupported.ext')
-    assert not migrator.apply(path)
+@pytest.mark.parametrize("extension", [".json", ".md"])
+def test_file_linter_lint_ignores_file_with_extension(extension: str) -> None:
+    dependency = create_autospec(Dependency)
+    dependency.path.suffix.lower.return_value = extension
+    path_lookup = create_autospec(PathLookup)
+    context = create_autospec(LinterContext)
+    linter = FileLinter(dependency, path_lookup, context)
+
+    advices = list(linter.lint())
+
+    assert not advices
+    dependency.path.suffix.lower.assert_called_once()
+    path_lookup.assert_not_called()
+    context.assert_not_called()
 
 
-def test_file_migrator_fix_ignores_unsupported_language() -> None:
-    languages = LinterContext(TableMigrationIndex([]))
-    migrator = LocalFileMigrator(lambda: languages)
-    migrator._extensions[".py"] = Language.R  # pylint: disable=protected-access
-    path = Path('unsupported.py')
-    with pytest.raises(ValueError):
-        assert not migrator.apply(path)
+@pytest.mark.parametrize("name", [".ds_store", "metadata"])
+def test_file_linter_lint_ignores_file_with_name(name: str) -> None:
+    dependency = create_autospec(Dependency)
+    dependency.path.name.lower.return_value = name
+    path_lookup = create_autospec(PathLookup)
+    context = create_autospec(LinterContext)
+    linter = FileLinter(dependency, path_lookup, context)
+
+    advices = list(linter.lint())
+
+    assert not advices
+    dependency.path.name.lower.assert_called_once()
+    path_lookup.assert_not_called()
+    context.assert_not_called()
 
 
-def test_file_migrator_fix_reads_supported_extensions(migration_index) -> None:
-    languages = LinterContext(migration_index)
-    migrator = LocalFileMigrator(lambda: languages)
-    path = Path(__file__)
-    assert not migrator.apply(path)
+@pytest.mark.parametrize("extension", [".scala", ".sh", ".r"])
+def test_file_linter_lint_warns_not_yet_supported_language(extension: str) -> None:
+    expected = Failure("unsupported-language", f"Unsupported language for suffix: {extension}", -1, -1, -1, -1)
+    dependency = create_autospec(Dependency)
+    dependency.path.suffix.lower.return_value = extension
+    path_lookup = create_autospec(PathLookup)
+    context = create_autospec(LinterContext)
+    linter = FileLinter(dependency, path_lookup, context)
+
+    advices = list(linter.lint())
+
+    assert advices == [expected]
+    dependency.path.suffix.lower.assert_called()
+    path_lookup.assert_not_called()
+    context.assert_not_called()
 
 
-def test_file_migrator_supported_language_no_diagnostics() -> None:
-    languages = create_autospec(LinterContext)
-    languages.linter(Language.PYTHON).lint.return_value = []
-    migrator = LocalFileMigrator(lambda: languages)
-    path = Path(__file__)
-    migrator.apply(path)
-    languages.fixer.assert_not_called()
+def test_file_linter_lints_unsupported_container() -> None:
+    expected = Failure("unsupported-file", "Unsupported file", -1, -1, -1, -1)
+    container = create_autospec(SourceContainer)
+    dependency = create_autospec(Dependency)
+    dependency.path.suffix.lower.return_value = ".py"
+    dependency.load.return_value = container
+    path_lookup = create_autospec(PathLookup)
+    context = create_autospec(LinterContext)
+    linter = FileLinter(dependency, path_lookup, context)
+
+    advices = list(linter.lint())
+
+    assert advices == [expected]
+    container.assert_not_called()
+    dependency.load.assert_called_once_with(path_lookup)
+    path_lookup.assert_not_called()  # not used as the `load` method is mocked
+    context.assert_not_called()
 
 
-def test_migrator_supported_language_no_fixer() -> None:
-    languages = create_autospec(LinterContext)
-    languages.linter(Language.PYTHON).lint.return_value = [Mock(code='some-code')]
-    languages.fixer.return_value = None
-    migrator = LocalFileMigrator(lambda: languages)
-    path = Path(__file__)
-    migrator.apply(path)
-    languages.fixer.assert_called_once_with(Language.PYTHON, 'some-code')
+def test_file_linter_lints_file() -> None:
+    local_file = create_autospec(LocalFile)
+    local_file.language = Language.PYTHON
+    local_file.content = "print(1)"
+    dependency = create_autospec(Dependency)
+    dependency.path.suffix.lower.return_value = ".py"
+    dependency.load.return_value = local_file
+    path_lookup = create_autospec(PathLookup)
+    python_linter = create_autospec(PythonLinter)
+    context = create_autospec(LinterContext)
+    context.linter.return_value = python_linter
+    linter = FileLinter(dependency, path_lookup, context)
+
+    advices = list(linter.lint())
+
+    assert not advices
+    local_file.assert_not_called()
+    dependency.load.assert_called_once_with(path_lookup)
+    path_lookup.assert_not_called()  # not used as the `load` method is mocked
+    context.linter.assert_called_once_with(Language.PYTHON)
+    python_linter.lint.assert_called_once_with("print(1)")
 
 
-def test_migrator_supported_language_with_fixer(tmpdir) -> None:
-    languages = create_autospec(LinterContext)
-    languages.linter(Language.PYTHON).lint.return_value = [Mock(code='some-code')]
-    languages.fixer(Language.PYTHON, 'some-code').apply.return_value = "Hi there!"
-    migrator = LocalFileMigrator(lambda: languages)
-    path = Path(tmpdir, 'any.py')
-    path.write_text("import tempfile", encoding='utf-8')
-    migrator.apply(path)
-    assert path.read_text("utf-8") == "Hi there!"
+def test_file_linter_lints_notebook() -> None:
+    notebook = create_autospec(Notebook)
+    dependency = create_autospec(Dependency)
+    dependency.path.suffix.lower.return_value = ".py"
+    dependency.load.return_value = notebook
+    path_lookup = create_autospec(PathLookup)
+    context = create_autospec(LinterContext)
+    linter = FileLinter(dependency, path_lookup, context)
 
+    advices = list(linter.lint())
 
-def test_migrator_walks_directory() -> None:
-    languages = create_autospec(LinterContext)
-    languages.linter(Language.PYTHON).lint.return_value = [Mock(code='some-code')]
-    languages.fixer.return_value = None
-    migrator = LocalFileMigrator(lambda: languages)
-    path = Path(__file__).parent
-    migrator.apply(path)
-    languages.fixer.assert_called_with(Language.PYTHON, 'some-code')
-    assert languages.fixer.call_count > 1
+    assert not advices
+    notebook.assert_not_called()
+    dependency.load.assert_called_once_with(path_lookup)
+    path_lookup.assert_not_called()  # not used as the `load` method is mocked
+    context.assert_not_called()
 
 
 def test_notebook_migrator_ignores_unsupported_extensions() -> None:
