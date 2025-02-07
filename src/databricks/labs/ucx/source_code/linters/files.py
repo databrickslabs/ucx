@@ -279,9 +279,9 @@ class FileLinter:
     def _load_source_container(self, dependency: Dependency, path_lookup: PathLookup) -> SourceContainer | None:
         # TODO: Move the ignore suffixes and names to `Folder`
         if dependency.path.suffix.lower() in self._IGNORED_SUFFIXES:
-            return
+            return None
         if dependency.path.name.lower() in self._IGNORED_NAMES:
-            return
+            return None
         source_container = dependency.load(path_lookup)
         return source_container
 
