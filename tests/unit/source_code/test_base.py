@@ -1,6 +1,5 @@
 import dataclasses
 import logging
-import os
 from pathlib import Path
 from unittest.mock import create_autospec, patch
 
@@ -111,8 +110,10 @@ def test_fixer_is_never_supported_for_diagnostic_empty_code() -> None:
 def test_back_up_path(tmp_path) -> None:
     path = tmp_path / "file.txt"
     path.touch()
+
     path_backed_up = back_up_path(path)
 
+    assert path_backed_up
     assert path_backed_up.as_posix().endswith("file.txt.bak")
     assert path_backed_up.exists()
     assert path.exists()
@@ -120,19 +121,24 @@ def test_back_up_path(tmp_path) -> None:
 
 def test_back_up_non_existing_file_path(tmp_path) -> None:
     path = tmp_path / "file.txt"
+
     path_backed_up = back_up_path(path)
+
     assert not path_backed_up
     assert not path.exists()
 
 
 def test_back_up_path_with_permission_error(caplog) -> None:
     path = create_autospec(Path)
+    path_backed_up = create_autospec(Path)
+    path.with_suffix.return_value = path_backed_up
+
     with (
-        patch("shutil.copyfile", side_effect=PermissionError("Permission denied")),
+        patch("shutil.copyfile", side_effect=PermissionError("Permission denied")) as copyfile,
         caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.source_code.base"),
     ):
-        path_backed_up = back_up_path(path)
-    assert not path_backed_up
+        assert not back_up_path(path)
+        copyfile.assert_called_once_with(path, path_backed_up)
     assert f"Cannot back up file: {path}" in caplog.messages
     assert path.exists()
 
@@ -145,6 +151,7 @@ def test_back_up_and_revert_back_up_path(tmp_path) -> None:
     is_successfully_reverted_backup = revert_back_up_path(path)
 
     assert is_successfully_reverted_backup
+    assert path_backed_up
     assert not path_backed_up.exists()
     assert path.exists()
     assert path.read_text() == "content"
@@ -164,13 +171,16 @@ def test_revert_back_up_without_backup_file(tmp_path, caplog) -> None:
 
 def test_revert_back_up_with_permission_error(caplog) -> None:
     path = create_autospec(Path)
+    path_backed_up = create_autospec(Path)
+    path.with_suffix.return_value = path_backed_up
 
     with (
-        patch("shutil.copyfile", side_effect=PermissionError("Permission denied")),
+        patch("shutil.copyfile", side_effect=PermissionError("Permission denied")) as copyfile,
         caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.source_code.base"),
     ):
         is_successfully_reverted_backup = revert_back_up_path(path)
 
+        copyfile.assert_called_once_with(path_backed_up, path)
     assert not is_successfully_reverted_backup
     assert f"Cannot revert backup: {path}"
 
