@@ -132,6 +132,17 @@ def test_file_linter_lints_notebook() -> None:
     context.assert_not_called()
 
 
+def test_file_linter_lints_this_file(mock_path_lookup) -> None:
+    """This test does not mock to test closer to reality."""
+    dependency = Dependency(FileLoader(), Path(__file__), inherits_context=False)
+    context = LinterContext()
+    linter = FileLinter(dependency, mock_path_lookup, context)
+
+    advices = list(linter.lint())
+
+    assert not advices
+
+
 def test_notebook_migrator_ignores_unsupported_extensions() -> None:
     languages = LinterContext(TableMigrationIndex([]))
     migrator = NotebookMigrator(languages)
