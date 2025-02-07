@@ -14,6 +14,7 @@ from databricks.labs.ucx.source_code.base import (
     LocatedAdvice,
     UsedTable,
     back_up_path,
+    revert_back_up_path,
 )
 from databricks.labs.ucx.source_code.linters.base import Fixer
 
@@ -133,3 +134,16 @@ def test_back_up_path_with_permission_error(caplog) -> None:
     assert not path_backed_up
     assert f"Cannot back up file: {path}" in caplog.messages
     assert path.exists()
+
+
+def test_back_up_and_revert_back_up_path(tmp_path) -> None:
+    path = tmp_path / "file.txt"
+    path.write_text("content")
+
+    path_backed_up = back_up_path(path)
+    is_successfully_reverted_backup = revert_back_up_path(path)
+
+    assert is_successfully_reverted_backup
+    assert not path_backed_up.exists()
+    assert path.exists()
+    assert path.read_text() == "content"

@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import codecs
 import dataclasses
+import filecmp
 import io
 import logging
+import os
 import shutil
 import sys
 from abc import abstractmethod, ABC
@@ -425,6 +427,18 @@ def is_a_notebook(path: Path, content: str | None = None) -> bool:
     return file_header == magic_header
 
 
+def _add_backup_suffix(path: Path) -> Path:
+    """Add a backup suffix to a path.
+
+    The backed up path is the same as the original path with an additional
+    `.bak` appended to the suffix.
+
+    Reuse this method so that the backup path is consistent in this module.
+    """
+    # Not checking for the backup suffix to allow making backups of backups.
+    return path.with_suffix(path.suffix + ".bak")
+
+
 def back_up_path(path: Path) -> Path | None:
     """Back up a path.
 
@@ -434,10 +448,43 @@ def back_up_path(path: Path) -> Path | None:
     Returns :
         path | None : The backed up path. If None, the backup failed.
     """
-    path_backed_up = path.with_suffix(path.suffix + ".bak")
+    path_backed_up = _add_backup_suffix(path)
     try:
         shutil.copyfile(path, path_backed_up)
-    except OSError:
-        logger.warning(f"Cannot back up file: {path}", exc_info=True)
+    except OSError as e:
+        logger.warning(f"Cannot back up file: {path}", exc_info=e)
         return None
     return path_backed_up
+
+
+def revert_back_up_path(path: Path) -> bool | None:
+    """Revert a backed up path, see :func:back_up_path.
+
+    The backed up path is the same as the original path with an additional
+    `.bak` appended to the suffix.
+
+    Args :
+        path : The original path, NOT the backed up path.
+
+    Returns :
+        bool : Flag if the revert was successful. If None, the backed up path
+        does not exist, thus it cannot be reverted and the operation is not
+        successful nor failed.
+    """
+    path_backed_up = _add_backup_suffix(path)
+    if not path_backed_up.exists():
+        logger.warning(f"Backup is missing: {path_backed_up}")
+        return None
+    try:
+        shutil.copyfile(path_backed_up, path)
+    except OSError as e:
+        logger.warning(f"Cannot revert backup: {path}", exc_info=e)
+        return False
+    is_same_file = filecmp.cmp(path, path_backed_up, shallow=True)
+    if is_same_file:
+        try:
+            os.unlink(path_backed_up)
+        except OSError as e:
+            logger.warning(f"Cannot remove backup: {path_backed_up}", exc_info=e)
+            return False
+    return is_same_file
