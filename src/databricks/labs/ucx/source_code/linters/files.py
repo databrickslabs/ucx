@@ -213,11 +213,6 @@ class NotebookLinter:
 
 
 class FileLinter:
-    _NOT_YET_SUPPORTED_SUFFIXES = {
-        '.scala',
-        '.sh',
-        '.r',
-    }
     _IGNORED_SUFFIXES = {
         '.json',
         '.md',
@@ -273,10 +268,6 @@ class FileLinter:
         if self._dependency.path.suffix.lower() in self._IGNORED_SUFFIXES:
             return
         if self._dependency.path.name.lower() in self._IGNORED_NAMES:
-            return
-        if self._dependency.path.suffix.lower() in self._NOT_YET_SUPPORTED_SUFFIXES:
-            message = f"Unsupported language for suffix: {self._dependency.path.suffix.lower()}"
-            yield Failure("unsupported-language", message, -1, -1, -1, -1)
             return
         source_container = self._dependency.load(self._path_lookup)
         if isinstance(source_container, Notebook):

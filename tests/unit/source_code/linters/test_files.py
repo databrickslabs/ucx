@@ -55,23 +55,6 @@ def test_file_linter_lint_ignores_file_with_name(name: str) -> None:
     context.assert_not_called()
 
 
-@pytest.mark.parametrize("extension", [".scala", ".sh", ".r"])
-def test_file_linter_lint_warns_not_yet_supported_language(extension: str) -> None:
-    expected = Failure("unsupported-language", f"Unsupported language for suffix: {extension}", -1, -1, -1, -1)
-    dependency = create_autospec(Dependency)
-    dependency.path.suffix.lower.return_value = extension
-    path_lookup = create_autospec(PathLookup)
-    context = create_autospec(LinterContext)
-    linter = FileLinter(dependency, path_lookup, context)
-
-    advices = list(linter.lint())
-
-    assert advices == [expected]
-    dependency.path.suffix.lower.assert_called()
-    path_lookup.assert_not_called()
-    context.assert_not_called()
-
-
 def test_file_linter_lints_unsupported_container() -> None:
     expected = Failure("unsupported-file", "Unsupported file", -1, -1, -1, -1)
     container = create_autospec(SourceContainer)
