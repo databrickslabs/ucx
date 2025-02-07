@@ -147,3 +147,15 @@ def test_back_up_and_revert_back_up_path(tmp_path) -> None:
     assert not path_backed_up.exists()
     assert path.exists()
     assert path.read_text() == "content"
+
+
+def test_revert_back_up_without_backup_file(tmp_path, caplog) -> None:
+    path = tmp_path / "file.txt"
+    path.touch()
+
+    with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.source_code.base"):
+        is_successfully_reverted_backup = revert_back_up_path(path)
+
+    assert is_successfully_reverted_backup is None
+    assert f"Backup is missing: {path.with_suffix('.txt.bak')}"
+    assert path.exists()
