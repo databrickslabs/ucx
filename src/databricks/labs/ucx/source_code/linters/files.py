@@ -265,6 +265,7 @@ class FileLinter:
 
     def lint(self) -> Iterable[Advice]:
         """Lint the file."""
+        # TODO: Move the ignore suffixes and names to `Folder`
         if self._dependency.path.suffix.lower() in self._IGNORED_SUFFIXES:
             return
         if self._dependency.path.name.lower() in self._IGNORED_NAMES:
