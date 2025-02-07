@@ -406,14 +406,14 @@ def safe_read_text(path: Path, size: int = -1) -> str | None:
         return None
 
 
-def write_text(path: Path, content: str, *, encoding: str | None = None) -> int:
+def write_text(path: Path, contents: str, *, encoding: str | None = None) -> int:
     """Write content to a file as text, encode according to the BOM marker if that is present.
 
     This differs to the normal `.read_text()` method on path which does not support BOM markers.
 
     Arguments:
         path (Path): The file path to write text to.
-        content (str) : The content to write to the file.
+        contents (str) : The content to write to the file.
         encoding (str) : Force encoding with a specific locale. If not present the file BOM and
             system locale are used.
 
@@ -424,17 +424,17 @@ def write_text(path: Path, content: str, *, encoding: str | None = None) -> int:
         with path.open("rb") as binary_io:
             encoding = _detect_encoding_bom(binary_io, preserve_position=False)
     # If encoding=None, the system locale is used for encoding (as per open()).
-    return path.write_text(content, encoding=encoding)
+    return path.write_text(contents, encoding=encoding)
 
 
-def safe_write_text(path: Path, content: str, *, encoding: str | None = None) -> int | None:
+def safe_write_text(path: Path, contents: str, *, encoding: str | None = None) -> int | None:
     """Safe write content to a file by handling writing exceptions, see :func:write_text.
 
     Returns:
         int | None : The number of characters written to the file. If None, no content was written.
     """
     try:
-        return write_text(path, content, encoding=encoding)
+        return write_text(path, contents, encoding=encoding)
     except OSError as e:
         logger.warning(f"Cannot write to file: {path}", exc_info=e)
         return None
