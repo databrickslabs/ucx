@@ -17,7 +17,6 @@ def test_job_crawler(ws, make_job, inventory_schema, sql_backend):
     new_job = make_job(spark_conf=_SPARK_CONF)
     skip_job = make_job(spark_conf=_SPARK_CONF)
 
-    ws.config.include_job_ids = [new_job.job_id]
     job_crawler = JobsCrawler(ws=ws, sql_backend=sql_backend, schema=inventory_schema, include_job_ids=[new_job.job_id])
     jobs = job_crawler.snapshot()
     results = []
