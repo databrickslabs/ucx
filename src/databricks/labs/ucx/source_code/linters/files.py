@@ -272,8 +272,9 @@ class FileLinter:
     def lint(self) -> Iterable[Advice]:
         """Lint the file."""
         if isinstance(self._dependency, KnownDependency):
-            failures = [problem.as_failure() for problem in self._dependency.problems]
-            yield from failures
+            # TODO: Pass on the right advice type (https://github.com/databrickslabs/ucx/issues/3625)
+            advices = [problem.as_advice().as_advisory() for problem in self._dependency.problems]
+            yield from advices
             return
         if self._dependency.path.suffix.lower() in self._IGNORED_SUFFIXES:
             return

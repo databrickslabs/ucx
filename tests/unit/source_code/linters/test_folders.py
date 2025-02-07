@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from databricks.labs.ucx.source_code.base import CurrentSessionState, Failure, LocatedAdvice
+from databricks.labs.ucx.source_code.base import Advisory, CurrentSessionState, Failure, LocatedAdvice
 from databricks.labs.ucx.source_code.files import FileLoader, ImportFileResolver
 from databricks.labs.ucx.source_code.folders import FolderLoader
 from databricks.labs.ucx.source_code.graph import DependencyResolver, SourceContainer
@@ -63,10 +63,10 @@ def test_local_code_linter_lints_children_in_context(mock_path_lookup, local_cod
 
 def test_local_code_linter_lints_import_from_known_list(tmp_path, mock_path_lookup, local_code_linter) -> None:
     expected_failures = [
-        Failure(
+        Advisory(
             "jvm-access-in-shared-clusters", "Cannot access Spark Driver JVM on UC Shared Clusters", -1, -1, -1, -1
         ),
-        Failure(
+        Advisory(
             "legacy-context-in-shared-clusters",
             "sc is not supported on UC Shared Clusters. Rewrite it using spark",
             -1,
@@ -89,7 +89,7 @@ def test_local_code_linter_lints_import_from_known_list(tmp_path, mock_path_look
 
 def test_local_code_linter_lints_known_s3fs_problems(local_code_linter, mock_path_lookup) -> None:
     known_url = "https://github.com/databrickslabs/ucx/blob/main/src/databricks/labs/ucx/source_code/known.json"
-    expected = Failure(
+    expected = Advisory(
         "direct-filesystem-access",
         "S3fs library assumes AWS IAM Instance Profile to work with S3, "
         "which is not compatible with Databricks Unity Catalog, that "
@@ -112,19 +112,22 @@ S3FS_DEPRECATION_MESSAGE = (
 
 
 @pytest.mark.parametrize(
-    "source_code, failure",
+    "source_code, advice",
     [
-        ("import s3fs", Failure('direct-filesystem-access', S3FS_DEPRECATION_MESSAGE, -1, -1, -1, -1)),
-        ("from s3fs import something", Failure('direct-filesystem-access', S3FS_DEPRECATION_MESSAGE, -1, -1, -1, -1)),
+        ("import s3fs", Advisory('direct-filesystem-access', S3FS_DEPRECATION_MESSAGE, -1, -1, -1, -1)),
+        ("from s3fs import something", Advisory('direct-filesystem-access', S3FS_DEPRECATION_MESSAGE, -1, -1, -1, -1)),
         ("import certifi", None),
         ("from certifi import core", None),
-        ("import s3fs, certifi", Failure('direct-filesystem-access', S3FS_DEPRECATION_MESSAGE, -1, -1, -1, -1)),
+        ("import s3fs, certifi", Advisory('direct-filesystem-access', S3FS_DEPRECATION_MESSAGE, -1, -1, -1, -1)),
         ("from certifi import core, s3fs", None),
-        ("def func():\n    import s3fs", Failure('direct-filesystem-access', S3FS_DEPRECATION_MESSAGE, -1, -1, -1, -1)),
-        ("import s3fs as s", Failure('direct-filesystem-access', S3FS_DEPRECATION_MESSAGE, -1, -1, -1, -1)),
+        (
+            "def func():\n    import s3fs",
+            Advisory('direct-filesystem-access', S3FS_DEPRECATION_MESSAGE, -1, -1, -1, -1),
+        ),
+        ("import s3fs as s", Advisory('direct-filesystem-access', S3FS_DEPRECATION_MESSAGE, -1, -1, -1, -1)),
         (
             "from s3fs.subpackage import something",
-            Failure('direct-filesystem-access', S3FS_DEPRECATION_MESSAGE, -1, -1, -1, -1),
+            Advisory('direct-filesystem-access', S3FS_DEPRECATION_MESSAGE, -1, -1, -1, -1),
         ),
         ("", None),
     ],
@@ -134,11 +137,11 @@ def test_local_code_linter_lints_known_s3fs_problems_from_source_code(
     mock_path_lookup,
     local_code_linter,
     source_code: str,
-    failure: Failure | None,
+    advice: Advisory | None,
 ) -> None:
     known_url = "https://github.com/databrickslabs/ucx/blob/main/src/databricks/labs/ucx/source_code/known.json"
     module_name = "s3fs.subpackage" if "subpackage" in source_code else "s3fs"
-    expected = [LocatedAdvice(failure, Path(f"{known_url}#{module_name}"))] if failure else []
+    expected = [LocatedAdvice(advice, Path(f"{known_url}#{module_name}"))] if advice else []
     path = tmp_path / "file.py"
     path.write_text(source_code)
     located_advices = list(local_code_linter.lint_path(path))

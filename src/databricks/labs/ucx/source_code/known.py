@@ -15,7 +15,7 @@ from pathlib import Path
 from databricks.labs.blueprint.entrypoint import get_logger
 
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
-from databricks.labs.ucx.source_code.base import CurrentSessionState, Failure
+from databricks.labs.ucx.source_code.base import Advice, CurrentSessionState
 from databricks.labs.ucx.source_code.graph import (
     Dependency,
     DependencyLoader,
@@ -62,9 +62,9 @@ class KnownProblem:
     def as_dict(self):
         return {'code': self.code, 'message': self.message}
 
-    def as_failure(self) -> Failure:
-        # TODO: Pass in the line number and column number https://github.com/databrickslabs/ucx/issues/3625
-        return Failure(self.code, self.message, -1, -1, -1, -1)
+    def as_advice(self) -> Advice:
+        # TODO: Pass on the complete Advice (https://github.com/databrickslabs/ucx/issues/3625)
+        return Advice(self.code, self.message, -1, -1, -1, -1)
 
 
 UNKNOWN = Compatibility(False, [])
