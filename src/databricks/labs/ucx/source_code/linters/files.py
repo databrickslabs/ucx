@@ -299,6 +299,18 @@ class FileLinter:
         notebook_linter = NotebookLinter(notebook, self._path_lookup, self._context, self._inherited_tree)
         yield from notebook_linter.lint()
 
+    def apply(self) -> None:
+        """Apply changes to the file."""
+        source_container = self._load_source_container(self._dependency, self._path_lookup)
+        if isinstance(source_container, LocalFile):
+            self._apply_file(source_container)
+
+    def _apply_file(self, local_file: LocalFile) -> None:
+        """Apply changes to a local file."""
+        fixed_code = self._context.apply_fixes(local_file.language, local_file.content)
+        if fixed_code != local_file.content:
+            local_file.write_text(fixed_code)
+
 
 class NotebookMigrator:
     def __init__(self, languages: LinterContext):

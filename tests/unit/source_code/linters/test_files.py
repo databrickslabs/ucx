@@ -107,6 +107,20 @@ def test_file_linter_lints_this_file(mock_path_lookup) -> None:
     assert not advices
 
 
+def test_file_linter_applies_migrated(tmp_path, mock_path_lookup, migration_index) -> None:
+    """This test does not mock to test closer to reality."""
+    path = tmp_path / "file.py"
+    path.write_text("df = spark.read.table('old.things')")
+    dependency = Dependency(FileLoader(), path, inherits_context=False)
+    context = LinterContext(migration_index)
+    linter = FileLinter(dependency, mock_path_lookup, context)
+
+    linter.apply()
+
+    # The .rstrip() is to remove the trailing newlines added by the fixer
+    assert path.read_text().rstrip() == "df = spark.read.table('brand.new.stuff')"
+
+
 def test_notebook_migrator_ignores_unsupported_extensions() -> None:
     languages = LinterContext(TableMigrationIndex([]))
     migrator = NotebookMigrator(languages)
