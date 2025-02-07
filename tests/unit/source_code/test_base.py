@@ -15,6 +15,7 @@ from databricks.labs.ucx.source_code.base import (
     UsedTable,
     back_up_path,
     revert_back_up_path,
+    safe_write_text,
     write_text,
 )
 from databricks.labs.ucx.source_code.linters.base import Fixer
@@ -137,6 +138,18 @@ def test_write_text_with_permission_error(tmp_path) -> None:
     with pytest.raises(PermissionError, match="Permission denied"):
         write_text(path, "content", encoding="utf-8")
 
+    path.write_text.assert_called_once_with("content", encoding="utf-8")
+
+
+def test_safe_write_text_with_permission_error(tmp_path, caplog) -> None:
+    path = create_autospec(Path)
+    path.write_text.side_effect = PermissionError("Permission denied")
+
+    with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.source_code.base"):
+        numbers_of_character_written = safe_write_text(path, "content", encoding="utf-8")
+
+    assert f"Cannot write to file: {path}" in caplog.messages
+    assert numbers_of_character_written is None
     path.write_text.assert_called_once_with("content", encoding="utf-8")
 
 

@@ -427,6 +427,19 @@ def write_text(path: Path, content: str, *, encoding: str | None = None) -> int:
     return path.write_text(content, encoding=encoding)
 
 
+def safe_write_text(path: Path, content: str, *, encoding: str | None = None) -> int | None:
+    """Safe write content to a file by handling writing exceptions, see :func:write_text.
+
+    Returns:
+        int | None : The number of characters written to the file. If None, no content was written.
+    """
+    try:
+        return write_text(path, content, encoding=encoding)
+    except OSError as e:
+        logger.warning(f"Cannot write to file: {path}", exc_info=e)
+        return None
+
+
 # duplicated from CellLanguage to prevent cyclic import
 LANGUAGE_COMMENT_PREFIXES = {Language.PYTHON: '#', Language.SCALA: '//', Language.SQL: '--'}
 NOTEBOOK_HEADER = "Databricks notebook source"
