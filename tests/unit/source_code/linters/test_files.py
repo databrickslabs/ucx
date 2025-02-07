@@ -125,6 +125,23 @@ def test_file_linter_lints_this_file(mock_path_lookup) -> None:
     assert not advices
 
 
+def test_file_linter_applies_unsupported_file() -> None:
+    source_container = create_autospec(SourceContainer)
+    dependency = create_autospec(Dependency)
+    dependency.path.suffix.lower.return_value = ".py"
+    dependency.load.return_value = source_container
+    path_lookup = create_autospec(PathLookup)
+    context = create_autospec(LinterContext)
+    linter = FileLinter(dependency, path_lookup, context)
+
+    linter.apply()
+
+    source_container.assert_not_called()
+    dependency.load.assert_called_once_with(path_lookup)
+    path_lookup.assert_not_called()  # not used as the `load` method is mocked
+    context.assert_not_called()
+
+
 def test_file_linter_applies_migrated(tmp_path, mock_path_lookup, migration_index) -> None:
     """This test does not mock to test closer to reality."""
     path = tmp_path / "file.py"
