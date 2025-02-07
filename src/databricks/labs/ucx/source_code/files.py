@@ -50,6 +50,7 @@ class LocalFile(SourceContainer):
         if self._source == contents:
             return None  # Avoiding unnecessary write
         number_of_characters_written = safe_write_text(self._path, contents)
+        # safe_write_text logs if writing fails
         if number_of_characters_written is not None:
             self._source = contents
         return number_of_characters_written
