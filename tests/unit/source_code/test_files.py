@@ -1,6 +1,6 @@
 import codecs
 from pathlib import Path
-from unittest.mock import create_autospec, patch
+from unittest.mock import create_autospec
 
 import pytest
 from databricks.sdk.service.workspace import Language
@@ -50,14 +50,17 @@ def test_local_file_write_text_with_empty_contents(tmp_path) -> None:
     assert path.read_text() == ""
 
 
-def test_local_file_write_text_with_permission_error(tmp_path, caplog) -> None:
+def test_local_file_write_text_with_error(tmp_path, caplog) -> None:
+    class _LocalFile(LocalFile):
+        def _safe_write_text(self, contents: str) -> None:
+            # Simulate an error, safe_write_text handles the error, no returns signals an error
+            _ = contents
+
     path = tmp_path / "test.py"
-    local_file = LocalFile(path, "print(1)", Language.PYTHON)
+    local_file = _LocalFile(path, "print(1)", Language.PYTHON)
 
-    with patch("databricks.labs.ucx.source_code.files.safe_write_text", return_value=None) as safe_write_text:
-        number_of_characters_written = local_file.write_text("print(2)")
+    number_of_characters_written = local_file.write_text("print(2)")
 
-        safe_write_text.assert_called_once_with(path, "print(2)")
     assert number_of_characters_written is None
 
 

@@ -39,6 +39,10 @@ class LocalFile(SourceContainer):
         """The local file content"""
         return self._source
 
+    def _safe_write_text(self, contents: str) -> int | None:
+        """Write content to the local file."""
+        return safe_write_text(self._path, contents)
+
     def write_text(self, contents: str) -> int | None:
         """Write content to the local file.
 
@@ -49,7 +53,7 @@ class LocalFile(SourceContainer):
         """
         if self._source == contents:
             return None  # Avoiding unnecessary write
-        number_of_characters_written = safe_write_text(self._path, contents)
+        number_of_characters_written = self._safe_write_text(contents)
         # safe_write_text logs if writing fails
         if number_of_characters_written is not None:
             self._source = contents

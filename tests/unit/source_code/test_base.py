@@ -187,6 +187,7 @@ def test_back_up_path_with_permission_error(caplog) -> None:
         copyfile.assert_called_once_with(path, path_backed_up)
     assert f"Cannot back up file: {path}" in caplog.messages
     assert path.exists()
+    path_backed_up.assert_not_called()
 
 
 def test_back_up_and_revert_back_up_path(tmp_path) -> None:
@@ -229,6 +230,7 @@ def test_revert_back_up_with_permission_error(caplog) -> None:
         copyfile.assert_called_once_with(path_backed_up, path)
     assert not is_successfully_reverted_backup
     assert f"Cannot revert backup: {path}"
+    path_backed_up.assert_not_called()
 
 
 def test_revert_back_up_when_backup_file_cannot_be_deleted(caplog) -> None:
@@ -247,3 +249,4 @@ def test_revert_back_up_when_backup_file_cannot_be_deleted(caplog) -> None:
         unlink.assert_called_once_with(path_backed_up)
     assert is_successfully_reverted_backup
     assert f"Cannot remove backup file: {path_backed_up}"
+    path_backed_up.assert_not_called()
