@@ -8,9 +8,10 @@ from databricks.labs.ucx.source_code.base import (
     Advisory,
     Convention,
     Deprecation,
-    LocatedAdvice,
     Failure,
+    LocatedAdvice,
     UsedTable,
+    back_up_path,
 )
 from databricks.labs.ucx.source_code.linters.base import Fixer
 
@@ -101,3 +102,13 @@ def test_fixer_is_never_supported_for_diagnostic_empty_code() -> None:
 
     assert not fixer.is_supported("test")
     assert not fixer.is_supported("other-code")
+
+
+def test_back_up_path(tmp_path) -> None:
+    path = tmp_path / "file.txt"
+    path.touch()
+    path_backed_up = back_up_path(path)
+
+    assert path_backed_up.as_posix().endswith("file.txt.bak")
+    assert path_backed_up.exists()
+    assert path.exists()

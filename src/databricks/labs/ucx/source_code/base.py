@@ -4,6 +4,7 @@ import codecs
 import dataclasses
 import io
 import logging
+import shutil
 import sys
 from abc import abstractmethod, ABC
 from collections.abc import Iterable
@@ -14,10 +15,9 @@ from typing import Any, BinaryIO, TextIO, TypeVar
 
 from astroid import NodeNG  # type: ignore
 
+from databricks.labs.blueprint.paths import WorkspacePath
 from databricks.sdk.service import compute
 from databricks.sdk.service.workspace import Language
-
-from databricks.labs.blueprint.paths import WorkspacePath
 
 
 if sys.version_info >= (3, 11):
@@ -423,3 +423,17 @@ def is_a_notebook(path: Path, content: str | None = None) -> bool:
         return content.startswith(magic_header)
     file_header = safe_read_text(path, size=len(magic_header))
     return file_header == magic_header
+
+
+def back_up_path(path: Path) -> Path:
+    """Back up a path.
+
+    The backed up path is the same as the original path with an additional
+    `.bak` appended to the suffix.
+
+    Returns :
+        path : The backed up path.
+    """
+    path_backed_up = path.with_suffix(path.suffix + ".bak")
+    shutil.copyfile(path, path_backed_up)
+    return path_backed_up
