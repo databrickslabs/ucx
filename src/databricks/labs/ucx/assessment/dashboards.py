@@ -173,8 +173,6 @@ class RedashDashboardCrawler(CrawlerBase[Dashboard]):
     def _crawl(self) -> Iterable[Dashboard]:
         dashboards = []
         for sdk_dashboard in self._list_dashboards():
-            if sdk_dashboard.id is None:
-                continue
             dashboard = Dashboard.from_sdk_redash_dashboard(sdk_dashboard)
             dashboards.append(dashboard)
         return dashboards
@@ -192,7 +190,13 @@ class RedashDashboardCrawler(CrawlerBase[Dashboard]):
         # to a small number of items in debug mode for the assessment workflow just to complete.
         while self._debug_listing_upper_limit is None or self._debug_listing_upper_limit > len(dashboards):
             try:
-                dashboards.append(next(dashboards_iterator))
+                dashboard = next(dashboards_iterator)
+                if dashboard.id is None:
+                    continue
+                #     Dashboard details are not available in the listing, so we need to fetch them
+                dashboard_details = self._get_dashboard(dashboard.id)
+                if dashboard_details:
+                    dashboards.append(dashboard_details)
             except StopIteration:
                 break
             except DatabricksError as e:
