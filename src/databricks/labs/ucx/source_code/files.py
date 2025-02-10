@@ -61,7 +61,7 @@ class LocalFile(SourceContainer):
             int : The number of characters written. If None, nothing is written to the file.
         """
         if self._original_code == self._migrated_code:
-            return None  # Avoiding unnecessary write
+            return len(self._migrated_code)  # Avoiding unnecessary write
         return self._safe_write_text(self._migrated_code)
 
     def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:

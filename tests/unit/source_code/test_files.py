@@ -56,6 +56,19 @@ def test_local_file_flush_migrated_code_with_empty_contents(tmp_path) -> None:
     assert path.read_text() == ""
 
 
+def test_local_file_flush_non_migrated_code(tmp_path) -> None:
+    path = tmp_path / "test.py"
+    path.write_text("print(1)")
+    local_file = LocalFile(path, "print(1)", Language.PYTHON)
+
+    number_of_characters_written = local_file.flush()
+
+    assert number_of_characters_written == len("print(1)")
+    assert local_file.original_code == "print(1)"
+    assert local_file.migrated_code == "print(1)"
+    assert path.read_text() == "print(1)"
+
+
 def test_local_file_flush_migrated_code_with_error(tmp_path, caplog) -> None:
     class _LocalFile(LocalFile):
         def _safe_write_text(self, contents: str) -> None:
