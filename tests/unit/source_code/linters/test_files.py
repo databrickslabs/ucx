@@ -26,7 +26,7 @@ from tests.unit import locate_site_packages, _samples_path
 def test_file_linter_lints_file() -> None:
     local_file = create_autospec(LocalFile)
     local_file.language = Language.PYTHON
-    local_file.content = "print(1)"
+    local_file.original_code = "print(1)"
     dependency = create_autospec(Dependency)
     dependency.path.suffix.lower.return_value = ".py"
     dependency.load.return_value = local_file

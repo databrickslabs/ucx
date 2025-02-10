@@ -243,7 +243,7 @@ class FileLinter:
         """Lint a local file."""
         try:
             linter = self._context.linter(local_file.language)
-            yield from linter.lint(local_file.content)
+            yield from linter.lint(local_file.original_code)
         except ValueError:
             # TODO: Remove when implementing: https://github.com/databrickslabs/ucx/issues/3544
             yield Failure("unsupported-language", f"Unsupported language: {local_file.language}", -1, -1, -1, -1)
@@ -261,8 +261,8 @@ class FileLinter:
 
     def _apply_file(self, local_file: LocalFile) -> None:
         """Apply changes to a local file."""
-        fixed_code = self._context.apply_fixes(local_file.language, local_file.content)
-        if fixed_code != local_file.content:
+        fixed_code = self._context.apply_fixes(local_file.language, local_file.original_code)
+        if fixed_code != local_file.original_code:
             local_file.write_text(fixed_code)
 
 

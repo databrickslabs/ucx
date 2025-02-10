@@ -13,7 +13,7 @@ from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 def test_local_file_content_is_accessible() -> None:
     local_file = LocalFile(Path("test.py"), "print(1)", Language.PYTHON)
-    assert local_file.content == "print(1)"
+    assert local_file.original_code == "print(1)"
 
 
 def test_local_file_write_text_existing_file(tmp_path) -> None:
@@ -24,7 +24,7 @@ def test_local_file_write_text_existing_file(tmp_path) -> None:
     number_of_characters_written = local_file.write_text("print(2)")
 
     assert number_of_characters_written == len("print(2)")
-    assert local_file.content == "print(2)"
+    assert local_file.original_code == "print(2)"
     assert path.read_text() == "print(2)"
 
 
@@ -35,7 +35,7 @@ def test_local_file_write_text_non_existing_file(tmp_path) -> None:
     number_of_characters_written = local_file.write_text("print(2)")
 
     assert number_of_characters_written == len("print(2)")
-    assert local_file.content == "print(2)"
+    assert local_file.original_code == "print(2)"
     assert path.read_text() == "print(2)"
 
 
@@ -46,7 +46,7 @@ def test_local_file_write_text_with_empty_contents(tmp_path) -> None:
     number_of_characters_written = local_file.write_text("")
 
     assert number_of_characters_written == 0
-    assert local_file.content == ""
+    assert local_file.original_code == ""
     assert path.read_text() == ""
 
 
@@ -209,7 +209,7 @@ def test_file_loader_loads_file_with_bom(tmp_path, bom, encoding) -> None:
 
     # TODO: Test specific error while loading: https://github.com/databrickslabs/ucx/issues/3584
     assert isinstance(local_file, LocalFile)
-    assert local_file.content == "a = 12"
+    assert local_file.original_code == "a = 12"
     path_lookup.resolve.assert_called_once_with(path)
 
 

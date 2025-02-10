@@ -31,13 +31,24 @@ class LocalFile(SourceContainer):
 
     def __init__(self, path: Path, source: str, language: Language):
         self._path = path
-        self._source = source
+        self._original_code = source
+        self._migrated_code = source
         self.language = language
 
     @property
-    def content(self) -> str:
-        """The local file content"""
-        return self._source
+    def original_code(self) -> str:
+        """The source code when creating the container."""
+        return self._original_code
+
+    @property
+    def migrated_code(self) -> str:
+        """The source code after fixing with a linter."""
+        return self._migrated_code
+
+    @migrated_code.setter
+    def migrated_code(self, source: str) -> None:
+        """Set the source code after fixing with a linter."""
+        self._migrated_code = source
 
     def _safe_write_text(self, contents: str) -> int | None:
         """Write content to the local file."""
@@ -51,19 +62,19 @@ class LocalFile(SourceContainer):
         Returns :
             int : The number of characters written. If None, nothing is written to the file.
         """
-        if self._source == contents:
+        if self._original_code == contents:
             return None  # Avoiding unnecessary write
         number_of_characters_written = self._safe_write_text(contents)
         # safe_write_text logs if writing fails
         if number_of_characters_written is not None:
-            self._source = contents
+            self._original_code = contents
         return number_of_characters_written
 
     def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
         """The dependency graph for the local file."""
         if self.language == Language.PYTHON:
             context = parent.new_dependency_graph_context()
-            analyzer = PythonCodeAnalyzer(context, self._source)
+            analyzer = PythonCodeAnalyzer(context, self._original_code)
             problems = analyzer.build_graph()
             for idx, problem in enumerate(problems):
                 if problem.has_missing_path():
@@ -77,7 +88,7 @@ class LocalFile(SourceContainer):
     def build_inherited_context(self, graph: DependencyGraph, child_path: Path) -> InheritedContext:
         if self.language == Language.PYTHON:
             context = graph.new_dependency_graph_context()
-            analyzer = PythonCodeAnalyzer(context, self._source)
+            analyzer = PythonCodeAnalyzer(context, self._original_code)
             inherited = analyzer.build_inherited_context(child_path)
             problems = list(inherited.problems)
             for idx, problem in enumerate(problems):
