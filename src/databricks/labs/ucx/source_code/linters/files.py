@@ -203,7 +203,7 @@ class NotebookLinter:
         # TODO deal with workspace notebooks
         language = get_file_language_if_supported(resolved)
         # we only support Python notebooks for now
-        if language is not Language.PYTHON:
+        if language != Language.PYTHON:
             logger.warning(f"Unsupported notebook language: {language}")
             return None
         source = safe_read_text(resolved)
