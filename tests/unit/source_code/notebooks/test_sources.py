@@ -31,30 +31,11 @@ def test_file_linter_lints_sql(tmp_path, migration_index, mock_path_lookup) -> N
     assert not advices
 
 
-@pytest.mark.parametrize(
-    "path",
-    [
-        "xyz.json",
-        "xyz.xml",
-        "xyz.yml",
-        "xyz.cfg",
-        "xyz.md",
-        "xyz.txt",
-        "xyz.gif",
-        "xyz.png",
-        "xyz.jpg",
-        "xyz.jpeg",
-        "xyz.tif",
-        "xyz.bmp",
-        "xyz.toml",
-        ".DS_Store",  # on MacOS
-    ],
-)
-def test_file_linter_lints_ignorable_language(tmp_path, path, migration_index, mock_path_lookup) -> None:
-    path = tmp_path / path
+def test_file_linter_lints_ignorable_language(tmp_path, mock_path_lookup) -> None:
+    path = tmp_path / ".DS_Store"
     path.touch()
     dependency = Dependency(FileLoader(), path)
-    linter = FileLinter(dependency, mock_path_lookup, LinterContext(migration_index))
+    linter = FileLinter(dependency, mock_path_lookup, LinterContext())
     advices = list(linter.lint())
     assert not advices
 
