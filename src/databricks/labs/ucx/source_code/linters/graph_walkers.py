@@ -151,7 +151,7 @@ class _CollectorWalker(DependencyGraphWalker[S], abc.ABC):
     ) -> Iterable[S]:
         language = get_file_language_if_supported(dependency.path)
         if not language:
-            logger.warning(f"Unknown language for {dependency.path}")
+            logger.warning(f"Unsupported language for {dependency.path}")
             return
         cell_language = CellLanguage.of_language(language)
         source = safe_read_text(dependency.path)
