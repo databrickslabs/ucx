@@ -262,8 +262,8 @@ class FileLinter:
     def _apply_file(self, local_file: LocalFile) -> None:
         """Apply changes to a local file."""
         fixed_code = self._context.apply_fixes(local_file.language, local_file.original_code)
-        if fixed_code != local_file.original_code:
-            local_file.write_text(fixed_code)
+        local_file.migrated_code = fixed_code
+        local_file.flush()
 
 
 class NotebookMigrator:

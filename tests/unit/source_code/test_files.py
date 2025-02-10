@@ -16,52 +16,61 @@ def test_local_file_content_is_accessible() -> None:
     assert local_file.original_code == "print(1)"
 
 
-def test_local_file_write_text_existing_file(tmp_path) -> None:
+def test_local_file_flush_migrated_code_existing_file(tmp_path) -> None:
     path = tmp_path / "test.py"
     path.touch()
     local_file = LocalFile(path, "print(1)", Language.PYTHON)
 
-    number_of_characters_written = local_file.write_text("print(2)")
+    local_file.migrated_code = "print(2)"
+    number_of_characters_written = local_file.flush()
 
     assert number_of_characters_written == len("print(2)")
-    assert local_file.original_code == "print(2)"
+    assert local_file.original_code == "print(1)"
+    assert local_file.migrated_code == "print(2)"
     assert path.read_text() == "print(2)"
 
 
-def test_local_file_write_text_non_existing_file(tmp_path) -> None:
+def test_local_file_flush_migrated_code_non_existing_file(tmp_path) -> None:
     path = tmp_path / "test.py"
     local_file = LocalFile(path, "print(1)", Language.PYTHON)
 
-    number_of_characters_written = local_file.write_text("print(2)")
+    local_file.migrated_code = "print(2)"
+    number_of_characters_written = local_file.flush()
 
     assert number_of_characters_written == len("print(2)")
-    assert local_file.original_code == "print(2)"
+    assert local_file.original_code == "print(1)"
+    assert local_file.migrated_code == "print(2)"
     assert path.read_text() == "print(2)"
 
 
-def test_local_file_write_text_with_empty_contents(tmp_path) -> None:
+def test_local_file_flush_migrated_code_with_empty_contents(tmp_path) -> None:
     path = tmp_path / "test.py"
     local_file = LocalFile(path, "print(1)", Language.PYTHON)
 
-    number_of_characters_written = local_file.write_text("")
+    local_file.migrated_code = ""
+    number_of_characters_written = local_file.flush()
 
     assert number_of_characters_written == 0
-    assert local_file.original_code == ""
+    assert local_file.original_code == "print(1)"
+    assert local_file.migrated_code == ""
     assert path.read_text() == ""
 
 
-def test_local_file_write_text_with_error(tmp_path, caplog) -> None:
+def test_local_file_flush_migrated_code_with_error(tmp_path, caplog) -> None:
     class _LocalFile(LocalFile):
         def _safe_write_text(self, contents: str) -> None:
             # Simulate an error, safe_write_text handles the error, no returns signals an error
             _ = contents
 
     path = tmp_path / "test.py"
+    path.write_text("print(1)")
     local_file = _LocalFile(path, "print(1)", Language.PYTHON)
 
-    number_of_characters_written = local_file.write_text("print(2)")
+    local_file.migrated_code = "print(2)"
+    number_of_characters_written = local_file.flush()
 
     assert number_of_characters_written is None
+    assert path.read_text() == "print(1)"
 
 
 @pytest.mark.parametrize("language", [Language.SQL, Language.SCALA, Language.R])

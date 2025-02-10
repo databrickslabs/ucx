@@ -54,21 +54,15 @@ class LocalFile(SourceContainer):
         """Write content to the local file."""
         return safe_write_text(self._path, contents)
 
-    def write_text(self, contents: str) -> int | None:
-        """Write content to the local file.
-
-        Mimics the behavior of Path.write_text.
+    def flush(self) -> int | None:
+        """Flush the migrated code to the local file.
 
         Returns :
             int : The number of characters written. If None, nothing is written to the file.
         """
-        if self._original_code == contents:
+        if self._original_code == self._migrated_code:
             return None  # Avoiding unnecessary write
-        number_of_characters_written = self._safe_write_text(contents)
-        # safe_write_text logs if writing fails
-        if number_of_characters_written is not None:
-            self._original_code = contents
-        return number_of_characters_written
+        return self._safe_write_text(self._migrated_code)
 
     def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
         """The dependency graph for the local file."""
