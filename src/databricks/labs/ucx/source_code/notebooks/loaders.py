@@ -6,7 +6,7 @@ from typing import TypeVar
 
 from databricks.sdk.service.workspace import Language
 
-from databricks.labs.ucx.source_code.base import is_a_notebook, file_language, safe_read_text
+from databricks.labs.ucx.source_code.base import is_a_notebook, get_file_language_if_supported, safe_read_text
 from databricks.labs.ucx.source_code.graph import (
     BaseNotebookResolver,
     Dependency,
@@ -102,7 +102,7 @@ class NotebookLoader(DependencyLoader):
 
     @staticmethod
     def _detect_language(path: Path, content: str) -> Language | None:
-        language = file_language(path)
+        language = get_file_language_if_supported(path)
         if language:
             return language
         for cell_language in CellLanguage:
