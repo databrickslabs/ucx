@@ -61,3 +61,18 @@ def test_folder_cannot_load_unresolved_path(graph_parent_child_context) -> None:
     folder = graph_parent_child_context.dependency.load(path_lookup)
     assert folder is None
     path_lookup.resolve.assert_called_once_with(graph_parent_child_context.dependency.path)
+
+
+@pytest.mark.parametrize("subdirectory", [".venv"])
+def test_folder_build_dependency_graph_ignore_subdirectories(tmp_path, mock_path_lookup, simple_dependency_resolver, subdirectory: str) -> None:
+    """The folder loader should only include directories with source code"""
+    path = tmp_path / subdirectory / "file.py"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.touch()
+    dependency = Dependency(FolderLoader(NotebookLoader(), FileLoader()), tmp_path, inherits_context=False)
+    graph = DependencyGraph(dependency, None, simple_dependency_resolver, mock_path_lookup, CurrentSessionState())
+    folder = graph.dependency.load(mock_path_lookup)
+    assert folder is not None
+    problems = folder.build_dependency_graph(graph)
+    assert not problems
+    assert path not in mock_path_lookup.successfully_resolved_paths, "Subdirectory should be ignored"
