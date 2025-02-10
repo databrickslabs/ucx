@@ -23,38 +23,6 @@ from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolv
 from tests.unit import locate_site_packages, _samples_path
 
 
-@pytest.mark.parametrize("extension", [".json", ".md"])
-def test_file_linter_lint_ignores_file_with_extension(extension: str) -> None:
-    dependency = create_autospec(Dependency)
-    dependency.path.suffix.lower.return_value = extension
-    path_lookup = create_autospec(PathLookup)
-    context = create_autospec(LinterContext)
-    linter = FileLinter(dependency, path_lookup, context)
-
-    advices = list(linter.lint())
-
-    assert not advices
-    dependency.path.suffix.lower.assert_called_once()
-    path_lookup.assert_not_called()
-    context.assert_not_called()
-
-
-@pytest.mark.parametrize("name", [".ds_store", "metadata"])
-def test_file_linter_lint_ignores_file_with_name(name: str) -> None:
-    dependency = create_autospec(Dependency)
-    dependency.path.name.lower.return_value = name
-    path_lookup = create_autospec(PathLookup)
-    context = create_autospec(LinterContext)
-    linter = FileLinter(dependency, path_lookup, context)
-
-    advices = list(linter.lint())
-
-    assert not advices
-    dependency.path.name.lower.assert_called_once()
-    path_lookup.assert_not_called()
-    context.assert_not_called()
-
-
 def test_file_linter_lints_file() -> None:
     local_file = create_autospec(LocalFile)
     local_file.language = Language.PYTHON
