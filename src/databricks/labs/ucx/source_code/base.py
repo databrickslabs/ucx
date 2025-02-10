@@ -321,10 +321,12 @@ SUPPORTED_EXTENSION_LANGUAGES = {
 
 
 def get_file_language_if_supported(path: Path) -> Language | None:
-    """Get the file language if it is supported by UCX.
+    """Get the file language if it is supported by UCX's linter module.
 
     This function returns the language of the file based on the file
     extension. If the file extension is not supported, it returns None.
+
+    Use this function to filter paths before passing it to the linters.
     """
     return SUPPORTED_EXTENSION_LANGUAGES.get(path.suffix.lower())
 
