@@ -15,7 +15,7 @@ from databricks.labs.ucx.source_code.base import (
     safe_read_text,
 )
 from databricks.labs.ucx.source_code.files import LocalFile
-from databricks.labs.ucx.source_code.graph import Dependency, SourceContainer
+from databricks.labs.ucx.source_code.graph import Dependency
 from databricks.labs.ucx.source_code.linters.base import PythonLinter
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.linters.imports import SysPathChange, UnresolvedPath
@@ -213,20 +213,6 @@ class NotebookLinter:
 
 
 class FileLinter:
-    _IGNORED_NAMES = {
-        '.ds_store',
-        '.gitignore',
-        '.coverage',
-        'license',
-        'codeowners',
-        'makefile',
-        'pkg-info',
-        'metadata',
-        'wheel',
-        'record',
-        'notice',
-        'zip-safe',
-    }
 
     def __init__(
         self,
@@ -242,7 +228,7 @@ class FileLinter:
 
     def lint(self) -> Iterable[Advice]:
         """Lint the file."""
-        source_container = self._load_source_container(self._dependency, self._path_lookup)
+        source_container = self._dependency.load(self._path_lookup)
         if not source_container:
             # The linter only reports **linting** errors, not loading errors
             return
@@ -252,13 +238,6 @@ class FileLinter:
             yield from self._lint_file(source_container)
         else:
             yield Failure("unsupported-file", "Unsupported file", -1, -1, -1, -1)
-
-    def _load_source_container(self, dependency: Dependency, path_lookup: PathLookup) -> SourceContainer | None:
-        # TODO: Move the ignore suffixes and names to `Folder`
-        if dependency.path.name.lower() in self._IGNORED_NAMES:
-            return None
-        source_container = dependency.load(path_lookup)
-        return source_container
 
     def _lint_file(self, local_file: LocalFile) -> Iterable[Advice]:
         """Lint a local file."""
@@ -276,7 +255,7 @@ class FileLinter:
 
     def apply(self) -> None:
         """Apply changes to the file."""
-        source_container = self._load_source_container(self._dependency, self._path_lookup)
+        source_container = self._dependency.load(self._path_lookup)
         if isinstance(source_container, LocalFile):
             self._apply_file(source_container)
 

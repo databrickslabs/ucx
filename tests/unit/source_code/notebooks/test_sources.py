@@ -31,15 +31,6 @@ def test_file_linter_lints_sql(tmp_path, migration_index, mock_path_lookup) -> N
     assert not advices
 
 
-def test_file_linter_lints_ignorable_language(tmp_path, mock_path_lookup) -> None:
-    path = tmp_path / ".DS_Store"
-    path.touch()
-    dependency = Dependency(FileLoader(), path)
-    linter = FileLinter(dependency, mock_path_lookup, LinterContext())
-    advices = list(linter.lint())
-    assert not advices
-
-
 class _NotebookLinter(NotebookLinter):
     """A helper class to construct the notebook linter from source code for testing simplification."""
 
