@@ -9,6 +9,21 @@ from databricks.sdk.service.iam import Group
 from databricks.labs.ucx.account.workspaces import AccountWorkspaces
 
 
+@pytest.mark.skip(reason="Test tests interferes with other tests")
+def test_clean_test_users_in_account(acc: AccountClient) -> None:
+    """Run this test to clean up the account from test users.
+
+    Watchdog does not clean up the account from test users as it only looks
+    at the workspace level. This test is not really a test, but a test
+    utility to clean up the account from test users.
+    """
+    for user in acc.users.list(attributes="id", filter='displayName sw "dummy-"'):  # "sw" is short for "starts with"
+        if user.id:
+            acc.users.delete(user.id)
+    # No assert as the API is eventually consistent and this test is skipped
+    # Verify manually instead
+
+
 @pytest.fixture
 def clean_account_level_groups(acc: AccountClient):
     """Clean test generated account level groups."""
