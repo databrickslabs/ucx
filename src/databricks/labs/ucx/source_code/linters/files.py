@@ -263,7 +263,7 @@ class FileLinter:
         """Apply changes to a local file."""
         fixed_code = self._context.apply_fixes(local_file.language, local_file.original_code)
         local_file.migrated_code = fixed_code
-        local_file.flush()
+        local_file.back_up_original_and_flush_migrated_code()
 
 
 class NotebookMigrator:
