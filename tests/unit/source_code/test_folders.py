@@ -64,7 +64,9 @@ def test_folder_cannot_load_unresolved_path(graph_parent_child_context) -> None:
 
 
 @pytest.mark.parametrize("subdirectory", [".venv"])
-def test_folder_build_dependency_graph_ignore_subdirectories(tmp_path, mock_path_lookup, simple_dependency_resolver, subdirectory: str) -> None:
+def test_folder_build_dependency_graph_ignore_subdirectories(
+    tmp_path, mock_path_lookup, simple_dependency_resolver, subdirectory: str
+) -> None:
     """The folder loader should only include directories with source code"""
     path = tmp_path / subdirectory / "file.py"
     path.parent.mkdir(parents=True, exist_ok=True)
