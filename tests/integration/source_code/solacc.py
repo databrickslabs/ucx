@@ -16,6 +16,7 @@ from databricks.labs.ucx.contexts.workspace_cli import LocalCheckoutContext
 from databricks.labs.ucx.framework.utils import run_command
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.source_code.base import LocatedAdvice
+from databricks.labs.ucx.source_code.files import FileLoader
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
@@ -106,7 +107,7 @@ class _SolaccContext:
     unparsed_files_path: Path | None = None
     files_to_skip: set[Path] | None = None
     total_count = 0
-    parseable_count = 0
+    unparseable_count = 0
     uninferrable_count = 0
     missing_imports: dict[str, dict[str, int]] = field(default_factory=dict)
     stats: list[_SolaccStats] = field(default_factory=list)
@@ -164,18 +165,17 @@ class _CleanablePathLookup(PathLookup):
 def _lint_dir(solacc: _SolaccContext, soldir: Path):
     path_lookup = _CleanablePathLookup()
     ws = WorkspaceClient(host='...', token='...')
+    files_to_skip = set(solacc.files_to_skip) if solacc.files_to_skip else set()
     ctx = LocalCheckoutContext(ws).replace(
         linter_context_factory=lambda session_state: LinterContext(TableMigrationIndex([]), session_state),
         path_lookup=path_lookup,
+        file_loader=FileLoader(exclude_paths=files_to_skip),
     )
     all_files = list(soldir.glob('**/*.py')) + list(soldir.glob('**/*.sql'))
     solacc.total_count += len(all_files)
-    # pre-populate linted_files such that files to skip are not linted
-    files_to_skip = set(solacc.files_to_skip) if solacc.files_to_skip else set()
-    linted_files = set(files_to_skip)
     # lint solution
     start_timestamp = datetime.now(timezone.utc)
-    advices = list(ctx.local_code_linter.lint_path(soldir, linted_files))
+    advices = list(ctx.local_code_linter.lint_path(soldir))
     end_timestamp = datetime.now(timezone.utc)
     # record stats
     stats = _SolaccStats(
@@ -189,7 +189,7 @@ def _lint_dir(solacc: _SolaccContext, soldir: Path):
     solacc.stats.append(stats)
     # collect unparseable files
     unparseables = _collect_unparseable(advices)
-    solacc.parseable_count += len(linted_files) - len(files_to_skip) - len(set(advice.path for advice in unparseables))
+    solacc.unparseable_count += len(files_to_skip) + len(set(advice.path for advice in unparseables))
     if solacc.unparsed_files_path:
         for unparseable in unparseables:
             logger.error(f"Error during parsing of {unparseable.path}: {unparseable.advice.message}".replace("\n", " "))
@@ -227,11 +227,11 @@ def _lint_repos(clone_urls, sol_to_lint: str | None):
             if os.getenv("CI"):
                 shutil.rmtree(sol_dir)
     all_files_len = solacc.total_count - (len(solacc.files_to_skip) if solacc.files_to_skip else 0)
-    parseable_pct = int(solacc.parseable_count / all_files_len * 100)
+    unparseable_pct = int(solacc.unparseable_count / all_files_len * 100)
     missing_imports_count = sum(sum(details.values()) for details in solacc.missing_imports.values())
     logger.info(
         f"Skipped: {len(solacc.files_to_skip or [])}, "
-        f"parseable: {parseable_pct}% ({solacc.parseable_count}/{all_files_len}), "
+        f"unparseable: {unparseable_pct}% ({solacc.unparseable_count}/{all_files_len}), "
         f"missing imports: {missing_imports_count}, "
         f"not computed: {solacc.uninferrable_count}"
     )
@@ -243,7 +243,7 @@ def _lint_repos(clone_urls, sol_to_lint: str | None):
             message = json.dumps(dataclasses.asdict(stats), default=str)
             stats_file.writelines([message])
     # fail the job if files are unparseable
-    if parseable_pct < 100:
+    if unparseable_pct > 0:
         sys.exit(1)
 
 

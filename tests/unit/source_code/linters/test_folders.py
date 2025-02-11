@@ -45,9 +45,8 @@ def test_local_code_linter_walks_directory(mock_path_lookup, local_code_linter) 
     # TODO remove sample paths and clean up test when the paths is no longer needed
     mock_path_lookup.append_path(Path(_samples_path(SourceContainer)))
     path = Path(__file__).parent / "../samples" / "simulate-sys-path"
-    paths: set[Path] = set()
-    advices = list(local_code_linter.lint_path(path, paths))
-    assert len(paths) > 10
+    advices = list(local_code_linter.lint_path(path))
+    assert len(mock_path_lookup.successfully_resolved_paths) > 10
     assert not advices
 
 
@@ -55,9 +54,8 @@ def test_local_code_linter_lints_children_in_context(mock_path_lookup, local_cod
     # TODO remove sample paths and clean up test when the paths is no longer needed
     mock_path_lookup.append_path(Path(_samples_path(SourceContainer)))
     path = Path(__file__).parent.parent / "samples" / "parent-child-context"
-    paths: set[Path] = set()
-    advices = list(local_code_linter.lint_path(path, paths))
-    assert len(paths) == 3
+    advices = list(local_code_linter.lint_path(path))
+    assert mock_path_lookup.successfully_resolved_paths == {path, Path("parent.py"), Path("child.py")}
     assert not advices
 
 

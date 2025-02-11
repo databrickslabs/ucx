@@ -36,22 +36,38 @@ T = TypeVar("T")
 
 
 class DependencyGraphWalker(abc.ABC, Generic[T]):
+    """Walks over the dependencies in a graph starting from the root dependencies going depth first.
 
-    def __init__(self, graph: DependencyGraph, walked_paths: set[Path], path_lookup: PathLookup):
+    Implemented as an object to iterate over, for example:
+    ``` python
+    walker = DependencyGraphWalker()
+    for processed_dependency_output in walker:
+        # Do something with output
+    ```
+    """
+
+    def __init__(self, graph: DependencyGraph, path_lookup: PathLookup):
         self._graph = graph
-        self._walked_paths = walked_paths
         self._path_lookup = path_lookup
-        self._lineage: list[Dependency] = []
+
+        self._walked_paths = set[Path]()
+        self._lineage = list[Dependency]()
 
     def __iter__(self) -> Iterator[T]:
+        """Iterate over the dependencies starting from the root."""
         for dependency in self._graph.root_dependencies:
             # the dependency is a root, so its path is the one to use
             # for computing lineage and building python global context
-            root_path = dependency.path
-            yield from self._iter_one(dependency, self._graph, root_path)
+            yield from self._iter_one(dependency, self._graph, dependency.path)
 
     def _iter_one(self, dependency: Dependency, graph: DependencyGraph, root_path: Path) -> Iterable[T]:
+        """Iterate over a single dependency going depth first."""
         if dependency.path in self._walked_paths:
+            # TODO: Decide to not skip dependencies that have been walked already.
+            # Open questions:
+            # - Should this come before or after the lineage logging?
+            # - When do we reach this? Also, it could mean that is coming from a different root,
+            #   which maybe needs to be processed.
             return
         self._lineage.append(dependency)
         self._walked_paths.add(dependency.path)
@@ -63,11 +79,13 @@ class DependencyGraphWalker(abc.ABC, Generic[T]):
         # missing graph problems have already been reported while building the graph
         if maybe_graph.graph:
             child_graph = maybe_graph.graph
+            # This makes the implementation depth first
             for child_dependency in child_graph.local_dependencies:
                 yield from self._iter_one(child_dependency, child_graph, root_path)
         self._lineage.pop()
 
     def _log_walk_one(self, dependency: Dependency) -> None:
+        """Possibly overwrite this method in a subclass for more specific logging"""
         logger.debug(f'Analyzing dependency: {dependency}')
 
     @abc.abstractmethod
@@ -76,30 +94,26 @@ class DependencyGraphWalker(abc.ABC, Generic[T]):
         dependency: Dependency,
         path_lookup: PathLookup,
         inherited_tree: Tree | None,
-    ) -> Iterable[T]: ...
+    ) -> Iterable[T]:
+        """Process a dependency."""
 
     @property
     def lineage(self) -> list[LineageAtom]:
+        """The lineage for getting to the dependency."""
         lists: list[list[LineageAtom]] = [dependency.lineage for dependency in self._lineage]
         return list(itertools.chain(*lists))
 
 
 class LintingWalker(DependencyGraphWalker[LocatedAdvice]):
+    """Lint the dependencies in the graph."""
 
-    def __init__(
-        self,
-        graph: DependencyGraph,
-        walked_paths: set[Path],
-        path_lookup: PathLookup,
-        key: str,
-        context_factory: Callable[[], LinterContext],
-    ):
-        super().__init__(graph, walked_paths, path_lookup)
-        self._key = key
+    def __init__(self, graph: DependencyGraph, path_lookup: PathLookup, context_factory: Callable[[], LinterContext]):
+        super().__init__(graph, path_lookup)
         self._context_factory = context_factory
 
     def _log_walk_one(self, dependency: Dependency) -> None:
-        logger.info(f'Linting {self._key} dependency: {dependency}')
+        """Log linting a dependency"""
+        logger.info(f"Linting dependency: {dependency}")
 
     def _process_dependency(
         self,
@@ -107,6 +121,7 @@ class LintingWalker(DependencyGraphWalker[LocatedAdvice]):
         path_lookup: PathLookup,
         inherited_tree: Tree | None,
     ) -> Iterable[LocatedAdvice]:
+        """Lint the dependency and yield the located advices."""
         # FileLinter determines which file/notebook linter to use
         linter = FileLinter(dependency, path_lookup, self._context_factory(), inherited_tree)
         for advice in linter.lint():
@@ -121,12 +136,11 @@ class _CollectorWalker(DependencyGraphWalker[S], abc.ABC):
     def __init__(
         self,
         graph: DependencyGraph,
-        walked_paths: set[Path],
         path_lookup: PathLookup,
         session_state: CurrentSessionState,
         migration_index: TableMigrationIndex,
     ):
-        super().__init__(graph, walked_paths, path_lookup)
+        super().__init__(graph, path_lookup)
         self._linter_context = LinterContext(migration_index, session_state)
 
     def _process_dependency(
