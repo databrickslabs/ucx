@@ -5,7 +5,6 @@ from databricks.labs.ucx.source_code.graph import (
     Dependency,
     DependencyProblem,
     DependencyResolver,
-    SourceContainer,
 )
 from databricks.labs.ucx.source_code.files import FileLoader, ImportFileResolver
 from databricks.labs.ucx.source_code.notebooks.loaders import (
@@ -191,7 +190,7 @@ def test_dependency_resolver_raises_problem_with_unloadable_root_file(mock_path_
 def test_dependency_resolver_raises_problem_with_unloadable_root_notebook(mock_path_lookup) -> None:
 
     class FailingNotebookLoader(NotebookLoader):
-        def load_dependency(self, path_lookup: PathLookup, dependency: Dependency) -> SourceContainer | None:
+        def load_dependency(self, path_lookup: PathLookup, dependency: Dependency) -> None:
             return None
 
     notebook_loader = FailingNotebookLoader()
