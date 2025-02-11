@@ -72,17 +72,16 @@ class DependencyGraphWalker(abc.ABC, Generic[T]):
         self._lineage.append(dependency)
         self._walked_paths.add(dependency.path)
         self._log_walk_one(dependency)
-        if dependency.path.is_file() or is_a_notebook(dependency.path):
-            inherited_tree = graph.root.build_inherited_tree(root_path, dependency.path)
-            path_lookup = self._path_lookup.change_directory(dependency.path.parent)
-            yield from self._process_dependency(dependency, path_lookup, inherited_tree)
-            maybe_graph = graph.locate_dependency(dependency.path)
-            # missing graph problems have already been reported while building the graph
-            if maybe_graph.graph:
-                child_graph = maybe_graph.graph
-                # This makes the implementation depth first
-                for child_dependency in child_graph.local_dependencies:
-                    yield from self._iter_one(child_dependency, child_graph, root_path)
+        inherited_tree = graph.root.build_inherited_tree(root_path, dependency.path)
+        path_lookup = self._path_lookup.change_directory(dependency.path.parent)
+        yield from self._process_dependency(dependency, path_lookup, inherited_tree)
+        maybe_graph = graph.locate_dependency(dependency.path)
+        # missing graph problems have already been reported while building the graph
+        if maybe_graph.graph:
+            child_graph = maybe_graph.graph
+            # This makes the implementation depth first
+            for child_dependency in child_graph.local_dependencies:
+                yield from self._iter_one(child_dependency, child_graph, root_path)
         self._lineage.pop()
 
     def _log_walk_one(self, dependency: Dependency) -> None:
