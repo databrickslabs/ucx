@@ -117,11 +117,10 @@ class WorkflowLinter:
         assert job.settings is not None
         assert job.settings.name is not None
         assert job.settings.tasks is not None
-        linted_paths: set[Path] = set()
         for task in job.settings.tasks:
             graph, advices, session_state = self._build_task_dependency_graph(task, job)
             if not advices:
-                advices = self._lint_task(task, graph, session_state, linted_paths)
+                advices = self._lint_task(graph, session_state)
             for advice in advices:
                 absolute_path = "UNKNOWN" if advice.has_missing_path() else advice.path.absolute().as_posix()
                 job_problem = JobProblem(
@@ -173,20 +172,8 @@ class WorkflowLinter:
         located_advices = [problem.as_located_advice() for problem in problems]
         return graph, located_advices, session_state
 
-    def _lint_task(
-        self,
-        task: jobs.Task,
-        graph: DependencyGraph,
-        session_state: CurrentSessionState,
-        linted_paths: set[Path],
-    ) -> Iterable[LocatedAdvice]:
-        walker = LintingWalker(
-            graph,
-            linted_paths,
-            self._path_lookup,
-            task.task_key,
-            lambda: LinterContext(self._migration_index, session_state),
-        )
+    def _lint_task(self, graph: DependencyGraph, session_state: CurrentSessionState) -> Iterable[LocatedAdvice]:
+        walker = LintingWalker(graph, self._path_lookup, lambda: LinterContext(self._migration_index, session_state))
         yield from walker
 
     def _collect_task_dfsas(
@@ -199,7 +186,7 @@ class WorkflowLinter:
         # need to add lineage for job/task because walker doesn't register them
         job_id = str(job.job_id)
         job_name = job.settings.name if job.settings and job.settings.name else "<anonymous>"
-        for dfsa in DfsaCollectorWalker(graph, set(), self._path_lookup, session_state, self._migration_index):
+        for dfsa in DfsaCollectorWalker(graph, self._path_lookup, session_state, self._migration_index):
             atoms = [
                 LineageAtom(object_type="WORKFLOW", object_id=job_id, other={"name": job_name}),
                 LineageAtom(object_type="TASK", object_id=f"{job_id}/{task.task_key}"),
@@ -216,7 +203,7 @@ class WorkflowLinter:
         # need to add lineage for job/task because walker doesn't register them
         job_id = str(job.job_id)
         job_name = job.settings.name if job.settings and job.settings.name else "<anonymous>"
-        for used_table in TablesCollectorWalker(graph, set(), self._path_lookup, session_state, self._migration_index):
+        for used_table in TablesCollectorWalker(graph, self._path_lookup, session_state, self._migration_index):
             atoms = [
                 LineageAtom(object_type="WORKFLOW", object_id=job_id, other={"name": job_name}),
                 LineageAtom(object_type="TASK", object_id=f"{job_id}/{task.task_key}"),
