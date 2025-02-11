@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from databricks.labs.ucx.source_code.base import Advisory, CurrentSessionState, Failure, LocatedAdvice
+from databricks.labs.ucx.source_code.base import Advisory, CurrentSessionState, LocatedAdvice
 from databricks.labs.ucx.source_code.files import FileLoader, ImportFileResolver
 from databricks.labs.ucx.source_code.folders import FolderLoader
 from databricks.labs.ucx.source_code.graph import DependencyResolver, SourceContainer
