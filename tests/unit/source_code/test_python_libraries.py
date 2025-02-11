@@ -2,7 +2,6 @@ from unittest.mock import create_autospec, call
 
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
-from databricks.labs.ucx.source_code.known import KnownList
 
 
 def test_python_library_resolver_resolves_library(mock_path_lookup) -> None:
@@ -11,7 +10,7 @@ def test_python_library_resolver_resolves_library(mock_path_lookup) -> None:
         assert command_str.startswith("pip --disable-pip-version-check install anything -t")
         return 0, "", ""
 
-    python_library_resolver = PythonLibraryResolver(allow_list=KnownList(), runner=mock_pip_install)
+    python_library_resolver = PythonLibraryResolver(runner=mock_pip_install)
     problems = python_library_resolver.register_library(mock_path_lookup, "anything")
 
     assert len(problems) == 0
@@ -21,7 +20,7 @@ def test_python_library_resolver_failing(mock_path_lookup) -> None:
     def mock_pip_install(_):
         return 1, "", "nope"
 
-    python_library_resolver = PythonLibraryResolver(allow_list=KnownList(), runner=mock_pip_install)
+    python_library_resolver = PythonLibraryResolver(runner=mock_pip_install)
     problems = python_library_resolver.register_library(mock_path_lookup, "anything")
 
     assert len(problems) == 1
@@ -36,7 +35,7 @@ def test_python_library_resolver_adds_to_path_lookup_only_once() -> None:
 
     path_lookup = create_autospec(PathLookup)
     path_lookup.resolve.return_value = None
-    python_library_resolver = PythonLibraryResolver(allow_list=KnownList(), runner=mock_pip_install)
+    python_library_resolver = PythonLibraryResolver(runner=mock_pip_install)
 
     problems = python_library_resolver.register_library(path_lookup, "library")
     assert len(problems) == 0
@@ -51,7 +50,7 @@ def test_python_library_resolver_resolves_library_with_known_problems(mock_path_
     def mock_pip_install(_):
         return 0, "", ""
 
-    python_library_resolver = PythonLibraryResolver(allow_list=KnownList(), runner=mock_pip_install)
+    python_library_resolver = PythonLibraryResolver(runner=mock_pip_install)
     problems = python_library_resolver.register_library(mock_path_lookup, "boto3==1.17.0")
 
     assert len(problems) == 1
@@ -62,14 +61,14 @@ def test_python_library_resolver_installs_with_command(mock_path_lookup) -> None
     def mock_pip_install(_):
         return 0, "", ""
 
-    python_library_resolver = PythonLibraryResolver(allow_list=KnownList(), runner=mock_pip_install)
+    python_library_resolver = PythonLibraryResolver(runner=mock_pip_install)
     problems = python_library_resolver.register_library(mock_path_lookup, "library.whl", "--verbose")
 
     assert len(problems) == 0
 
 
 def test_python_library_resolver_installs_multiple_eggs(mock_path_lookup) -> None:
-    python_library_resolver = PythonLibraryResolver(allow_list=KnownList())
+    python_library_resolver = PythonLibraryResolver()
     problems = python_library_resolver.register_library(mock_path_lookup, "first.egg", "second.egg")
 
     assert len(problems) == 2

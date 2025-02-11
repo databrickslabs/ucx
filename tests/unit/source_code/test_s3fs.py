@@ -10,7 +10,6 @@ from databricks.labs.ucx.source_code.graph import (
 )
 from databricks.labs.ucx.source_code.files import FileLoader, ImportFileResolver
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader, NotebookResolver
-from databricks.labs.ucx.source_code.known import KnownList
 from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
 
 S3FS_DEPRECATION_MESSAGE = (
@@ -119,12 +118,11 @@ def test_detect_s3fs_import(
     sample = tmp_path / "test_detect_s3fs_import.py"
     sample.write_text(source)
     mock_path_lookup.append_path(tmp_path)
-    allow_list = KnownList()
     notebook_loader = NotebookLoader()
     file_loader = FileLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
-    import_resolver = ImportFileResolver(file_loader, allow_list=allow_list)
-    pip_resolver = PythonLibraryResolver(allow_list=allow_list)
+    import_resolver = ImportFileResolver(file_loader)
+    pip_resolver = PythonLibraryResolver()
     dependency_resolver = DependencyResolver(
         pip_resolver, notebook_resolver, import_resolver, import_resolver, mock_path_lookup
     )
@@ -154,9 +152,8 @@ def test_detect_s3fs_import_in_dependencies(
     empty_index, expected: list[DependencyProblem], mock_path_lookup, mock_notebook_resolver
 ) -> None:
     file_loader = FileLoader()
-    allow_list = KnownList()
-    import_resolver = ImportFileResolver(file_loader, allow_list=allow_list)
-    pip_resolver = PythonLibraryResolver(allow_list=allow_list)
+    import_resolver = ImportFileResolver(file_loader)
+    pip_resolver = PythonLibraryResolver()
     dependency_resolver = DependencyResolver(
         pip_resolver, mock_notebook_resolver, import_resolver, import_resolver, mock_path_lookup
     )

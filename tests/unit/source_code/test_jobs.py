@@ -14,7 +14,6 @@ from databricks.labs.blueprint.paths import DBFSPath, WorkspacePath
 from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.directfs_access import DirectFsAccessCrawler
 from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
-from databricks.labs.ucx.source_code.known import KnownList
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service import compute, jobs, pipelines
@@ -45,10 +44,9 @@ def test_job_problem_as_message() -> None:
 @pytest.fixture
 def dependency_resolver(mock_path_lookup) -> DependencyResolver:
     file_loader = FileLoader()
-    allow_list = KnownList()
-    import_file_resolver = ImportFileResolver(file_loader, allow_list=allow_list)
+    import_file_resolver = ImportFileResolver(file_loader)
     resolver = DependencyResolver(
-        PythonLibraryResolver(allow_list=allow_list),
+        PythonLibraryResolver(),
         NotebookResolver(NotebookLoader()),
         import_file_resolver,
         import_file_resolver,
