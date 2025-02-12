@@ -77,10 +77,6 @@ def _collect_uninferrable_count(advices: list[LocatedAdvice]):
     return not_computed
 
 
-def _collect_unparseable(advices: list[LocatedAdvice]):
-    return list(located_advice for located_advice in advices if located_advice.advice.code == 'parse-error')
-
-
 def _print_advices(located_advices: list[LocatedAdvice]) -> None:
     messages = [f"{located_advice}\n" for located_advice in located_advices]
     if os.getenv("CI"):
@@ -174,8 +170,16 @@ def _lint_dir(solacc: _SolaccContext, soldir: Path):
     all_files = list(soldir.glob('**/*.py')) + list(soldir.glob('**/*.sql'))
     solacc.total_count += len(all_files)
     # lint solution
+    advices, unparseable_advices = [], []
     start_timestamp = datetime.now(timezone.utc)
-    advices = list(ctx.local_code_linter.lint_path(soldir))
+    for located_advice in ctx.local_code_linter.lint_path(soldir):
+        print(located_advice)  # defaults to writing to sys.stdout
+        advices.append(located_advice)
+        if located_advice.advice.code == 'parse-error':
+            unparseable_advices.append(located_advice)
+        if located_advice.advice.code == 'import-not-found':
+            missing_import = located_advice.advice.message.split(':')[1].strip()
+            solacc.register_missing_import(missing_import)
     end_timestamp = datetime.now(timezone.utc)
     # record stats
     stats = _SolaccStats(
@@ -188,10 +192,9 @@ def _lint_dir(solacc: _SolaccContext, soldir: Path):
     )
     solacc.stats.append(stats)
     # collect unparseable files
-    unparseables = _collect_unparseable(advices)
-    solacc.unparseable_count += len(files_to_skip) + len(set(advice.path for advice in unparseables))
+    solacc.unparseable_count += len(files_to_skip) + len(set(advice.path for advice in unparseable_advices))
     if solacc.unparsed_files_path:
-        for unparseable in unparseables:
+        for unparseable in unparseable_advices:
             logger.error(f"Error during parsing of {unparseable.path}: {unparseable.advice.message}".replace("\n", " "))
             # populate solacc-unparsed.txt
             with solacc.unparsed_files_path.open(mode="a", encoding="utf-8") as f:
@@ -201,9 +204,6 @@ def _lint_dir(solacc: _SolaccContext, soldir: Path):
                     path = unparseable.path
                 f.write(path.as_posix())
                 f.write("\n")
-    # collect missing imports
-    for missing_import in _collect_missing_imports(advices):
-        solacc.register_missing_import(missing_import)
     # collect uninferrable
     solacc.uninferrable_count += _collect_uninferrable_count(advices)
     # display advices
