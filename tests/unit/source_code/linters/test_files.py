@@ -9,7 +9,6 @@ from databricks.labs.ucx.source_code.graph import DependencyResolver
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
 from databricks.labs.ucx.source_code.linters.files import NotebookMigrator
 from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
-from databricks.labs.ucx.source_code.known import KnownList
 
 from databricks.sdk.service.workspace import Language
 
@@ -101,7 +100,7 @@ def test_migrator_walks_directory() -> None:
 
 
 def test_triple_dot_import() -> None:
-    file_resolver = ImportFileResolver(FileLoader(), KnownList())
+    file_resolver = ImportFileResolver(FileLoader())
     path_lookup = create_autospec(PathLookup)
     path_lookup.cwd.as_posix.return_value = '/some/path/to/folder'
     path_lookup.resolve.return_value = Path('/some/path/foo.py')
@@ -114,7 +113,7 @@ def test_triple_dot_import() -> None:
 
 
 def test_single_dot_import() -> None:
-    file_resolver = ImportFileResolver(FileLoader(), KnownList())
+    file_resolver = ImportFileResolver(FileLoader())
     path_lookup = create_autospec(PathLookup)
     path_lookup.cwd.as_posix.return_value = '/some/path/to/folder'
     path_lookup.resolve.return_value = Path('/some/path/to/folder/foo.py')
@@ -147,10 +146,9 @@ def test_known_issues(path: Path, migration_index) -> None:
     folder_loader = FolderLoader(notebook_loader, file_loader)
     path_lookup = PathLookup.from_sys_path(Path.cwd())
     session_state = CurrentSessionState()
-    allow_list = KnownList()
     notebook_resolver = NotebookResolver(NotebookLoader())
-    import_resolver = ImportFileResolver(file_loader, allow_list)
-    pip_resolver = PythonLibraryResolver(allow_list)
+    import_resolver = ImportFileResolver(file_loader)
+    pip_resolver = PythonLibraryResolver()
     resolver = DependencyResolver(pip_resolver, notebook_resolver, import_resolver, import_resolver, path_lookup)
     linter = LocalCodeLinter(
         notebook_loader,

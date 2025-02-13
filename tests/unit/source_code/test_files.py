@@ -8,7 +8,7 @@ from databricks.sdk.service.workspace import Language
 from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyProblem, StubContainer
 from databricks.labs.ucx.source_code.files import FileLoader, ImportFileResolver, LocalFile
-from databricks.labs.ucx.source_code.known import KnownDependency, KnownList
+from databricks.labs.ucx.source_code.known import KnownDependency
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 
@@ -193,7 +193,7 @@ def test_file_loader_ignores_path_by_loading_it_as_stub_container(tmp_path) -> N
 
 
 def test_import_resolver_resolves_import_from_known_list_without_problems() -> None:
-    import_file_resolver = ImportFileResolver(FileLoader(), KnownList())
+    import_file_resolver = ImportFileResolver(FileLoader())
     path_lookup = create_autospec(PathLookup)
 
     maybe_dependency = import_file_resolver.resolve_import(path_lookup, "aiohttp")
@@ -212,7 +212,7 @@ def test_import_resolver_resolves_import_from_known_list_without_problems() -> N
 
 
 def test_import_resolver_resolves_import_from_known_list_with_problems() -> None:
-    import_file_resolver = ImportFileResolver(FileLoader(), KnownList())
+    import_file_resolver = ImportFileResolver(FileLoader())
     path_lookup = create_autospec(PathLookup)
 
     maybe_dependency = import_file_resolver.resolve_import(path_lookup, "pyspark.sql.functions")

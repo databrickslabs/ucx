@@ -6,7 +6,6 @@ from databricks.labs.ucx.source_code.base import Advisory, CurrentSessionState, 
 from databricks.labs.ucx.source_code.files import FileLoader, ImportFileResolver
 from databricks.labs.ucx.source_code.folders import FolderLoader
 from databricks.labs.ucx.source_code.graph import DependencyResolver, SourceContainer
-from databricks.labs.ucx.source_code.known import KnownList
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.linters.folders import LocalCodeLinter
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader, NotebookResolver
@@ -19,10 +18,9 @@ def local_code_linter(mock_path_lookup, migration_index):
     notebook_loader = NotebookLoader()
     file_loader = FileLoader()
     folder_loader = FolderLoader(notebook_loader, file_loader)
-    allow_list = KnownList()
-    pip_resolver = PythonLibraryResolver(allow_list)
+    pip_resolver = PythonLibraryResolver()
     session_state = CurrentSessionState()
-    import_file_resolver = ImportFileResolver(file_loader, allow_list)
+    import_file_resolver = ImportFileResolver(file_loader)
     resolver = DependencyResolver(
         pip_resolver,
         NotebookResolver(NotebookLoader()),

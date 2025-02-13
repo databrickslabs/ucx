@@ -13,7 +13,6 @@ from databricks.labs.lsql.backends import MockBackend
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.tables import FasterTableScanCrawler
 from databricks.labs.ucx.source_code.graph import BaseNotebookResolver, DependencyResolver
-from databricks.labs.ucx.source_code.known import KnownList
 from databricks.labs.ucx.source_code.files import FileLoader, ImportFileResolver
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
@@ -252,10 +251,9 @@ def simple_dependency_resolver(mock_path_lookup: PathLookup) -> DependencyResolv
         """
         return 0, "", ""
 
-    allow_list = KnownList()
-    library_resolver = PythonLibraryResolver(allow_list, mock_pip_install_always_successful)
+    library_resolver = PythonLibraryResolver(runner=mock_pip_install_always_successful)
     notebook_resolver = NotebookResolver(NotebookLoader())
-    import_resolver = ImportFileResolver(FileLoader(), allow_list)
+    import_resolver = ImportFileResolver(FileLoader())
     return DependencyResolver(library_resolver, notebook_resolver, import_resolver, import_resolver, mock_path_lookup)
 
 

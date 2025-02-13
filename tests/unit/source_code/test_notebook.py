@@ -6,7 +6,6 @@ from databricks.sdk.service.workspace import Language, ObjectType, ObjectInfo
 
 from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.graph import DependencyGraph, DependencyResolver
-from databricks.labs.ucx.source_code.known import KnownList
 from databricks.labs.ucx.source_code.files import FileLoader, ImportFileResolver
 from databricks.labs.ucx.source_code.linters.imports import DbutilsPyLinter
 from databricks.labs.ucx.source_code.python.python_ast import MaybeTree
@@ -132,8 +131,8 @@ def test_notebook_generates_runnable_cells(source: tuple[str, Language, list[str
 def dependency_resolver(mock_path_lookup) -> DependencyResolver:
     notebook_loader = NotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
-    library_resolver = PythonLibraryResolver(KnownList())
-    import_resolver = ImportFileResolver(FileLoader(), KnownList())
+    library_resolver = PythonLibraryResolver()
+    import_resolver = ImportFileResolver(FileLoader())
     return DependencyResolver(library_resolver, notebook_resolver, import_resolver, import_resolver, mock_path_lookup)
 
 

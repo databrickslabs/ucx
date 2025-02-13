@@ -20,9 +20,9 @@ def test_graph_visits_package_with_recursive_imports():
             return super().module_compatibility(name)
 
     allow_list = TestKnownList()
-    library_resolver = PythonLibraryResolver(allow_list)
+    library_resolver = PythonLibraryResolver(allow_list=allow_list)
     notebook_resolver = NotebookResolver(NotebookLoader())
-    import_resolver = ImportFileResolver(FileLoader(), allow_list)
+    import_resolver = ImportFileResolver(FileLoader(), allow_list=allow_list)
     path_lookup = PathLookup.from_sys_path(Path(__file__).parent)
     dependency_resolver = DependencyResolver(
         library_resolver, notebook_resolver, import_resolver, import_resolver, path_lookup
@@ -41,10 +41,9 @@ def test_graph_visits_package_with_recursive_imports():
 
 
 def test_graph_imports_dynamic_import():
-    allow_list = KnownList()
-    library_resolver = PythonLibraryResolver(allow_list)
+    library_resolver = PythonLibraryResolver()
     notebook_resolver = NotebookResolver(NotebookLoader())
-    import_resolver = ImportFileResolver(FileLoader(), allow_list)
+    import_resolver = ImportFileResolver(FileLoader())
     path_lookup = PathLookup.from_sys_path(Path(__file__).parent)
     dependency_resolver = DependencyResolver(
         library_resolver, notebook_resolver, import_resolver, import_resolver, path_lookup
