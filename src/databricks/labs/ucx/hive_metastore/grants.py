@@ -271,7 +271,7 @@ class GrantsCrawler(CrawlerBase[Grant]):
             partial(self.grants, catalog=catalog, any_file=True),
             partial(self.grants, catalog=catalog, anonymous_function=True),
         ]
-        if not self._include_databases:
+        if self._include_databases is None:
             # scan all databases, even empty ones
             for row in self._fetch(f"SHOW DATABASES FROM {escape_sql_identifier(catalog)}"):
                 tasks.append(partial(self.grants, catalog=catalog, database=row.databaseName))
