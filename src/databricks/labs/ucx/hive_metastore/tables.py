@@ -422,16 +422,16 @@ class TablesCrawler(CrawlerBase[Table]):
         self._include_database = include_databases
 
     def _all_databases(self) -> list[str]:
-        if not self._include_database:
-            databases = []
-            for row in self._fetch("SHOW DATABASES"):
-                database = row[0]
-                if database == self._schema:
-                    logger.debug(f"Skipping UCX inventory schema: {database}")
-                    continue
-                databases.append(database)
-            return databases
-        return self._include_database
+        if self._include_database is not None:
+            return self._include_database
+        databases = []
+        for row in self._fetch("SHOW DATABASES"):
+            database = row[0]
+            if database == self._schema:
+                logger.debug(f"Skipping UCX inventory schema: {database}")
+                continue
+            databases.append(database)
+        return databases
 
     def load_one(self, schema_name: str, table_name: str) -> Table | None:
         query = f"SELECT * FROM {escape_sql_identifier(self.full_name)} WHERE database='{schema_name}' AND name='{table_name}' LIMIT 1"
