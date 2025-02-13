@@ -92,7 +92,7 @@ def test_permission_for_udfs_migration_api(ws, sql_backend, runtime_ctx, migrate
     assert {"READ_METADATA"} == actual_udf_b_grants[migrated_group.name_in_account]
 
 
-def test_permission_for_files_anonymous_func(sql_backend, runtime_ctx, make_group):
+def test_permission_for_files_anonymous_func(sql_backend, runtime_ctx, make_group) -> None:
     old = make_group()
     new = make_group()
     logger.debug(f"old={old.display_name}, new={new.display_name}")
@@ -100,7 +100,8 @@ def test_permission_for_files_anonymous_func(sql_backend, runtime_ctx, make_grou
     sql_backend.execute(f"GRANT READ_METADATA ON ANY FILE TO `{old.display_name}`")
     sql_backend.execute(f"GRANT SELECT ON ANONYMOUS FUNCTION TO `{old.display_name}`")
 
-    grants = runtime_ctx.grants_crawler
+    # Ignoring database, table and UDF grants by replacing the created_databases with an empty list
+    grants = runtime_ctx.replace(created_databases=[]).grants_crawler
 
     tacl_support = TableAclSupport(grants, sql_backend)
     apply_tasks(tacl_support, [MigratedGroup.partial_info(old, new)])
