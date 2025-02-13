@@ -214,48 +214,6 @@ class NotebookLinter:
 
 
 class FileLinter:
-    _NOT_YET_SUPPORTED_SUFFIXES = {
-        '.scala',
-        '.sh',
-        '.r',
-    }
-    _IGNORED_SUFFIXES = {
-        '.json',
-        '.md',
-        '.txt',
-        '.xml',
-        '.yml',
-        '.toml',
-        '.cfg',
-        '.bmp',
-        '.gif',
-        '.png',
-        '.tif',
-        '.tiff',
-        '.svg',
-        '.jpg',
-        '.jpeg',
-        '.pyc',
-        '.whl',
-        '.egg',
-        '.class',
-        '.iml',
-        '.gz',
-    }
-    _IGNORED_NAMES = {
-        '.ds_store',
-        '.gitignore',
-        '.coverage',
-        'license',
-        'codeowners',
-        'makefile',
-        'pkg-info',
-        'metadata',
-        'wheel',
-        'record',
-        'notice',
-        'zip-safe',
-    }
 
     def __init__(
         self,
@@ -276,15 +234,10 @@ class FileLinter:
             advices = [problem.as_advice().as_advisory() for problem in self._dependency.problems]
             yield from advices
             return
-        if self._dependency.path.suffix.lower() in self._IGNORED_SUFFIXES:
-            return
-        if self._dependency.path.name.lower() in self._IGNORED_NAMES:
-            return
-        if self._dependency.path.suffix.lower() in self._NOT_YET_SUPPORTED_SUFFIXES:
-            message = f"Unsupported language for suffix: {self._dependency.path.suffix}"
-            yield Failure("unsupported-language", message, -1, -1, -1, -1)
-            return
         source_container = self._dependency.load(self._path_lookup)
+        if not source_container:
+            # The linter only reports **linting** errors, not loading errors
+            return
         if isinstance(source_container, Notebook):
             yield from self._lint_notebook(source_container)
         elif isinstance(source_container, LocalFile):
@@ -296,7 +249,7 @@ class FileLinter:
         """Lint a local file."""
         try:
             linter = self._context.linter(local_file.language)
-            yield from linter.lint(local_file.content)
+            yield from linter.lint(local_file.original_code)
         except ValueError:
             # TODO: Remove when implementing: https://github.com/databrickslabs/ucx/issues/3544
             yield Failure("unsupported-language", f"Unsupported language: {local_file.language}", -1, -1, -1, -1)
@@ -305,6 +258,18 @@ class FileLinter:
         """Lint a notebook."""
         notebook_linter = NotebookLinter(notebook, self._path_lookup, self._context, self._inherited_tree)
         yield from notebook_linter.lint()
+
+    def apply(self) -> None:
+        """Apply changes to the file."""
+        source_container = self._dependency.load(self._path_lookup)
+        if isinstance(source_container, LocalFile):
+            self._apply_file(source_container)
+
+    def _apply_file(self, local_file: LocalFile) -> None:
+        """Apply changes to a local file."""
+        fixed_code = self._context.apply_fixes(local_file.language, local_file.original_code)
+        local_file.migrated_code = fixed_code
+        local_file.back_up_original_and_flush_migrated_code()
 
 
 class NotebookMigrator:

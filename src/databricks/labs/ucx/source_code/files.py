@@ -6,7 +6,13 @@ from pathlib import Path
 
 from databricks.sdk.service.workspace import Language
 
-from databricks.labs.ucx.source_code.base import infer_file_language_if_supported, safe_read_text
+from databricks.labs.ucx.source_code.base import (
+    back_up_path,
+    infer_file_language_if_supported,
+    revert_back_up_path,
+    safe_read_text,
+    safe_write_text,
+)
 from databricks.labs.ucx.source_code.graph import (
     SourceContainer,
     DependencyGraph,
@@ -33,12 +39,52 @@ class LocalFile(SourceContainer):
     def __init__(self, path: Path, source: str, language: Language):
         self._path = path
         self._original_code = source
+        self._migrated_code = source
         self.language = language
 
     @property
-    def content(self) -> str:
-        """The local file content"""
+    def original_code(self) -> str:
+        """The source code when creating the container."""
         return self._original_code
+
+    @property
+    def migrated_code(self) -> str:
+        """The source code after fixing with a linter."""
+        return self._migrated_code
+
+    @migrated_code.setter
+    def migrated_code(self, source: str) -> None:
+        """Set the source code after fixing with a linter."""
+        self._migrated_code = source
+
+    def _safe_write_text(self, contents: str) -> int | None:
+        """Write content to the local file."""
+        return safe_write_text(self._path, contents)
+
+    def _back_up_path(self) -> Path | None:
+        """Back up the original file."""
+        return back_up_path(self._path)
+
+    def back_up_original_and_flush_migrated_code(self) -> int | None:
+        """Back up the original file and flush the migrated code to the file.
+
+        This is a single method to avoid overwriting the original file without a backup.
+
+        Returns :
+            int : The number of characters written. If None, nothing is written to the file.
+        """
+        if self._original_code == self._migrated_code:
+            # Avoiding unnecessary back up and flush
+            return len(self._migrated_code)
+        backed_up_path = self._back_up_path()
+        if not backed_up_path:
+            # Failed to back up the original file, avoid overwriting existing file
+            return None
+        number_of_characters_written = self._safe_write_text(self._migrated_code)
+        if number_of_characters_written is None:
+            # Failed to overwrite original file, clean up by reverting backup
+            revert_back_up_path(self._path)
+        return number_of_characters_written
 
     def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
         """The dependency graph for the local file."""

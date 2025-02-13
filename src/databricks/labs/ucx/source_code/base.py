@@ -4,6 +4,8 @@ import codecs
 import dataclasses
 import io
 import logging
+import os
+import shutil
 import sys
 from abc import abstractmethod, ABC
 from collections.abc import Iterable
@@ -14,10 +16,9 @@ from typing import Any, BinaryIO, TextIO, TypeVar
 
 from astroid import NodeNG  # type: ignore
 
+from databricks.labs.blueprint.paths import WorkspacePath
 from databricks.sdk.service import compute
 from databricks.sdk.service.workspace import Language
-
-from databricks.labs.blueprint.paths import WorkspacePath
 
 
 if sys.version_info >= (3, 11):
@@ -412,6 +413,40 @@ def safe_read_text(path: Path, size: int = -1) -> str | None:
         return None
 
 
+def write_text(path: Path, contents: str, *, encoding: str | None = None) -> int:
+    """Write content to a file as text, encode according to the BOM marker if that is present.
+
+    This differs to the normal `.read_text()` method on path which does not support BOM markers.
+
+    Arguments:
+        path (Path): The file path to write text to.
+        contents (str) : The content to write to the file.
+        encoding (str) : Force encoding with a specific locale. If not present the file BOM and
+            system locale are used.
+
+    Returns:
+        int : The number of characters written to the file.
+    """
+    if not encoding and path.exists():
+        with path.open("rb") as binary_io:
+            encoding = _detect_encoding_bom(binary_io, preserve_position=False)
+    # If encoding=None, the system locale is used for encoding (as per open()).
+    return path.write_text(contents, encoding=encoding)
+
+
+def safe_write_text(path: Path, contents: str, *, encoding: str | None = None) -> int | None:
+    """Safe write content to a file by handling writing exceptions, see :func:write_text.
+
+    Returns:
+        int | None : The number of characters written to the file. If None, no content was written.
+    """
+    try:
+        return write_text(path, contents, encoding=encoding)
+    except OSError as e:
+        logger.warning(f"Cannot write to file: {path}", exc_info=e)
+        return None
+
+
 # duplicated from CellLanguage to prevent cyclic import
 LANGUAGE_COMMENT_PREFIXES = {Language.PYTHON: '#', Language.SCALA: '//', Language.SQL: '--'}
 NOTEBOOK_HEADER = "Databricks notebook source"
@@ -430,3 +465,64 @@ def is_a_notebook(path: Path, content: str | None = None) -> bool:
         return content.startswith(magic_header)
     file_header = safe_read_text(path, size=len(magic_header))
     return file_header == magic_header
+
+
+def _add_backup_suffix(path: Path) -> Path:
+    """Add a backup suffix to a path.
+
+    The backed up path is the same as the original path with an additional
+    `.bak` appended to the suffix.
+
+    Reuse this method so that the backup path is consistent in this module.
+    """
+    # Not checking for the backup suffix to allow making backups of backups.
+    return path.with_suffix(path.suffix + ".bak")
+
+
+def back_up_path(path: Path) -> Path | None:
+    """Back up a path.
+
+    The backed up path is the same as the original path with an additional
+    `.bak` appended to the suffix.
+
+    Returns :
+        path | None : The backed up path. If None, the backup failed.
+    """
+    path_backed_up = _add_backup_suffix(path)
+    try:
+        shutil.copyfile(path, path_backed_up)
+    except OSError as e:
+        logger.warning(f"Cannot back up file: {path}", exc_info=e)
+        return None
+    return path_backed_up
+
+
+def revert_back_up_path(path: Path) -> bool | None:
+    """Revert a backed up path, see :func:back_up_path.
+
+    The backed up path is the same as the original path with an additional
+    `.bak` appended to the suffix.
+
+    Args :
+        path : The original path, NOT the backed up path.
+
+    Returns :
+        bool : Flag if the revert was successful. If None, the backed up path
+        does not exist, thus it cannot be reverted and the operation is not
+        successful nor failed.
+    """
+    path_backed_up = _add_backup_suffix(path)
+    if not path_backed_up.exists():
+        logger.warning(f"Backup is missing: {path_backed_up}")
+        return None
+    try:
+        shutil.copyfile(path_backed_up, path)
+    except OSError as e:
+        logger.warning(f"Cannot revert backup: {path}", exc_info=e)
+        return False
+    try:
+        os.unlink(path_backed_up)
+    except OSError as e:
+        # The backup revert is successful, but the backup file cannot be removed
+        logger.warning(f"Cannot remove backup file: {path_backed_up}", exc_info=e)
+    return True
