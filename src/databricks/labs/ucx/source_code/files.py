@@ -60,7 +60,7 @@ class LocalFile(SourceContainer):
         """Write content to the local file."""
         return safe_write_text(self._path, contents)
 
-    def _back_up_path(self) -> Path:
+    def _back_up_path(self) -> Path | None:
         """Back up the original file."""
         return back_up_path(self._path)
 
