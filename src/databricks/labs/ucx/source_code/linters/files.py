@@ -9,9 +9,9 @@ from typing import cast
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.source_code.base import (
-    infer_file_language_if_supported,
     Advice,
     Failure,
+    infer_file_language_if_supported,
     safe_read_text,
 )
 from databricks.labs.ucx.source_code.files import LocalFile
