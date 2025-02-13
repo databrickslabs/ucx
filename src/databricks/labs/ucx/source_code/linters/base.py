@@ -129,11 +129,18 @@ class PythonFixer(Fixer):
             logger.warning(f"Parsing source code resulted in failure `{maybe_tree.failure}`: {code}")
             return code
         assert maybe_tree.tree is not None
-        return self.apply_tree(maybe_tree.tree)
+        tree = self.apply_tree(maybe_tree.tree)
+        return tree.node.as_string()
 
     @abstractmethod
-    def apply_tree(self, tree: Tree) -> str:
-        """Apply the fixes to the AST tree."""
+    def apply_tree(self, tree: Tree) -> Tree:
+        """Apply the fixes to the AST tree.
+
+        For Python, the fixes are applied to a Tree so that we
+        - Can chain multiple fixers without transpiling back and forth between
+          source code and AST tree
+        - Can extend the tree with (brought into scope) nodes, e.g. to add imports
+        """
 
 
 class DfsaPyCollector(DfsaCollector, ABC):
