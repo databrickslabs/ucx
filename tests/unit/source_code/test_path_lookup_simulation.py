@@ -9,7 +9,6 @@ from databricks.labs.ucx.source_code.files import FileLoader, ImportFileResolver
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.graph import SourceContainer, DependencyResolver
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
-from databricks.labs.ucx.source_code.known import KnownList
 from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
 from tests.unit import (
     _samples_path,
@@ -45,9 +44,8 @@ def test_locates_notebooks(source: list[str], expected: int, mock_path_lookup) -
     file_loader = FileLoader()
     notebook_loader = NotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
-    allow_list = KnownList()
-    import_resolver = ImportFileResolver(file_loader, allow_list)
-    pip_resolver = PythonLibraryResolver(allow_list)
+    import_resolver = ImportFileResolver(file_loader)
+    pip_resolver = PythonLibraryResolver()
     dependency_resolver = DependencyResolver(
         pip_resolver, notebook_resolver, import_resolver, import_resolver, mock_path_lookup
     )
@@ -70,13 +68,12 @@ def test_locates_files(source: list[str], expected: int) -> None:
     elems = [_samples_path(SourceContainer)]
     elems.extend(source)
     file_path = Path(*elems)
-    allow_list = KnownList()
     lookup = PathLookup.from_sys_path(Path.cwd())
     file_loader = FileLoader()
     notebook_loader = NotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
-    import_resolver = ImportFileResolver(file_loader, allow_list)
-    pip_resolver = PythonLibraryResolver(allow_list)
+    import_resolver = ImportFileResolver(file_loader)
+    pip_resolver = PythonLibraryResolver()
     resolver = DependencyResolver(pip_resolver, notebook_resolver, import_resolver, import_resolver, lookup)
     maybe = resolver.build_local_file_dependency_graph(file_path, CurrentSessionState())
     assert not maybe.problems
@@ -113,9 +110,8 @@ sys.path.append('{child_dir_path.as_posix()}')
         notebook_loader = NotebookLoader()
         notebook_resolver = NotebookResolver(notebook_loader)
         file_loader = FileLoader()
-        allow_list = KnownList()
-        import_resolver = ImportFileResolver(file_loader, allow_list)
-        pip_resolver = PythonLibraryResolver(allow_list)
+        import_resolver = ImportFileResolver(file_loader)
+        pip_resolver = PythonLibraryResolver()
         resolver = DependencyResolver(pip_resolver, notebook_resolver, import_resolver, import_resolver, lookup)
         maybe = resolver.build_notebook_dependency_graph(parent_file_path, CurrentSessionState())
         assert not maybe.problems
@@ -152,10 +148,9 @@ def func():
         lookup = PathLookup.from_sys_path(Path.cwd())
         notebook_loader = NotebookLoader()
         notebook_resolver = NotebookResolver(notebook_loader)
-        allow_list = KnownList()
         file_loader = FileLoader()
-        import_resolver = ImportFileResolver(file_loader, allow_list)
-        pip_resolver = PythonLibraryResolver(allow_list)
+        import_resolver = ImportFileResolver(file_loader)
+        pip_resolver = PythonLibraryResolver()
         resolver = DependencyResolver(pip_resolver, notebook_resolver, import_resolver, import_resolver, lookup)
         maybe = resolver.build_notebook_dependency_graph(parent_file_path, CurrentSessionState())
         assert not maybe.problems

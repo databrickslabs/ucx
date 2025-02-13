@@ -12,11 +12,9 @@ from databricks.labs.ucx.source_code.notebooks.loaders import (
     NotebookResolver,
 )
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
-from databricks.labs.ucx.source_code.known import KnownList
 from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
-from tests.unit import (
-    locate_site_packages,
-)
+
+from tests.unit import locate_site_packages
 from tests.unit.conftest import MockPathLookup
 
 
@@ -140,8 +138,8 @@ def test_dependency_resolver_terminates_at_known_libraries(
     site_packages_path = locate_site_packages()
     lookup.append_path(site_packages_path)
     file_loader = FileLoader()
-    import_resolver = ImportFileResolver(file_loader, KnownList())
-    library_resolver = PythonLibraryResolver(KnownList())
+    import_resolver = ImportFileResolver(file_loader)
+    library_resolver = PythonLibraryResolver()
     resolver = DependencyResolver(library_resolver, mock_notebook_resolver, import_resolver, import_resolver, lookup)
     maybe = resolver.build_local_file_dependency_graph(Path("import-site-package.py"), CurrentSessionState())
     assert not maybe.failed
@@ -173,9 +171,8 @@ def test_dependency_resolver_raises_problem_with_unloadable_root_file(mock_path_
             return None
 
     file_loader = FailingFileLoader()
-    allow_list = KnownList()
-    import_resolver = ImportFileResolver(file_loader, allow_list)
-    pip_resolver = PythonLibraryResolver(allow_list)
+    import_resolver = ImportFileResolver(file_loader)
+    pip_resolver = PythonLibraryResolver()
     resolver = DependencyResolver(
         pip_resolver, mock_notebook_resolver, import_resolver, import_resolver, mock_path_lookup
     )
@@ -195,9 +192,8 @@ def test_dependency_resolver_raises_problem_with_unloadable_root_notebook(mock_p
 
     notebook_loader = FailingNotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
-    known_list = KnownList()
-    pip_resolver = PythonLibraryResolver(known_list)
-    import_resolver = ImportFileResolver(FileLoader(), known_list)
+    pip_resolver = PythonLibraryResolver()
+    import_resolver = ImportFileResolver(FileLoader())
     resolver = DependencyResolver(pip_resolver, notebook_resolver, import_resolver, import_resolver, mock_path_lookup)
     maybe = resolver.build_notebook_dependency_graph(Path("root5.py"), CurrentSessionState())
     assert list(maybe.problems) == [
