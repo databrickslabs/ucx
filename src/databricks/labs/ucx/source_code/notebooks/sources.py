@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 
 
 class Notebook(SourceContainer):
+    """
 
     TODO:
         Let `Notebook` inherit from `LocalFile`
@@ -55,7 +56,9 @@ class Notebook(SourceContainer):
     def original_code(self) -> str:
         return self._original_code
 
-    def to_migrated_code(self) -> str:
+    @property
+    def migrated_code(self) -> str:
+        """Format the migrated code by chaining the migrated cells."""
         default_language = CellLanguage.of_language(self._language)
         header = f"{default_language.comment_prefix} {NOTEBOOK_HEADER}"
         sources = [header]
