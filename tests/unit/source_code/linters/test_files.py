@@ -252,6 +252,21 @@ def test_notebook_linter_lints_source_yielding_parse_failure(migration_index, mo
     ]
 
 
+def test_notebook_linter_applies_migrated_table_with_rename(tmp_path, migration_index, mock_path_lookup) -> None:
+    """The table should be migrated to the new table name as defined in the migration index."""
+    path = tmp_path / "notebook.py"
+    source = "# Databricks notebook source\nspark.table('old.things')"
+    path.write_text(source)
+    notebook = Notebook.parse(path, source, Language.PYTHON)
+    linter = NotebookLinter(notebook, mock_path_lookup, LinterContext(migration_index))
+
+    linter.apply()
+
+    contents = path.read_text()
+    assert "old.things" not in contents
+    assert "brand.new.stuff" in contents
+
+
 @pytest.mark.xfail(reason="https://github.com/databrickslabs/ucx/issues/3556")
 def test_notebook_linter_lints_source_yielding_parse_failures(migration_index, mock_path_lookup) -> None:
     source = """
