@@ -159,8 +159,9 @@ Workspace Group Name  Members Count  Account Group Name  Members Count  Differen
 
 This command validates the groups to see if the groups at the account level and workspace level have different membership.
 This command is useful for administrators who want to ensure that the groups have the correct membership. It can also be
-used to debug issues related to group membership. See [group migration](docs/reference/local-group-migration.md) and
-[group migration](/docs/reference/workflows#group-migration-workflow) for more details.
+used to debug issues related to group membership. See
+[group migration](/docs/reference/workflows#group-migration-workflow) and
+[group migration](docs/reference/local-group-migration.md) for more details.
 
 Valid group membership is important to ensure users has correct access after legacy table ACL is migrated in [table migration process](/docs/process/#table-migration-process)
 
@@ -282,7 +283,7 @@ are eligible to be run as a collection. User can run the below commands as colle
 - `migrate-tables`
 - `migrate-acls`
 - `migrate-dbsql-dashboards`
-- `validate-group-membership`
+- `validate-groups-membership`
 Ex: `databricks labs ucx ensure-assessment-run --run-as-collection=True`
 
 ## Metastore related commands
