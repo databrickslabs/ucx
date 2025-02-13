@@ -9,7 +9,7 @@ from typing import cast
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.source_code.base import (
-    get_file_language_if_supported,
+    infer_file_language_if_supported,
     Advice,
     Failure,
     safe_read_text,
@@ -201,7 +201,7 @@ class NotebookLinter:
         if resolved is None:
             return None  # already reported during dependency building
         # TODO deal with workspace notebooks
-        language = get_file_language_if_supported(resolved)
+        language = infer_file_language_if_supported(resolved)
         # we only support Python notebooks for now
         if language != Language.PYTHON:
             logger.warning(f"Unsupported notebook language: {language}")

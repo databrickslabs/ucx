@@ -320,8 +320,8 @@ SUPPORTED_EXTENSION_LANGUAGES = {
 }
 
 
-def get_file_language_if_supported(path: Path) -> Language | None:
-    """Get the file language if it is supported by UCX's linter module.
+def infer_file_language_if_supported(path: Path) -> Language | None:
+    """Infer the file language if it is supported by UCX's linter module.
 
     This function returns the language of the file based on the file
     extension. If the file extension is not supported, it returns None.
@@ -422,7 +422,7 @@ def is_a_notebook(path: Path, content: str | None = None) -> bool:
         return path.is_notebook()
     if not path.is_file():
         return False
-    language = get_file_language_if_supported(path)
+    language = infer_file_language_if_supported(path)
     if not language:
         return False
     magic_header = f"{LANGUAGE_COMMENT_PREFIXES.get(language)} {NOTEBOOK_HEADER}"

@@ -6,7 +6,7 @@ from pathlib import Path
 
 from databricks.sdk.service.workspace import Language
 
-from databricks.labs.ucx.source_code.base import get_file_language_if_supported, safe_read_text
+from databricks.labs.ucx.source_code.base import infer_file_language_if_supported, safe_read_text
 from databricks.labs.ucx.source_code.graph import (
     SourceContainer,
     DependencyGraph,
@@ -95,7 +95,7 @@ class FileLoader(DependencyLoader):
             # Paths are excluded from further processing by loading them as stub container.
             # Note we don't return `None`, as the path is found.
             return StubContainer(resolved_path)
-        language = get_file_language_if_supported(resolved_path)
+        language = infer_file_language_if_supported(resolved_path)
         if not language:
             return StubContainer(resolved_path)
         content = safe_read_text(resolved_path)
