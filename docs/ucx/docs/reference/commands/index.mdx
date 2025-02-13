@@ -667,9 +667,52 @@ These commands are for [pipeline migration](/docs/process#delta-live-table-pipel
 
 ### `migrate-dlt-pipelines`
 
-```text
+```commandline
 $ databricks labs ucx migrate-dlt-pipelines [--include-pipeline-ids <comma separated list of pipeline ids>] [--exclude-pipeline-ids <comma separated list of pipeline ids>]
 ```
+
+## HMS (Hive Metastore) federation commands
+
+These commands are for [Hive Metastore federation](/docs/process#hive-metastore-federation-process) and require the [assessment workflow](/docs/reference/workflows#assessment-workflow) to be completed.
+Hive Metastore federation creates a UC catalog that mirrors all the schemas and tables in the source Hive Metastore. It is an alternative to the [table migration process](/docs/process#table-migration-process).
+
+### `enable_hms_federation`
+
+```commandline
+$ databricks labs ucx enable_hms_federation
+```
+
+This command sets the `enable_hms_federation` flag in the config.yml file to `True`.<br/>
+It is used to enable the Hive Metastore federation process.
+It is also used by the `migrate-locations` command to determine whether to set the [Fallback Mode](https://docs.databricks.com/en/data-governance/unity-catalog/hms-federation/hms-federation-internal.html) to "True" in the newly created external locations.
+In AWS it also also allows the creation a GLUE role if one is required using the `create-missing-principals` command.
+
+### `create_federated_catalog`
+
+```commandline
+$ databricks labs ucx create_federated_catalog
+```
+
+This command performs the following steps:
+1. Prompts the user for a name for the federated catalog and connection.
+2. Create an HMS "Connection" in the Unity Catalog. The HMS connection will point to the HMS used by the workspace that was identified in the installation process. It supports:
+        - Internal Workspace Hive Metastore
+        - AWS Glue Data Catalog
+        - External Database Hive Metastore (Postgres, SQL Server, MySQL)
+3. Create a federated catalog in Unity Catalog. The federated catalog will mirror all the schemas and tables in the source Hive Metastore.
+4. Whitelist the external location identified in the "Assessment" phase.
+
+### `migrate-glue-credentials`
+
+```commandline
+$ databricks labs ucx migrate-glue-credentials
+```
+
+AWS Only.
+This command is used for HMS Federation and creates a UC Service Credential for GLUE. It requires an existing UC compatible GLUE role.
+The role can be created using the `create-missing-principals` command.
+
+
 
 ## Utility commands
 

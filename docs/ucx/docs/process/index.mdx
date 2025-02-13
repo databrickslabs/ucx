@@ -8,7 +8,8 @@ On a high level, the steps in migration process are:
 1. [assessment](/docs/reference/workflows#assessment-workflow)
 2. [group migration](/docs/reference/workflows#group-migration-workflow)
 3. [table migration](/docs/process/#table-migration-process)
-4. [data reconciliation](/docs/reference/workflows#post-migration-data-reconciliation-workflow)
+4. [HMS Federation](/docs/process/#hms-federation)
+5. [data reconciliation](/docs/reference/workflows#post-migration-data-reconciliation-workflow)
 6. [code migration](/docs/reference/commands#code-migration-commands)
 7. [delta live table pipeline migration](/docs/process#delta-live-table-pipeline-migration-process)
 8. [final details](#final-details)
@@ -288,6 +289,26 @@ databricks labs ucx revert-migrated-tables --schema X --table Y [--delete-manage
 
 The [`revert-migrated-tables` command](/docs/reference/commands#revert-migrated-tables) drops the Unity Catalog table or view and reset
 the `upgraded_to` property on the source object. Use this command to allow for migrating a table or view again.
+
+
+## HMS Federation
+
+Hive Metastore (HMS) Federation is a feature that allows HMS to be federated to a catalog.
+More information is available in the [Databricks documentation](https://docs.databricks.com/en/data-governance/unity-catalog/hms-federation/index.html).
+HMS Federation is used in two scenarios:
+1. A step to ease the migration to Unity Catalog.
+2. A Hybrid solution where both HMS and UC access to the data is required.
+
+> You are required to complete the [assessment workflow](/docs/reference/workflows#assessment-workflow) before starting the table migration workflow.
+HMS Federation is an alternative to table migration.
+You are required to complete all the steps documented in the [table migration process](/docs/process#table-migration-process) except for:
+- [Table Mapping](/docs/process#table-mapping)
+- [Create Catalogs and Schemas](/docs/process/#step-2-create-catalogs-and-schemas)
+- [Migrate Hive metastore data objects](/docs/process#migrate-hive-metastore-data-objects)
+
+There are two steps to enable HMS Federation:
+1. [enable-hms-federation](/docs/reference/commands#enable-hms-federation)
+2. [create-federated-catalog](/docs/reference/commands#create-federated-catalog)
 
 
 ## Code Migration
