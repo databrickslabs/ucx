@@ -10,10 +10,9 @@ def test_python_fixer_has_dummy_code() -> None:
             """Dummy diagnostic code"""
             return "dummy"
 
-        def apply_tree(self, tree: Tree) -> str:
+        def apply_tree(self, tree: Tree) -> Tree:
             """Dummy fixer"""
-            _ = tree
-            return ""
+            return tree
 
     fixer = _PythonFixer()
     assert fixer.diagnostic_code == "dummy"
@@ -27,10 +26,9 @@ def test_python_fixer_applies_valid_python() -> None:
             """Dummy diagnostic code"""
             return "dummy"
 
-        def apply_tree(self, tree: Tree) -> str:
+        def apply_tree(self, tree: Tree) -> Tree:
             """Dummy fixer"""
-            _ = tree
-            return "fixed"
+            return tree
 
     fixer = _PythonFixer()
     assert fixer.diagnostic_code == "dummy"
@@ -47,10 +45,9 @@ def test_python_fixer_applies_invalid_python() -> None:
             """Dummy diagnostic code"""
             return "dummy"
 
-        def apply_tree(self, tree: Tree) -> str:
+        def apply_tree(self, tree: Tree) -> Tree:
             """Dummy fixer"""
-            _ = tree
-            return "fixed"
+            return tree
 
     fixer = _PythonFixer()
     assert fixer.apply("print(1") == "print(1"  # closing parenthesis is missing on purpose
