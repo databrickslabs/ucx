@@ -28,17 +28,6 @@ def test_dependency_graph_registers_library_from_egg(mock_path_lookup, simple_de
     assert lookup_resolve.exists()
 
 
-def test_folder_loads_content(mock_path_lookup, simple_dependency_resolver) -> None:
-    path = Path(__file__).parent / "samples" / "parent-child-context"
-    dependency = Dependency(FolderLoader(NotebookLoader(), FileLoader()), path, False)
-    graph = DependencyGraph(dependency, None, simple_dependency_resolver, mock_path_lookup, CurrentSessionState())
-    container = dependency.load(mock_path_lookup)
-    assert container is not None
-    container.build_dependency_graph(graph)
-    all_paths = [d.path for d in graph.all_dependencies]
-    assert len(all_paths) == 4
-
-
 def test_root_dependencies_returns_only_files(mock_path_lookup, simple_dependency_resolver) -> None:
     path = Path(__file__).parent / "samples" / "parent-child-context"
     dependency = Dependency(FolderLoader(NotebookLoader(), FileLoader()), path, False)

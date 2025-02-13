@@ -6,17 +6,16 @@ from databricks.labs.blueprint.tui import MockPrompts
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
-from databricks.labs.ucx.source_code.base import CurrentSessionState, Failure, Deprecation
+from databricks.labs.ucx.source_code.base import CurrentSessionState, Deprecation, Failure
 from databricks.labs.ucx.source_code.files import FileLoader, LocalFile, ImportFileResolver
-from databricks.labs.ucx.source_code.folders import Folder, FolderLoader
+from databricks.labs.ucx.source_code.folders import FolderLoader
 from databricks.labs.ucx.source_code.graph import Dependency, DependencyResolver, SourceContainer
-from databricks.labs.ucx.source_code.known import KnownList
 from databricks.labs.ucx.source_code.linters.base import PythonLinter
 from databricks.labs.ucx.source_code.linters.context import LinterContext
-from databricks.labs.ucx.source_code.linters.files import FileLinter, NotebookMigrator, NotebookLinter
+from databricks.labs.ucx.source_code.linters.files import FileLinter, NotebookLinter, NotebookMigrator
 from databricks.labs.ucx.source_code.linters.folders import LocalCodeLinter
-from databricks.labs.ucx.source_code.notebooks.sources import Notebook
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader, NotebookResolver
+from databricks.labs.ucx.source_code.notebooks.sources import Notebook
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
 
@@ -161,10 +160,9 @@ def local_code_linter(mock_path_lookup, migration_index):
     notebook_loader = NotebookLoader()
     file_loader = FileLoader()
     folder_loader = FolderLoader(notebook_loader, file_loader)
-    allow_list = KnownList()
-    pip_resolver = PythonLibraryResolver(allow_list)
+    pip_resolver = PythonLibraryResolver()
     session_state = CurrentSessionState()
-    import_file_resolver = ImportFileResolver(file_loader, allow_list)
+    import_file_resolver = ImportFileResolver(file_loader)
     resolver = DependencyResolver(
         pip_resolver,
         NotebookResolver(NotebookLoader()),
@@ -186,23 +184,21 @@ def local_code_linter(mock_path_lookup, migration_index):
 def test_linter_walks_directory(mock_path_lookup, local_code_linter) -> None:
     mock_path_lookup.append_path(Path(_samples_path(SourceContainer)))
     path = Path(__file__).parent / "../samples" / "simulate-sys-path"
-    paths: set[Path] = set()
-    advices = list(local_code_linter.lint_path(path, paths))
-    assert len(paths) > 10
+    advices = list(local_code_linter.lint_path(path))
     assert not advices
+    assert len(mock_path_lookup.successfully_resolved_paths) > 10
 
 
 def test_linter_lints_children_in_context(mock_path_lookup, local_code_linter) -> None:
     mock_path_lookup.append_path(Path(_samples_path(SourceContainer)))
     path = Path(__file__).parent.parent / "samples" / "parent-child-context"
-    paths: set[Path] = set()
-    advices = list(local_code_linter.lint_path(path, paths))
-    assert len(paths) == 3
+    advices = list(local_code_linter.lint_path(path))
     assert not advices
+    assert mock_path_lookup.successfully_resolved_paths == {path, Path("parent.py"), Path("child.py")}
 
 
 def test_triple_dot_import() -> None:
-    file_resolver = ImportFileResolver(FileLoader(), KnownList())
+    file_resolver = ImportFileResolver(FileLoader())
     path_lookup = create_autospec(PathLookup)
     path_lookup.cwd.as_posix.return_value = '/some/path/to/folder'
     path_lookup.resolve.return_value = Path('/some/path/foo.py')
@@ -215,7 +211,7 @@ def test_triple_dot_import() -> None:
 
 
 def test_single_dot_import() -> None:
-    file_resolver = ImportFileResolver(FileLoader(), KnownList())
+    file_resolver = ImportFileResolver(FileLoader())
     path_lookup = create_autospec(PathLookup)
     path_lookup.cwd.as_posix.return_value = '/some/path/to/folder'
     path_lookup.resolve.return_value = Path('/some/path/to/folder/foo.py')
@@ -225,13 +221,6 @@ def test_single_dot_import() -> None:
     assert maybe.dependency is not None
     assert maybe.dependency.path == Path('/some/path/to/folder/foo.py')
     path_lookup.resolve.assert_called_once_with(Path('/some/path/to/folder/foo.py'))
-
-
-def test_folder_has_repr() -> None:
-    notebook_loader = NotebookLoader()
-    file_loader = FileLoader()
-    folder = Folder(Path("test"), notebook_loader, file_loader, FolderLoader(notebook_loader, file_loader))
-    assert len(repr(folder)) > 0
 
 
 site_packages = locate_site_packages()
@@ -248,10 +237,9 @@ def test_known_issues(path: Path, migration_index) -> None:
     folder_loader = FolderLoader(notebook_loader, file_loader)
     path_lookup = PathLookup.from_sys_path(Path.cwd())
     session_state = CurrentSessionState()
-    allow_list = KnownList()
     notebook_resolver = NotebookResolver(NotebookLoader())
-    import_resolver = ImportFileResolver(file_loader, allow_list)
-    pip_resolver = PythonLibraryResolver(allow_list)
+    import_resolver = ImportFileResolver(file_loader)
+    pip_resolver = PythonLibraryResolver()
     resolver = DependencyResolver(pip_resolver, notebook_resolver, import_resolver, import_resolver, path_lookup)
     linter = LocalCodeLinter(
         notebook_loader,

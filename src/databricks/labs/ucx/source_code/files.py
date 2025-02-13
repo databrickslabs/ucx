@@ -8,7 +8,7 @@ from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.source_code.base import (
     back_up_path,
-    file_language,
+    infer_file_language_if_supported,
     revert_back_up_path,
     safe_read_text,
     safe_write_text,
@@ -23,6 +23,7 @@ from databricks.labs.ucx.source_code.graph import (
     BaseImportResolver,
     BaseFileResolver,
     MaybeDependency,
+    StubContainer,
 )
 from databricks.labs.ucx.source_code.known import KnownList
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
@@ -116,25 +117,31 @@ class LocalFile(SourceContainer):
         return f"<LocalFile {self._path}>"
 
 
-class StubContainer(SourceContainer):
-
-    def __init__(self, path: Path):
-        super().__init__()
-        self._path = path
-
-    def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
-        return []
-
-
 class FileLoader(DependencyLoader):
-    """Loader for a file dependency."""
+    """Loader for a file dependency.
+
+    Args:
+        exclude_paths (set[Path] | None) : A set of paths to load as
+            class:`StubContainer`. If None, no paths are excluded.
+
+            Note: The exclude paths are loaded as `StubContainer` to
+            signal that the path is found, however, it should not be
+            processed.
+    """
+
+    def __init__(self, *, exclude_paths: set[Path] | None = None):
+        self._exclude_paths = exclude_paths or set[Path]()
 
     def load_dependency(self, path_lookup: PathLookup, dependency: Dependency) -> LocalFile | StubContainer | None:
         """Load the dependency."""
         resolved_path = path_lookup.resolve(dependency.path)
         if not resolved_path:
             return None
-        language = file_language(resolved_path)
+        if resolved_path in self._exclude_paths:
+            # Paths are excluded from further processing by loading them as stub container.
+            # Note we don't return `None`, as the path is found.
+            return StubContainer(resolved_path)
+        language = infer_file_language_if_supported(resolved_path)
         if not language:
             return StubContainer(resolved_path)
         content = safe_read_text(resolved_path)
@@ -148,10 +155,10 @@ class FileLoader(DependencyLoader):
 
 class ImportFileResolver(BaseImportResolver, BaseFileResolver):
 
-    def __init__(self, file_loader: FileLoader, allow_list: KnownList):
+    def __init__(self, file_loader: FileLoader, *, allow_list: KnownList | None = None):
         super().__init__()
-        self._allow_list = allow_list
         self._file_loader = file_loader
+        self._allow_list = allow_list or KnownList()
 
     def resolve_file(self, path_lookup, path: Path) -> MaybeDependency:
         absolute_path = path_lookup.resolve(path)

@@ -120,6 +120,7 @@ def test_redash_dashboard_crawler_snapshot_persists_dashboards(mock_backend) -> 
         ),
     ]
     ws.dashboards.list.side_effect = lambda: (dashboard for dashboard in dashboards)  # Expects an iterator
+    ws.dashboards.get.side_effect = lambda dashboard_id: dashboards[0]
     crawler = RedashDashboardCrawler(ws, mock_backend, "test")
 
     crawler.snapshot()
@@ -155,6 +156,7 @@ def test_redash_dashboard_crawler_handles_databricks_error_on_iterate(caplog, mo
             raise TooManyRequests("Exceeded API limit")
 
     ws.dashboards.list.side_effect = list_dashboards
+    ws.dashboards.get.side_effect = lambda dashboard_id: SdkRedashDashboard(id=dashboard_id)
     crawler = RedashDashboardCrawler(ws, mock_backend, "test")
 
     with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.assessment.dashboards"):
@@ -170,6 +172,7 @@ def test_redash_dashboard_crawler_stops_when_debug_listing_upper_limit_reached(m
     ws = create_autospec(WorkspaceClient)
     dashboards = [SdkRedashDashboard(id="did1"), SdkRedashDashboard(id="did2")]
     ws.dashboards.list.side_effect = lambda: (dashboard for dashboard in dashboards)
+    ws.dashboards.get.side_effect = lambda dashboard_id: SdkRedashDashboard(id=dashboard_id)
     crawler = RedashDashboardCrawler(ws, mock_backend, "test", debug_listing_upper_limit=1)
 
     crawler.snapshot()
@@ -274,6 +277,7 @@ def test_redash_dashboard_crawler_snapshot_skips_dashboard_without_id(mock_backe
     ws = create_autospec(WorkspaceClient)
     dashboards = [SdkRedashDashboard(id="did1"), SdkRedashDashboard()]  # Second misses dashboard id
     ws.dashboards.list.side_effect = lambda: (dashboard for dashboard in dashboards)  # Expects an iterator
+    ws.dashboards.get.side_effect = lambda dashboard_id: SdkRedashDashboard(id=dashboard_id)
     crawler = RedashDashboardCrawler(ws, mock_backend, "test")
 
     crawler.snapshot()

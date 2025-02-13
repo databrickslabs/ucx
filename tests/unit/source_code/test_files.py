@@ -6,7 +6,7 @@ import pytest
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.source_code.base import CurrentSessionState
-from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyProblem
+from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyProblem, StubContainer
 from databricks.labs.ucx.source_code.files import FileLoader, LocalFile
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
@@ -195,13 +195,13 @@ def test_file_loader_loads_file_without_permission() -> None:
     path_lookup.resolve.assert_called_once_with(path)
 
 
-def test_file_loader_loads_non_ascii_file(mock_path_lookup) -> None:
+def test_file_loader_ignores_loading_non_ascii_file(mock_path_lookup) -> None:
     dependency = Dependency(FileLoader(), Path("nonascii.py"))
 
     local_file = dependency.load(mock_path_lookup)
 
     # TODO: Test specific error while loading: https://github.com/databrickslabs/ucx/issues/3584
-    assert local_file is None
+    assert not local_file
     assert Path("nonascii.py") in mock_path_lookup.successfully_resolved_paths
 
 
@@ -256,4 +256,16 @@ def test_file_loader_loads_empty_file(tmp_path) -> None:
 
     # TODO: Test specific error while loading: https://github.com/databrickslabs/ucx/issues/3584
     assert local_file
+    path_lookup.resolve.assert_called_once_with(path)
+
+
+def test_file_loader_ignores_path_by_loading_it_as_stub_container(tmp_path) -> None:
+    path = tmp_path / "path.py"
+    dependency = Dependency(FileLoader(exclude_paths={path}), path)
+    path_lookup = create_autospec(PathLookup)
+    path_lookup.resolve.return_value = path
+
+    stub = dependency.load(path_lookup)
+
+    assert isinstance(stub, StubContainer)
     path_lookup.resolve.assert_called_once_with(path)

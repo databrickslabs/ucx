@@ -11,7 +11,7 @@ from databricks.sdk.service.workspace import Language
 from databricks.labs.ucx.source_code.base import (
     Advice,
     Failure,
-    file_language,
+    infer_file_language_if_supported,
     safe_read_text,
 )
 from databricks.labs.ucx.source_code.files import LocalFile
@@ -201,9 +201,9 @@ class NotebookLinter:
         if resolved is None:
             return None  # already reported during dependency building
         # TODO deal with workspace notebooks
-        language = file_language(resolved)
+        language = infer_file_language_if_supported(resolved)
         # we only support Python notebooks for now
-        if language is not Language.PYTHON:
+        if language != Language.PYTHON:
             logger.warning(f"Unsupported notebook language: {language}")
             return None
         source = safe_read_text(resolved)
