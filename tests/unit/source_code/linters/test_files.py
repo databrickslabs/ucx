@@ -13,7 +13,7 @@ from databricks.labs.ucx.source_code.folders import FolderLoader
 from databricks.labs.ucx.source_code.graph import Dependency, DependencyResolver, SourceContainer
 from databricks.labs.ucx.source_code.linters.base import PythonLinter
 from databricks.labs.ucx.source_code.linters.context import LinterContext
-from databricks.labs.ucx.source_code.linters.files import FileLinter, NotebookLinter, NotebookMigrator
+from databricks.labs.ucx.source_code.linters.files import FileLinter, NotebookLinter
 from databricks.labs.ucx.source_code.linters.folders import LocalCodeLinter
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader, NotebookResolver
 from databricks.labs.ucx.source_code.notebooks.sources import Notebook
@@ -140,20 +140,6 @@ def test_file_linter_applies_migrated(tmp_path, mock_path_lookup, migration_inde
 
     # The .rstrip() is to remove the trailing newlines added by the fixer
     assert path.read_text().rstrip() == "df = spark.read.table('brand.new.stuff')"
-
-
-def test_notebook_migrator_ignores_unsupported_extensions() -> None:
-    languages = LinterContext(TableMigrationIndex([]))
-    migrator = NotebookMigrator(languages)
-    path = Path('unsupported.ext')
-    assert not migrator.apply(path)
-
-
-def test_notebook_migrator_supported_language_no_diagnostics(mock_path_lookup) -> None:
-    languages = LinterContext(TableMigrationIndex([]))
-    migrator = NotebookMigrator(languages)
-    path = mock_path_lookup.resolve(Path("root1.run.py"))
-    assert not migrator.apply(path)
 
 
 def test_triple_dot_import() -> None:
