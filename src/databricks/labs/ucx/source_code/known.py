@@ -15,13 +15,11 @@ from pathlib import Path
 from databricks.labs.blueprint.entrypoint import get_logger
 
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
-from databricks.labs.ucx.source_code.base import CurrentSessionState
+from databricks.labs.ucx.source_code.base import Advice, CurrentSessionState
 from databricks.labs.ucx.source_code.graph import (
     Dependency,
-    DependencyGraph,
     DependencyLoader,
-    DependencyProblem,
-    SourceContainer,
+    StubContainer,
 )
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
@@ -53,7 +51,7 @@ chedispy
 @dataclass
 class Compatibility:
     known: bool
-    problems: list[DependencyProblem]
+    problems: list[KnownProblem]
 
 
 @dataclass(unsafe_hash=True, frozen=True, eq=True, order=True)
@@ -63,6 +61,10 @@ class KnownProblem:
 
     def as_dict(self):
         return {'code': self.code, 'message': self.message}
+
+    def as_advice(self) -> Advice:
+        # TODO: Pass on the complete Advice (https://github.com/databrickslabs/ucx/issues/3625)
+        return Advice(self.code, self.message, -1, -1, -1, -1)
 
 
 UNKNOWN = Compatibility(False, [])
@@ -76,10 +78,10 @@ class KnownList:
         known = self._get_known()
         for distribution_name, modules in known.items():
             specific_modules_first = sorted(modules.items(), key=lambda x: x[0], reverse=True)
-            for module_ref, problems in specific_modules_first:
-                module_problems = [DependencyProblem(**_) for _ in problems]
-                self._module_problems[module_ref] = module_problems
-                self._library_problems[distribution_name].extend(module_problems)
+            for module_ref, raw_problems in specific_modules_first:
+                problems = [KnownProblem(**_) for _ in raw_problems]
+                self._module_problems[module_ref] = problems
+                self._library_problems[distribution_name].extend(problems)
         for name in sys.stdlib_module_names:
             self._module_problems[name] = []
 
@@ -261,39 +263,25 @@ class DistInfo:
         return f"<DistInfoPackage {self._path}>"
 
 
-class KnownContainer(SourceContainer):
-    """A container for known libraries."""
-
-    def __init__(self, path: Path, problems: list[DependencyProblem]):
-        super().__init__()
-        self._path = path
-        self._problems = problems
-
-    def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
-        """Return the known problems."""
-        _ = parent
-        return self._problems
-
-
 class KnownLoader(DependencyLoader):
-    """Always load as `KnownContainer`.
+    """Always load as `StubContainer`.
 
     This loader is used in combination with the KnownList to load known dependencies and their known problems.
     """
 
-    def load_dependency(self, path_lookup: PathLookup, dependency: Dependency) -> KnownContainer:
+    def load_dependency(self, path_lookup: PathLookup, dependency: Dependency) -> StubContainer:
         """Load the dependency."""
         _ = path_lookup
         if not isinstance(dependency, KnownDependency):
             raise RuntimeError("Only KnownDependency is supported")
         # Known library paths do not need to be resolved
-        return KnownContainer(dependency.path, dependency.problems)
+        return StubContainer(dependency.path)
 
 
 class KnownDependency(Dependency):
     """A dependency for known libraries, see :class:KnownList."""
 
-    def __init__(self, module_name: str, problems: list[DependencyProblem]):
+    def __init__(self, module_name: str, problems: list[KnownProblem]):
         known_url = "https://github.com/databrickslabs/ucx/blob/main/src/databricks/labs/ucx/source_code/known.json"
         # Note that Github does not support navigating JSON files, hence the #<module_name> does nothing.
         # https://docs.github.com/en/repositories/working-with-files/using-files/navigating-code-on-github

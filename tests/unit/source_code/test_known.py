@@ -7,9 +7,9 @@ from unittest.mock import create_autospec
 import pytest
 
 from databricks.labs.ucx.source_code.base import CurrentSessionState
-from databricks.labs.ucx.source_code.graph import DependencyProblem, DependencyGraph
+from databricks.labs.ucx.source_code.graph import DependencyGraph
 
-from databricks.labs.ucx.source_code.known import KnownList, KnownDependency, KnownContainer, KnownLoader
+from databricks.labs.ucx.source_code.known import KnownList, KnownDependency, KnownLoader, KnownProblem
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 
@@ -101,32 +101,21 @@ def test_analyze_dist_info() -> None:
     TestKnownList.analyze_cachetools_dist_info()
 
 
-@pytest.mark.parametrize("problems", [[], [DependencyProblem("test", "test")]])
-def test_known_container_loads_problems_during_dependency_graph_building(
-    simple_dependency_resolver, problems: list[DependencyProblem]
+@pytest.mark.parametrize("problems", [[], [KnownProblem("test", "test")]])
+def test_known_loader_loads_known_container_without_problems(
+    simple_dependency_resolver, problems: list[KnownProblem]
 ) -> None:
-    path_lookup = create_autospec(PathLookup)
-    dependency = KnownDependency("test", problems)
-    graph = DependencyGraph(dependency, None, simple_dependency_resolver, path_lookup, CurrentSessionState())
-    container = KnownContainer(Path("test.py"), problems)
-    assert container.build_dependency_graph(graph) == problems
-    path_lookup.assert_not_called()
-
-
-@pytest.mark.parametrize("problems", [[], [DependencyProblem("test", "test")]])
-def test_known_loader_loads_known_container_with_problems(
-    simple_dependency_resolver, problems: list[DependencyProblem]
-) -> None:
+    """The known problems are surfaced during linting not dependency graph building."""
     path_lookup = create_autospec(PathLookup)
     loader = KnownLoader()
     dependency = KnownDependency("test", problems)
     graph = DependencyGraph(dependency, None, simple_dependency_resolver, path_lookup, CurrentSessionState())
     container = loader.load_dependency(path_lookup, dependency)
-    assert container.build_dependency_graph(graph) == problems
+    assert not container.build_dependency_graph(graph)
     path_lookup.resolve.assert_not_called()
 
 
-@pytest.mark.parametrize("problems", [[], [DependencyProblem("test", "test")]])
-def test_known_dependency_has_problems(problems: list[DependencyProblem]) -> None:
+@pytest.mark.parametrize("problems", [[], [KnownProblem("test", "test")]])
+def test_known_dependency_has_problems(problems: list[KnownProblem]) -> None:
     dependency = KnownDependency("test", problems)
     assert dependency.problems == problems

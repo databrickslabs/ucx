@@ -7,7 +7,8 @@ from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyProblem
-from databricks.labs.ucx.source_code.files import FileLoader, LocalFile
+from databricks.labs.ucx.source_code.files import FileLoader, ImportFileResolver, LocalFile
+from databricks.labs.ucx.source_code.known import KnownDependency, KnownList
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 
@@ -177,3 +178,41 @@ def test_file_loader_loads_empty_file(tmp_path) -> None:
     # TODO: Test specific error while loading: https://github.com/databrickslabs/ucx/issues/3584
     assert local_file
     path_lookup.resolve.assert_called_once_with(path)
+
+
+def test_import_resolver_resolves_import_from_known_list_without_problems() -> None:
+    import_file_resolver = ImportFileResolver(FileLoader(), KnownList())
+    path_lookup = create_autospec(PathLookup)
+
+    maybe_dependency = import_file_resolver.resolve_import(path_lookup, "aiohttp")
+    assert not maybe_dependency.problems
+    assert isinstance(maybe_dependency.dependency, KnownDependency)
+    assert not maybe_dependency.dependency.problems
+    path_lookup.resolve.assert_not_called()
+
+    # Regression checks for KnownContainer to not yield the known problems
+    # The known problems should be surfaced during linting
+    graph = create_autospec(DependencyGraph)
+    container = maybe_dependency.dependency.load(path_lookup)
+    assert container
+    assert not container.build_dependency_graph(graph)
+    graph.assert_not_called()
+
+
+def test_import_resolver_resolves_import_from_known_list_with_problems() -> None:
+    import_file_resolver = ImportFileResolver(FileLoader(), KnownList())
+    path_lookup = create_autospec(PathLookup)
+
+    maybe_dependency = import_file_resolver.resolve_import(path_lookup, "pyspark.sql.functions")
+    assert not maybe_dependency.problems  # Problems are not surfaced during import resolving
+    assert isinstance(maybe_dependency.dependency, KnownDependency)
+    assert maybe_dependency.dependency.problems
+    path_lookup.resolve.assert_not_called()
+
+    # Regression checks for KnownContainer to not yield the known problems
+    # The known problems should be surfaced during linting
+    graph = create_autospec(DependencyGraph)
+    container = maybe_dependency.dependency.load(path_lookup)
+    assert container
+    assert not container.build_dependency_graph(graph)
+    graph.assert_not_called()

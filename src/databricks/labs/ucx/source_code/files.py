@@ -17,6 +17,7 @@ from databricks.labs.ucx.source_code.graph import (
     BaseImportResolver,
     BaseFileResolver,
     MaybeDependency,
+    StubContainer,
 )
 from databricks.labs.ucx.source_code.known import KnownDependency, KnownList
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
@@ -70,16 +71,6 @@ class LocalFile(SourceContainer):
         return f"<LocalFile {self._path}>"
 
 
-class StubContainer(SourceContainer):
-
-    def __init__(self, path: Path):
-        super().__init__()
-        self._path = path
-
-    def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
-        return []
-
-
 class FileLoader(DependencyLoader):
     """Loader for a file dependency."""
 
@@ -115,6 +106,11 @@ class ImportFileResolver(BaseImportResolver, BaseFileResolver):
         return MaybeDependency(None, [problem])
 
     def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
+        """Resolve an import by name.
+
+        1. Check the known modules.
+        2. Check the import on the path lookup.
+        """
         maybe = self._resolve_allow_list(name)
         if maybe is not None:
             return maybe
