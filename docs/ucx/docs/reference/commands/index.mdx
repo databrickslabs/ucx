@@ -682,8 +682,9 @@ Hive Metastore federation creates a UC catalog that mirrors all the schemas and 
 $ databricks labs ucx enable_hms_federation
 ```
 
-This command sets the `enable_hms_federation` flag in the config.yml file to `True`. This flag is used to enable the Hive Metastore federation process.
-This flag is used by the `migrate-locations` command to determine whether to set the [Fallback Mode](https://docs.databricks.com/en/data-governance/unity-catalog/hms-federation/hms-federation-internal.html) to "True" in the newly created external locations.
+This command sets the `enable_hms_federation` flag in the config.yml file to `True`.<br/>
+It is used to enable the Hive Metastore federation process.
+It is also used by the `migrate-locations` command to determine whether to set the [Fallback Mode](https://docs.databricks.com/en/data-governance/unity-catalog/hms-federation/hms-federation-internal.html) to "True" in the newly created external locations.
 In AWS it also also allows the creation a GLUE role if one is required using the `create-missing-principals` command.
 
 ### `create_federated_catalog`
