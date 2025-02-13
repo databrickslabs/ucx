@@ -18,7 +18,7 @@ from databricks.labs.ucx.source_code.base import (
     LocatedAdvice,
     UsedTable,
     SourceInfo,
-    file_language,
+    infer_file_language_if_supported,
     is_a_notebook,
     safe_read_text,
 )
@@ -149,9 +149,9 @@ class _CollectorWalker(DependencyGraphWalker[S], abc.ABC):
         path_lookup: PathLookup,
         inherited_tree: Tree | None,
     ) -> Iterable[S]:
-        language = file_language(dependency.path)
+        language = infer_file_language_if_supported(dependency.path)
         if not language:
-            logger.warning(f"Unknown language for {dependency.path}")
+            logger.warning(f"Unsupported language for {dependency.path}")
             return
         cell_language = CellLanguage.of_language(language)
         source = safe_read_text(dependency.path)
