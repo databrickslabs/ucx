@@ -13,7 +13,7 @@ from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolv
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
-from databricks.labs.ucx.source_code.folders import Folder, FolderLoader
+from databricks.labs.ucx.source_code.folders import FolderLoader
 from databricks.labs.ucx.source_code.files import FileLoader, ImportFileResolver
 from databricks.labs.ucx.source_code.linters.folders import LocalCodeLinter, LocalFileMigrator
 from databricks.labs.ucx.source_code.linters.context import LinterContext
@@ -123,13 +123,6 @@ def test_single_dot_import() -> None:
     assert maybe.dependency is not None
     assert maybe.dependency.path == Path('/some/path/to/folder/foo.py')
     path_lookup.resolve.assert_called_once_with(Path('/some/path/to/folder/foo.py'))
-
-
-def test_folder_has_repr() -> None:
-    notebook_loader = NotebookLoader()
-    file_loader = FileLoader()
-    folder = Folder(Path("test"), notebook_loader, file_loader, FolderLoader(notebook_loader, file_loader))
-    assert len(repr(folder)) > 0
 
 
 site_packages = locate_site_packages()
