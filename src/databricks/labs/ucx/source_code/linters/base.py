@@ -114,6 +114,28 @@ class PythonLinter(Linter):
     def lint_tree(self, tree: Tree) -> Iterable[Advice]: ...
 
 
+class PythonFixer(Fixer):
+    """Fix python source code."""
+
+    def apply(self, code: str) -> str:
+        """Apply the changes to Python source code.
+
+        The source code is parsed into an AST tree, and the fixes are applied
+        to the tree.
+        """
+        maybe_tree = MaybeTree.from_source_code(code)
+        if maybe_tree.failure:
+            # Fixing does not yield parse failures, linting does
+            logger.warning(f"Parsing source code resulted in failure `{maybe_tree.failure}`: {code}")
+            return code
+        assert maybe_tree.tree is not None
+        return self.apply_tree(maybe_tree.tree)
+
+    @abstractmethod
+    def apply_tree(self, tree: Tree) -> str:
+        """Apply the fixes to the AST tree."""
+
+
 class DfsaPyCollector(DfsaCollector, ABC):
 
     def collect_dfsas(self, source_code: str) -> Iterable[DirectFsAccess]:
