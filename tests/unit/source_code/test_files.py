@@ -13,7 +13,87 @@ from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 def test_local_file_content_is_accessible() -> None:
     local_file = LocalFile(Path("test.py"), "print(1)", Language.PYTHON)
-    assert local_file.content == "print(1)"
+    assert local_file.original_code == "print(1)"
+
+
+def test_local_file_flush_migrated_code_existing_file(tmp_path) -> None:
+    path = tmp_path / "test.py"
+    path.write_text("print(1)")
+    local_file = LocalFile(path, "print(1)", Language.PYTHON)
+
+    local_file.migrated_code = "print(2)"
+    number_of_characters_written = local_file.back_up_original_and_flush_migrated_code()
+
+    assert number_of_characters_written == len("print(2)")
+    assert local_file.original_code == "print(1)"
+    assert local_file.migrated_code == "print(2)"
+    assert path.with_suffix(".py.bak").read_text() == "print(1)"
+    assert path.read_text() == "print(2)"
+
+
+def test_local_file_flush_migrated_code_with_empty_contents(tmp_path) -> None:
+    path = tmp_path / "test.py"
+    path.write_text("print(1)")
+    local_file = LocalFile(path, "print(1)", Language.PYTHON)
+
+    local_file.migrated_code = ""
+    number_of_characters_written = local_file.back_up_original_and_flush_migrated_code()
+
+    assert number_of_characters_written == 0
+    assert local_file.original_code == "print(1)"
+    assert local_file.migrated_code == ""
+    assert path.with_suffix(".py.bak").read_text() == "print(1)"
+    assert path.read_text() == ""
+
+
+def test_local_file_flush_non_migrated_code(tmp_path) -> None:
+    path = tmp_path / "test.py"
+    path.write_text("print(1)")
+    local_file = LocalFile(path, "print(1)", Language.PYTHON)
+
+    number_of_characters_written = local_file.back_up_original_and_flush_migrated_code()
+
+    assert number_of_characters_written == len("print(1)")
+    assert local_file.original_code == "print(1)"
+    assert local_file.migrated_code == "print(1)"
+    assert not path.with_suffix(".py.bak").is_file()
+    assert path.read_text() == "print(1)"
+
+
+def test_local_file_does_not_flush_migrated_code_when_backup_fails(tmp_path) -> None:
+    class _LocalFile(LocalFile):
+        def _back_up_path(self) -> None:
+            # Simulate an error, back_up_path handles the error, no return signals an error
+            pass
+
+    path = tmp_path / "test.py"
+    path.write_text("print(1)")
+    local_file = _LocalFile(path, "print(1)", Language.PYTHON)
+
+    local_file.migrated_code = "print(2)"
+    number_of_characters_written = local_file.back_up_original_and_flush_migrated_code()
+
+    assert number_of_characters_written is None
+    assert not path.with_suffix(".py.bak").is_file()
+    assert path.read_text() == "print(1)"
+
+
+def test_local_file_flush_migrated_code_with_error(tmp_path) -> None:
+    class _LocalFile(LocalFile):
+        def _safe_write_text(self, contents: str) -> None:
+            # Simulate an error, safe_write_text handles the error, no returns signals an error
+            _ = contents
+
+    path = tmp_path / "test.py"
+    path.write_text("print(1)")
+    local_file = _LocalFile(path, "print(1)", Language.PYTHON)
+
+    local_file.migrated_code = "print(2)"
+    number_of_characters_written = local_file.back_up_original_and_flush_migrated_code()
+
+    assert number_of_characters_written is None
+    assert not path.with_suffix(".py.bak").is_file()
+    assert path.read_text() == "print(1)"
 
 
 @pytest.mark.parametrize("language", [Language.SQL, Language.SCALA, Language.R])
@@ -161,7 +241,7 @@ def test_file_loader_loads_file_with_bom(tmp_path, bom, encoding) -> None:
 
     # TODO: Test specific error while loading: https://github.com/databrickslabs/ucx/issues/3584
     assert isinstance(local_file, LocalFile)
-    assert local_file.content == "a = 12"
+    assert local_file.original_code == "a = 12"
     path_lookup.resolve.assert_called_once_with(path)
 
 

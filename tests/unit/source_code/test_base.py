@@ -1,5 +1,7 @@
 import dataclasses
+import logging
 from pathlib import Path
+from unittest.mock import create_autospec, patch
 
 import pytest
 
@@ -8,9 +10,13 @@ from databricks.labs.ucx.source_code.base import (
     Advisory,
     Convention,
     Deprecation,
-    LocatedAdvice,
     Failure,
+    LocatedAdvice,
     UsedTable,
+    back_up_path,
+    revert_back_up_path,
+    safe_write_text,
+    write_text,
 )
 from databricks.labs.ucx.source_code.linters.base import Fixer
 
@@ -101,3 +107,146 @@ def test_fixer_is_never_supported_for_diagnostic_empty_code() -> None:
 
     assert not fixer.is_supported("test")
     assert not fixer.is_supported("other-code")
+
+
+def test_write_text_to_non_existing_file(tmp_path) -> None:
+    path = tmp_path / "file.txt"
+
+    number_of_characters_written = write_text(path, "content")
+
+    assert path.exists()
+    assert path.read_text() == "content"
+    assert number_of_characters_written == len("content")
+
+
+def test_write_text_to_existing_file(tmp_path) -> None:
+    path = tmp_path / "file.txt"
+    path.touch()
+
+    number_of_characters_written = write_text(path, "content")
+
+    assert path.exists()
+    assert path.read_text() == "content"
+    assert number_of_characters_written == len("content")
+
+
+def test_write_text_with_permission_error(tmp_path) -> None:
+    path = create_autospec(Path)
+    path.write_text.side_effect = PermissionError("Permission denied")
+
+    # func:`safe_write_text` handles the errors
+    with pytest.raises(PermissionError, match="Permission denied"):
+        write_text(path, "content", encoding="utf-8")
+
+    path.write_text.assert_called_once_with("content", encoding="utf-8")
+
+
+def test_safe_write_text_with_permission_error(tmp_path, caplog) -> None:
+    path = create_autospec(Path)
+    path.write_text.side_effect = PermissionError("Permission denied")
+
+    with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.source_code.base"):
+        numbers_of_character_written = safe_write_text(path, "content", encoding="utf-8")
+
+    assert f"Cannot write to file: {path}" in caplog.messages
+    assert numbers_of_character_written is None
+    path.write_text.assert_called_once_with("content", encoding="utf-8")
+
+
+def test_back_up_path(tmp_path) -> None:
+    path = tmp_path / "file.txt"
+    path.touch()
+
+    path_backed_up = back_up_path(path)
+
+    assert path_backed_up
+    assert path_backed_up.as_posix().endswith("file.txt.bak")
+    assert path_backed_up.exists()
+    assert path.exists()
+
+
+def test_back_up_non_existing_file_path(tmp_path) -> None:
+    path = tmp_path / "file.txt"
+
+    path_backed_up = back_up_path(path)
+
+    assert not path_backed_up
+    assert not path.exists()
+
+
+def test_back_up_path_with_permission_error(caplog) -> None:
+    path = create_autospec(Path)
+    path_backed_up = create_autospec(Path)
+    path.with_suffix.return_value = path_backed_up
+
+    with (
+        patch("shutil.copyfile", side_effect=PermissionError("Permission denied")) as copyfile,
+        caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.source_code.base"),
+    ):
+        assert not back_up_path(path)
+        copyfile.assert_called_once_with(path, path_backed_up)
+    assert f"Cannot back up file: {path}" in caplog.messages
+    assert path.exists()
+    path_backed_up.assert_not_called()
+
+
+def test_back_up_and_revert_back_up_path(tmp_path) -> None:
+    path = tmp_path / "file.txt"
+    path.write_text("content")
+
+    path_backed_up = back_up_path(path)
+    is_successfully_reverted_backup = revert_back_up_path(path)
+
+    assert is_successfully_reverted_backup
+    assert path_backed_up
+    assert not path_backed_up.exists()
+    assert path.exists()
+    assert path.read_text() == "content"
+
+
+def test_revert_back_up_without_backup_file(tmp_path, caplog) -> None:
+    path = tmp_path / "file.txt"
+    path.touch()
+
+    with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.source_code.base"):
+        is_successfully_reverted_backup = revert_back_up_path(path)
+
+    assert is_successfully_reverted_backup is None
+    assert f"Backup is missing: {path.with_suffix('.txt.bak')}"
+    assert path.exists()
+
+
+def test_revert_back_up_with_permission_error(caplog) -> None:
+    path = create_autospec(Path)
+    path_backed_up = create_autospec(Path)
+    path.with_suffix.return_value = path_backed_up
+
+    with (
+        patch("shutil.copyfile", side_effect=PermissionError("Permission denied")) as copyfile,
+        caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.source_code.base"),
+    ):
+        is_successfully_reverted_backup = revert_back_up_path(path)
+
+        copyfile.assert_called_once_with(path_backed_up, path)
+    assert not is_successfully_reverted_backup
+    assert f"Cannot revert backup: {path}"
+    path_backed_up.assert_not_called()
+
+
+def test_revert_back_up_when_backup_file_cannot_be_deleted(caplog) -> None:
+    path = create_autospec(Path)
+    path_backed_up = create_autospec(Path)
+    path.with_suffix.return_value = path_backed_up
+
+    with (
+        patch("shutil.copyfile") as copyfile,
+        patch("os.unlink", side_effect=PermissionError("Permission denied")) as unlink,
+        caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.source_code.base"),
+    ):
+        is_successfully_reverted_backup = revert_back_up_path(path)
+
+        copyfile.assert_called_once_with(path_backed_up, path)
+        unlink.assert_called_once_with(path_backed_up)
+    assert is_successfully_reverted_backup
+    assert f"Cannot remove backup file: {path_backed_up}"
+    path_backed_up.assert_not_called()
