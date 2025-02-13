@@ -24,13 +24,13 @@ logger = logging.getLogger(__name__)
 
 class Notebook(SourceContainer):
 
-    @staticmethod
-    def parse(path: Path, source: str, default_language: Language) -> Notebook:
+    @classmethod
+    def parse(cls, path: Path, source: str, default_language: Language) -> Notebook:
         default_cell_language = CellLanguage.of_language(default_language)
         cells = default_cell_language.extract_cells(source)
         if cells is None:
             raise ValueError(f"Could not parse Notebook: {path}")
-        return Notebook(path, source, default_language, cells, source.endswith('\n'))
+        return cls(path, source, default_language, cells, source.endswith('\n'))
 
     def __init__(self, path: Path, source: str, language: Language, cells: list[Cell], ends_with_lf: bool):
         self._path = path
