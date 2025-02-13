@@ -16,6 +16,7 @@ from databricks.labs.ucx.source_code.base import (
 )
 from databricks.labs.ucx.source_code.files import LocalFile
 from databricks.labs.ucx.source_code.graph import Dependency
+from databricks.labs.ucx.source_code.known import KnownDependency
 from databricks.labs.ucx.source_code.linters.base import PythonLinter
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.linters.imports import SysPathChange, UnresolvedPath
@@ -228,6 +229,11 @@ class FileLinter:
 
     def lint(self) -> Iterable[Advice]:
         """Lint the file."""
+        if isinstance(self._dependency, KnownDependency):
+            # TODO: Pass on the right advice type (https://github.com/databrickslabs/ucx/issues/3625)
+            advices = [problem.as_advice().as_advisory() for problem in self._dependency.problems]
+            yield from advices
+            return
         source_container = self._dependency.load(self._path_lookup)
         if not source_container:
             # The linter only reports **linting** errors, not loading errors

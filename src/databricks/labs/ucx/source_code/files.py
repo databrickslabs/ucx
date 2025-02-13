@@ -25,7 +25,7 @@ from databricks.labs.ucx.source_code.graph import (
     MaybeDependency,
     StubContainer,
 )
-from databricks.labs.ucx.source_code.known import KnownList
+from databricks.labs.ucx.source_code.known import KnownDependency, KnownList
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.linters.python import PythonCodeAnalyzer
 
@@ -168,6 +168,11 @@ class ImportFileResolver(BaseImportResolver, BaseFileResolver):
         return MaybeDependency(None, [problem])
 
     def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
+        """Resolve an import by name.
+
+        1. Check the known modules.
+        2. Check the import on the path lookup.
+        """
         maybe = self._resolve_allow_list(name)
         if maybe is not None:
             return maybe
@@ -181,10 +186,8 @@ class ImportFileResolver(BaseImportResolver, BaseFileResolver):
         if not compatibility.known:
             logger.debug(f"Resolving unknown import: {name}")
             return None
-        if not compatibility.problems:
-            return MaybeDependency(None, [])
-        # TODO move to linter, see https://github.com/databrickslabs/ucx/issues/1527
-        return MaybeDependency(None, compatibility.problems)
+        dependency = KnownDependency(name, compatibility.problems)
+        return MaybeDependency(dependency, [])
 
     def _resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency | None:
         if not name:

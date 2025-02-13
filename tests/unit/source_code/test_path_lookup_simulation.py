@@ -32,9 +32,9 @@ from tests.unit import (
             ],
             3,
         ),
-        (["simulate-sys-path", "via-sys-path", "run_notebook_1.py"], 1),
-        (["simulate-sys-path", "via-sys-path", "run_notebook_2.py"], 1),
-        (["simulate-sys-path", "via-sys-path", "run_notebook_4.py"], 2),
+        (["simulate-sys-path", "via-sys-path", "run_notebook_1.py"], 2),
+        (["simulate-sys-path", "via-sys-path", "run_notebook_2.py"], 2),
+        (["simulate-sys-path", "via-sys-path", "run_notebook_4.py"], 3),
     ],
 )
 def test_locates_notebooks(source: list[str], expected: int, mock_path_lookup) -> None:
@@ -60,8 +60,8 @@ def test_locates_notebooks(source: list[str], expected: int, mock_path_lookup) -
     "source, expected",
     [
         (["simulate-sys-path", "siblings", "sibling1_file.py"], 2),
-        (["simulate-sys-path", "via-sys-path", "import_file_1.py"], 2),
-        (["simulate-sys-path", "via-sys-path", "import_file_2.py"], 2),
+        (["simulate-sys-path", "via-sys-path", "import_file_1.py"], 3),
+        (["simulate-sys-path", "via-sys-path", "import_file_2.py"], 3),
     ],
 )
 def test_locates_files(source: list[str], expected: int) -> None:
@@ -117,7 +117,7 @@ sys.path.append('{child_dir_path.as_posix()}')
         assert not maybe.problems
         assert maybe.graph is not None
         all_paths = [d.path for d in maybe.graph.all_dependencies]
-        assert len(all_paths) == 2
+        assert len(all_paths) == 3
 
 
 def test_locates_files_with_absolute_path() -> None:

@@ -79,6 +79,7 @@ class LocalCodeLinter:
         problems = container.build_dependency_graph(graph)
         for problem in problems:
             yield problem.as_located_advice()
+            return
         walker = LintingWalker(graph, self._path_lookup, self._context_factory)
         yield from walker
 

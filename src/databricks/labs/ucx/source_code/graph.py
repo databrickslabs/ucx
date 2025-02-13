@@ -66,17 +66,19 @@ class DependencyGraph:
     def register_import(self, name: str) -> list[DependencyProblem]:
         if not name:
             return [DependencyProblem('import-empty', 'Empty import name')]
-        maybe = self._resolver.resolve_import(self.path_lookup, name)
-        if not maybe.dependency:
-            return maybe.problems
-        maybe_graph = self.register_dependency(maybe.dependency)
+        maybe_dependency = self._resolver.resolve_import(self.path_lookup, name)
+        if maybe_dependency.problems:
+            return maybe_dependency.problems
+        assert maybe_dependency.dependency
+        maybe_graph = self.register_dependency(maybe_dependency.dependency)
         return maybe_graph.problems
 
     def register_file(self, path: Path) -> list[DependencyProblem]:
-        maybe = self._resolver.resolve_file(self.path_lookup, path)
-        if not maybe.dependency:
-            return maybe.problems
-        maybe_graph = self.register_dependency(maybe.dependency)
+        maybe_dependency = self._resolver.resolve_file(self.path_lookup, path)
+        if maybe_dependency.problems:
+            return maybe_dependency.problems
+        assert maybe_dependency.dependency
+        maybe_graph = self.register_dependency(maybe_dependency.dependency)
         return maybe_graph.problems
 
     def register_dependency(self, dependency: Dependency) -> MaybeGraph:
@@ -398,8 +400,34 @@ class BaseFileResolver(abc.ABC):
 
 @dataclass
 class MaybeDependency:
+    """A class:`Dependency` or a :class:`Failure`.
+
+    The `MaybeDependency` is designed to either contain a `dependency` OR
+    `problems`, never both or neither. Typically, a `Dependency` is
+    constructed by a resolver yielding a `MaybeDependency` with
+    `list[Problems]` if the dependency could NOT be resolved, otherwise it
+    yields the `Dependency`, resulting in code that looks like:
+
+    ``` python
+    maybe_dependency = resolver.resolve_import(path_lookup, module_name)
+    if maybe_dependency.problems:
+        # Handle failure and return early
+    assert maybe_dependency.dependency, "Dependency should be given when no problems are given."
+    # Use dependency
+    ```
+    """
+
     dependency: Dependency | None
+    """The dependency"""
+
     problems: list[DependencyProblem]
+    """The problems during constructing the dependency"""
+
+    def __post_init__(self):
+        if not self.dependency and not self.problems:
+            raise ValueError(f"Dependency or problems should be given: {self}")
+        if self.dependency and self.problems:
+            raise ValueError(f"Dependency and problems should not be both given: {self}")
 
 
 class DependencyResolver:

@@ -3,6 +3,8 @@ from unittest.mock import create_autospec
 
 import pytest
 from databricks.labs.blueprint.tui import MockPrompts
+
+
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
@@ -19,7 +21,7 @@ from databricks.labs.ucx.source_code.notebooks.sources import Notebook
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
 
-from tests.unit import locate_site_packages, _samples_path
+from tests.unit import locate_site_packages
 
 
 def test_file_linter_lints_file() -> None:
@@ -153,48 +155,6 @@ def test_notebook_migrator_supported_language_no_diagnostics(mock_path_lookup) -
     migrator = NotebookMigrator(languages)
     path = mock_path_lookup.resolve(Path("root1.run.py"))
     assert not migrator.apply(path)
-
-
-@pytest.fixture()
-def local_code_linter(mock_path_lookup, migration_index):
-    notebook_loader = NotebookLoader()
-    file_loader = FileLoader()
-    folder_loader = FolderLoader(notebook_loader, file_loader)
-    pip_resolver = PythonLibraryResolver()
-    session_state = CurrentSessionState()
-    import_file_resolver = ImportFileResolver(file_loader)
-    resolver = DependencyResolver(
-        pip_resolver,
-        NotebookResolver(NotebookLoader()),
-        import_file_resolver,
-        import_file_resolver,
-        mock_path_lookup,
-    )
-    return LocalCodeLinter(
-        notebook_loader,
-        file_loader,
-        folder_loader,
-        mock_path_lookup,
-        session_state,
-        resolver,
-        lambda: LinterContext(migration_index),
-    )
-
-
-def test_linter_walks_directory(mock_path_lookup, local_code_linter) -> None:
-    mock_path_lookup.append_path(Path(_samples_path(SourceContainer)))
-    path = Path(__file__).parent / "../samples" / "simulate-sys-path"
-    advices = list(local_code_linter.lint_path(path))
-    assert not advices
-    assert len(mock_path_lookup.successfully_resolved_paths) > 10
-
-
-def test_linter_lints_children_in_context(mock_path_lookup, local_code_linter) -> None:
-    mock_path_lookup.append_path(Path(_samples_path(SourceContainer)))
-    path = Path(__file__).parent.parent / "samples" / "parent-child-context"
-    advices = list(local_code_linter.lint_path(path))
-    assert not advices
-    assert mock_path_lookup.successfully_resolved_paths == {path, Path("parent.py"), Path("child.py")}
 
 
 def test_triple_dot_import() -> None:

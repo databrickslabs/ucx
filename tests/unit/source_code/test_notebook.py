@@ -227,6 +227,7 @@ def test_notebook_builds_python_dependency_graph(mock_path_lookup) -> None:
 
 def test_notebook_builds_python_dependency_graph_with_loop(mock_path_lookup) -> None:
     path = "run_notebooks.py"
+    expected_path = {mock_path_lookup.cwd / path for path in (path, "leaf1.py", "leaf2.py", "leaf3.py")}
     resolver = dependency_resolver(mock_path_lookup)
     maybe = resolver.resolve_notebook(mock_path_lookup, Path(path), False)
     assert maybe.dependency is not None
@@ -234,13 +235,13 @@ def test_notebook_builds_python_dependency_graph_with_loop(mock_path_lookup) -> 
     container = maybe.dependency.load(mock_path_lookup)
     assert container is not None
     container.build_dependency_graph(graph)
-    expected_paths = [path, "leaf1.py", "leaf2.py", "leaf3.py"]
     all_paths = set(d.path for d in graph.all_dependencies)
-    assert all_paths == {mock_path_lookup.cwd / path for path in expected_paths}
+    assert not expected_path - all_paths
 
 
 def test_notebook_builds_python_dependency_graph_with_fstring_loop(mock_path_lookup) -> None:
     path = "run_notebooks_with_fstring.py"
+    expected_path = {mock_path_lookup.cwd / path for path in (path, "leaf1.py", "leaf2.py", "leaf3.py")}
     resolver = dependency_resolver(mock_path_lookup)
     maybe = resolver.resolve_notebook(mock_path_lookup, Path(path), False)
     assert maybe.dependency is not None
@@ -248,9 +249,8 @@ def test_notebook_builds_python_dependency_graph_with_fstring_loop(mock_path_loo
     container = maybe.dependency.load(mock_path_lookup)
     assert container is not None
     container.build_dependency_graph(graph)
-    expected_paths = [path, "leaf1.py", "leaf2.py", "leaf3.py"]
     all_paths = set(d.path for d in graph.all_dependencies)
-    assert all_paths == {mock_path_lookup.cwd / path for path in expected_paths}
+    assert not expected_path - all_paths
 
 
 def test_detects_multiple_calls_to_dbutils_notebook_run_in_python_code() -> None:

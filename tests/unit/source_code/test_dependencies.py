@@ -109,9 +109,9 @@ def test_dependency_resolver_visits_file_dependencies(simple_dependency_resolver
     assert maybe.graph.all_relative_names() == {"root5.py", "leaf4.py"}
 
 
-def test_dependency_resolver_skips_builtin_dependencies(simple_dependency_resolver) -> None:
+def test_dependency_resolver_skips_standard_library_dependencies(simple_dependency_resolver) -> None:
     maybe = simple_dependency_resolver.build_local_file_dependency_graph(
-        Path("python_builtins.py"), CurrentSessionState()
+        Path("standard_libraries.py"), CurrentSessionState()
     )
     assert not maybe.failed
     graph = maybe.graph
@@ -123,7 +123,7 @@ def test_dependency_resolver_skips_builtin_dependencies(simple_dependency_resolv
 
 def test_dependency_resolver_ignores_known_dependencies(simple_dependency_resolver) -> None:
     maybe = simple_dependency_resolver.build_local_file_dependency_graph(
-        Path("python_builtins.py"), CurrentSessionState()
+        Path("standard_libraries.py"), CurrentSessionState()
     )
     assert maybe.graph
     graph = maybe.graph

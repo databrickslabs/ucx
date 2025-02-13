@@ -9,6 +9,7 @@ from databricks.labs.ucx.source_code.graph import (
     Dependency,
     DependencyGraph,
     DependencyProblem,
+    MaybeDependency,
     InheritedContext,
 )
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader
@@ -201,3 +202,15 @@ def test_dependency_problem_as_located_advice_has_path_missing_by_default() -> N
     problem = DependencyProblem("code", "message")
     located_advice = problem.as_located_advice()
     assert located_advice.has_missing_path()
+
+
+def test_maybe_dependency_raises_value_error_if_no_dependency_nor_problems() -> None:
+    with pytest.raises(ValueError, match="Dependency or problems should be given: *"):
+        MaybeDependency(None, [])
+
+
+def test_maybe_dependency_raises_value_error_if_dependency_and_problems() -> None:
+    dependency = Dependency(FileLoader(), Path("test"))
+    problem = DependencyProblem("code", "message")
+    with pytest.raises(ValueError, match="Dependency and problems should not be both given: *"):
+        MaybeDependency(dependency, [problem])
