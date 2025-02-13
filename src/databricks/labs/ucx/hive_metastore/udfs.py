@@ -54,9 +54,9 @@ class UdfsCrawler(CrawlerBase[Udf]):
         self._include_database = include_databases
 
     def _all_databases(self) -> list[str]:
-        if not self._include_database:
-            return [row[0] for row in self._fetch("SHOW DATABASES")]
-        return self._include_database
+        if self._include_database is not None:
+            return self._include_database
+        return [row[0] for row in self._fetch("SHOW DATABASES")]
 
     def _try_fetch(self) -> Iterable[Udf]:
         """Tries to load udf information from the database or throws TABLE_OR_VIEW_NOT_FOUND error"""
