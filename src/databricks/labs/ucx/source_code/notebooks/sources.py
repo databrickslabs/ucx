@@ -24,6 +24,10 @@ logger = logging.getLogger(__name__)
 
 class Notebook(SourceContainer):
 
+    TODO:
+        Let `Notebook` inherit from `LocalFile`
+    """
+
     @classmethod
     def parse(cls, path: Path, source: str, default_language: Language) -> Notebook:
         default_cell_language = CellLanguage.of_language(default_language)
@@ -34,7 +38,7 @@ class Notebook(SourceContainer):
 
     def __init__(self, path: Path, source: str, language: Language, cells: list[Cell], ends_with_lf: bool):
         self._path = path
-        self._source = source
+        self._original_code = source
         self._language = language
         self._cells = cells
         self._ends_with_lf = ends_with_lf
@@ -49,7 +53,7 @@ class Notebook(SourceContainer):
 
     @property
     def original_code(self) -> str:
-        return self._source
+        return self._original_code
 
     def to_migrated_code(self) -> str:
         default_language = CellLanguage.of_language(self._language)
