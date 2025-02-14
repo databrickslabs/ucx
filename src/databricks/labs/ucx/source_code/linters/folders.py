@@ -53,7 +53,7 @@ class LocalCodeLinter:
         maybe_graph = self._build_dependency_graph_from_path(path)
         if maybe_graph.problems:
             for problem in maybe_graph.problems:
-                yield problem.as_located_advice(Failure)
+                yield problem.as_located_advice()
             return
         assert maybe_graph.graph
         walker = LinterWalker(maybe_graph.graph, self._path_lookup, self._context_factory)
@@ -69,7 +69,7 @@ class LocalCodeLinter:
         maybe_graph = self._build_dependency_graph_from_path(path)
         if maybe_graph.problems:
             for problem in maybe_graph.problems:
-                yield problem.as_located_advice(Failure)
+                yield problem.as_located_advice()
             return
         assert maybe_graph.graph
         walker = FixerWalker(maybe_graph.graph, self._path_lookup, self._context_factory)

@@ -547,7 +547,7 @@ class DependencyProblem:
 
     def as_located_advice(self) -> LocatedAdvice:
         """Converts the dependency problem in a located advice for linting."""
-        # Advisory level is chosen to treat a dependency problem as a WARNING. It is the most server while not being
+        # Advisory level is chosen to treat a dependency problem as a WARNING. It is the most severe while not being
         # CRITICAL (yet).
         advisory = Advisory(
             code=self.code,
