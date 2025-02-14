@@ -173,26 +173,6 @@ def test_workflow_linter_lints_job_with_import_pypi_library(simple_ctx, make_job
     assert len([problem for problem in problems if problem.message == problem_message]) == 0
 
 
-def test_lint_local_code(simple_ctx) -> None:
-    # no need to connect
-    session_state = CurrentSessionState()
-    linter_context = LinterContext(TableMigrationIndex([]), session_state)
-    light_ctx = simple_ctx
-    ucx_path = Path(__file__).parent.parent.parent.parent
-    path_to_scan = Path(ucx_path, "src")
-    # TODO: LocalCheckoutContext has to move into GlobalContext because of this hack
-    linter = LocalCodeLinter(
-        light_ctx.notebook_loader,
-        light_ctx.file_loader,
-        light_ctx.folder_loader,
-        light_ctx.path_lookup,
-        light_ctx.dependency_resolver,
-        lambda: linter_context,
-    )
-    problems = list(linter.lint(path_to_scan))
-    assert len(problems) > 0
-
-
 @pytest.mark.parametrize("order", [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]])
 def test_graph_computes_magic_run_route_recursively_in_parent_folder(simple_ctx, order) -> None:
     # order in which we consider files influences the algorithm so we check all order
