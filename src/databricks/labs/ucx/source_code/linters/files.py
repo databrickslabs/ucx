@@ -41,7 +41,11 @@ class NotebookLinter:
     """
 
     def __init__(
-        self, notebook: Notebook, path_lookup: PathLookup, context: LinterContext, parent_tree: Tree | None = None
+        self,
+        notebook: Notebook,
+        path_lookup: PathLookup,
+        context: LinterContext,
+        parent_tree: Tree | None = None,
     ):
         self._context: LinterContext = context
         self._path_lookup = path_lookup
