@@ -47,7 +47,7 @@ def test_notebook_flush_non_migrated_code(tmp_path) -> None:
 
     path = tmp_path / "test.py"
     path.write_text(source_code)
-    notebook = Notebook.parse(path, "print(1)", Language.PYTHON)
+    notebook = Notebook.parse(path, source_code, Language.PYTHON)
 
     number_of_characters_written = notebook.back_up_original_and_flush_migrated_code()
 
