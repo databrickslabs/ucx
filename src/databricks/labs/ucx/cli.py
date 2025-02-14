@@ -19,7 +19,6 @@ from databricks.labs.ucx.contexts.account_cli import AccountContext
 from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext, LocalCheckoutContext
 from databricks.labs.ucx.hive_metastore.tables import What
 from databricks.labs.ucx.install import AccountInstaller
-from databricks.labs.ucx.source_code.linters.folders import LocalCodeLinter
 from databricks.labs.ucx.workspace_access.groups import AccountGroupLookup
 
 ucx = App(__file__)
@@ -863,7 +862,10 @@ def download(
 
 @ucx.command
 def lint_local_code(
-    w: WorkspaceClient, prompts: Prompts, path: Path | str | None = None, ctx: LocalCheckoutContext | None = None,
+    w: WorkspaceClient,
+    prompts: Prompts,
+    path: Path | str | None = None,
+    ctx: LocalCheckoutContext | None = None,
 ):
     """Lint local code files looking for problems."""
     if ctx is None:

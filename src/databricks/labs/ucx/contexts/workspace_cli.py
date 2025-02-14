@@ -231,7 +231,6 @@ class LocalCheckoutContext(WorkspaceContext):
             self.file_loader,
             self.folder_loader,
             self.path_lookup,
-            session_state,
             self.dependency_resolver,
             lambda: self.linter_context_factory(session_state),
         )

@@ -206,7 +206,6 @@ def test_known_issues(path: Path, migration_index) -> None:
         file_loader,
         folder_loader,
         path_lookup,
-        session_state,
         resolver,
         lambda: LinterContext(migration_index, session_state),
     )

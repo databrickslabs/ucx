@@ -1,20 +1,22 @@
 from __future__ import annotations
 
 import logging
-import sys
 from collections.abc import Callable, Iterable
 from pathlib import Path
-from typing import TextIO
 
-from databricks.labs.blueprint.tui import Prompts
-from databricks.sdk.service.workspace import Language
-
-from databricks.labs.ucx.source_code.base import CurrentSessionState, LocatedAdvice, is_a_notebook
-from databricks.labs.ucx.source_code.graph import DependencyResolver, DependencyLoader, Dependency, DependencyGraph
-from databricks.labs.ucx.source_code.linters.context import LinterContext
-from databricks.labs.ucx.source_code.folders import FolderLoader
+from databricks.labs.ucx.source_code.base import Failure, LocatedAdvice, is_a_notebook
 from databricks.labs.ucx.source_code.files import FileLoader
-from databricks.labs.ucx.source_code.linters.graph_walkers import LinterWalker
+from databricks.labs.ucx.source_code.folders import FolderLoader
+from databricks.labs.ucx.source_code.graph import (
+    Dependency,
+    DependencyGraph,
+    DependencyLoader,
+    DependencyProblem,
+    DependencyResolver,
+    MaybeGraph,
+)
+from databricks.labs.ucx.source_code.linters.context import LinterContext
+from databricks.labs.ucx.source_code.linters.graph_walkers import FixerWalker, LinterWalker
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
@@ -23,6 +25,7 @@ logger = logging.getLogger(__name__)
 
 
 class LocalCodeLinter:
+    """Lint local code to become Unity Catalog compatible."""
 
     def __init__(
         self,
@@ -30,7 +33,6 @@ class LocalCodeLinter:
         file_loader: FileLoader,
         folder_loader: FolderLoader,
         path_lookup: PathLookup,
-        session_state: CurrentSessionState,
         dependency_resolver: DependencyResolver,
         context_factory: Callable[[], LinterContext],
     ) -> None:
@@ -38,31 +40,50 @@ class LocalCodeLinter:
         self._file_loader = file_loader
         self._folder_loader = folder_loader
         self._path_lookup = path_lookup
-        self._session_state = session_state
         self._dependency_resolver = dependency_resolver
-        self._extensions = {".py": Language.PYTHON, ".sql": Language.SQL}
         self._context_factory = context_factory
 
-    def lint(
-        self,
-        prompts: Prompts,
-        path: Path | None,
-        stdout: TextIO = sys.stdout,
-    ) -> list[LocatedAdvice]:
-        """Lint local code files looking for problems in notebooks and python files."""
-        if path is None:
-            response = prompts.question(
-                "Which file or directory do you want to lint?",
-                default=Path.cwd().as_posix(),
-                validate=lambda p_: Path(p_).exists(),
-            )
-            path = Path(response)
-        located_advices = list(self.lint_path(path))
-        for located_advice in located_advices:
-            stdout.write(f"{located_advice}\n")
-        return located_advices
+    def lint(self, path: Path) -> Iterable[LocatedAdvice]:
+        """Lint local code generating advices on becoming Unity Catalog compatible.
 
-    def lint_path(self, path: Path) -> Iterable[LocatedAdvice]:
+        Parameters :
+            path (Path) : The path to the resource(s) to lint. If the path is a directory, then all files within the
+                directory and subdirectories are linted.
+        """
+        maybe_graph = self._build_dependency_graph_from_path(path)
+        if maybe_graph.problems:
+            for problem in maybe_graph.problems:
+                yield problem.as_located_advice(Failure)
+            return
+        assert maybe_graph.graph
+        walker = LinterWalker(maybe_graph.graph, self._path_lookup, self._context_factory)
+        yield from walker
+
+    def apply(self, path: Path) -> Iterable[LocatedAdvice]:
+        """Apply local code fixes to become Unity Catalog compatible.
+
+        Parameters :
+            path (Path) : The path to the resource(s) to lint. If the path is a directory, then all files within the
+                directory and subdirectories are linted.
+        """
+        maybe_graph = self._build_dependency_graph_from_path(path)
+        if maybe_graph.problems:
+            for problem in maybe_graph.problems:
+                yield problem.as_located_advice(Failure)
+            return
+        assert maybe_graph.graph
+        walker = FixerWalker(maybe_graph.graph, self._path_lookup, self._context_factory)
+        yield from walker
+
+    def _build_dependency_graph_from_path(self, path: Path) -> MaybeGraph:
+        """Build a dependency graph from the path.
+
+        It tries to load the path as a directory, file or notebook.
+
+        Returns :
+            MaybeGraph : If the loading fails, the returned maybe graph contains a problem. Otherwise, returned maybe
+            graph contains the graph.
+        """
         is_dir = path.is_dir()
         loader: DependencyLoader
         if is_a_notebook(path):
@@ -71,14 +92,14 @@ class LocalCodeLinter:
             loader = self._folder_loader
         else:
             loader = self._file_loader
-        path_lookup = self._path_lookup.change_directory(path if is_dir else path.parent)
         root_dependency = Dependency(loader, path, not is_dir)  # don't inherit context when traversing folders
-        graph = DependencyGraph(root_dependency, None, self._dependency_resolver, path_lookup, self._session_state)
-        container = root_dependency.load(path_lookup)
-        assert container is not None  # because we just created it
-        problems = container.build_dependency_graph(graph)
-        for problem in problems:
-            yield problem.as_located_advice()
-            return
-        walker = LinterWalker(graph, self._path_lookup, self._context_factory)
-        yield from walker
+        container = root_dependency.load(self._path_lookup)
+        if container is None:
+            problem = DependencyProblem("dependency-not-found", "Dependency not found", source_path=path)
+            return MaybeGraph(None, [problem])
+        session_state = self._context_factory().session_state
+        graph = DependencyGraph(root_dependency, None, self._dependency_resolver, self._path_lookup, session_state)
+        problems = list(container.build_dependency_graph(graph))
+        if problems:
+            return MaybeGraph(None, problems)
+        return MaybeGraph(graph)

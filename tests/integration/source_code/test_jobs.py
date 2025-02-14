@@ -188,7 +188,6 @@ def test_lint_local_code(simple_ctx):
         light_ctx.file_loader,
         light_ctx.folder_loader,
         light_ctx.path_lookup,
-        session_state,
         light_ctx.dependency_resolver,
         lambda: linter_context,
     )

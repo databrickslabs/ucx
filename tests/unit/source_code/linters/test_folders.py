@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from databricks.labs.ucx.source_code.base import Advisory, CurrentSessionState, LocatedAdvice
+from databricks.labs.ucx.source_code.base import Advisory, LocatedAdvice
 from databricks.labs.ucx.source_code.files import FileLoader, ImportFileResolver
 from databricks.labs.ucx.source_code.folders import FolderLoader
 from databricks.labs.ucx.source_code.graph import DependencyResolver, SourceContainer
@@ -19,7 +19,6 @@ def local_code_linter(mock_path_lookup, migration_index):
     file_loader = FileLoader()
     folder_loader = FolderLoader(notebook_loader, file_loader)
     pip_resolver = PythonLibraryResolver()
-    session_state = CurrentSessionState()
     import_file_resolver = ImportFileResolver(file_loader)
     resolver = DependencyResolver(
         pip_resolver,
@@ -29,13 +28,7 @@ def local_code_linter(mock_path_lookup, migration_index):
         mock_path_lookup,
     )
     return LocalCodeLinter(
-        notebook_loader,
-        file_loader,
-        folder_loader,
-        mock_path_lookup,
-        session_state,
-        resolver,
-        lambda: LinterContext(migration_index),
+        notebook_loader, file_loader, folder_loader, mock_path_lookup, resolver, lambda: LinterContext(migration_index)
     )
 
 
