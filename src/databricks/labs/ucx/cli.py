@@ -605,16 +605,6 @@ def revert_cluster_remap(w: WorkspaceClient, prompts: Prompts):
     ctx.cluster_access.revert_cluster_remap(cluster_list, cluster_ids)
 
 
-@ucx.command
-def migrate_local_code(w: WorkspaceClient, prompts: Prompts):
-    """Fix the code files based on their language."""
-    ctx = LocalCheckoutContext(w)
-    working_directory = Path.cwd()
-    if not prompts.confirm("Do you want to apply UC migration to all files in the current directory?"):
-        return
-    ctx.local_file_migrator.apply(working_directory)
-
-
 @ucx.command(is_account=True)
 def show_all_metastores(a: AccountClient, workspace_id: str | None = None):
     """Show all metastores in the account"""
@@ -887,6 +877,25 @@ def lint_local_code(
         assert response
         path = Path(response)
     for advice in ctx.local_code_linter.lint(Path(path)):
+        print(advice.message)
+
+
+@ucx.command
+def migrate_local_code(
+    w: WorkspaceClient, prompts: Prompts, path: Path | str | None = None, ctx: LocalCheckoutContext | None = None
+):
+    """Fix the code files based on their language."""
+    if ctx is None:
+        ctx = LocalCheckoutContext(w)
+    if not path:
+        response = prompts.question(
+            "Which file or directory do you want to lint?",
+            default=Path.cwd().as_posix(),
+            validate=lambda p_: Path(p_).exists(),
+        )
+        assert response
+        path = Path(response)
+    for advice in ctx.local_code_linter.apply(Path(path)):
         print(advice.message)
 
 
