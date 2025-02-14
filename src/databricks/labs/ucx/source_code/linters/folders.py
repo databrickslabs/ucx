@@ -4,7 +4,7 @@ import logging
 from collections.abc import Callable, Iterable
 from pathlib import Path
 
-from databricks.labs.ucx.source_code.base import Failure, LocatedAdvice, is_a_notebook
+from databricks.labs.ucx.source_code.base import LocatedAdvice, is_a_notebook
 from databricks.labs.ucx.source_code.files import FileLoader
 from databricks.labs.ucx.source_code.folders import FolderLoader
 from databricks.labs.ucx.source_code.graph import (
@@ -59,7 +59,7 @@ class LocalCodeLinter:
         walker = LinterWalker(maybe_graph.graph, self._path_lookup, self._context_factory)
         yield from walker
 
-    def apply(self, path: Path) -> None:
+    def apply(self, path: Path) -> Iterable[LocatedAdvice]:
         """Apply local code fixes to become Unity Catalog compatible.
 
         Parameters :

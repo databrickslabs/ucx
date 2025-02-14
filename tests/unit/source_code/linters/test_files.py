@@ -2,7 +2,6 @@ from pathlib import Path
 from unittest.mock import create_autospec
 
 import pytest
-from databricks.labs.blueprint.tui import MockPrompts
 
 
 from databricks.sdk.service.workspace import Language

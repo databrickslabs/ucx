@@ -879,7 +879,7 @@ def lint_local_code(
         assert response
         path = Path(response)
     for advice in ctx.local_code_linter.lint(Path(path)):
-        print(advice.message)
+        print(advice)
 
 
 @ucx.command
@@ -898,7 +898,7 @@ def migrate_local_code(
         assert response
         path = Path(response)
     for advice in ctx.local_code_linter.apply(Path(path)):
-        print(advice.message)
+        print(advice)
 
 
 @ucx.command
