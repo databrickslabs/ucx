@@ -1,5 +1,6 @@
 import dataclasses
 import logging
+import urllib.parse
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
@@ -170,8 +171,20 @@ class SparkCallMatcher(_TableNameMatcher):
 
     def apply(self, from_table: FromTableSqlLinter, index: TableMigrationIndex, node: Call) -> None:
         table_arg = self._get_table_arg(node)
-        assert isinstance(table_arg, Const)
-        # TODO locate constant when value is inferred
+        if not isinstance(table_arg, Const):
+            # TODO: https://github.com/databrickslabs/ucx/issues/3695
+            source_code = node.as_string()
+            new_issue_url = (
+                "https://github.com/databrickslabs/ucx/issues/new?title=Autofix+the+following+Python+code"
+                "&labels=migrate/code,needs-triage&type=Feature"
+                "&body=%23+Desired+behaviour%0A%0AAutofix+following+Python+code"
+                "%0A%0A%60%60%60+python%0ATODO:+Add+relevant+source+code%0A"
+                f"{urllib.parse.quote_plus(source_code)}%0A%60%60%60"
+            )
+            logger.warning(
+                f"Cannot fix the following Python code: {source_code}. Please report this issue at {new_issue_url}"
+            )
+            return
         info = UsedTable.parse(table_arg.value, from_table.schema)
         dst = self._find_dest(index, info)
         if dst is not None:

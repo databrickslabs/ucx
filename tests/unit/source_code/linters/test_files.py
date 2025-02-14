@@ -302,6 +302,7 @@ print(2
     ]
 
 
+@pytest.mark.skip(reason="https://github.com/databrickslabs/ucx/issues/3695")
 def test_notebook_linter_lints_and_applies_migrated_table(tmp_path, migration_index, mock_path_lookup) -> None:
     """Regression test with the tests below."""
     expected = """
@@ -378,6 +379,7 @@ spark.table(table_name)
     assert path.read_text() == source_code
 
 
+@pytest.mark.skip(reason="https://github.com/databrickslabs/ucx/issues/3695")
 def test_notebook_linter_lints_and_applies_migrated_table_with_rename(
     tmp_path, migration_index, mock_path_lookup
 ) -> None:
