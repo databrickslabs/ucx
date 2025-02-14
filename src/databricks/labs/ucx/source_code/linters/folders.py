@@ -102,4 +102,4 @@ class LocalCodeLinter:
         problems = list(container.build_dependency_graph(graph))
         if problems:
             return MaybeGraph(None, problems)
-        return MaybeGraph(graph)
+        return MaybeGraph(graph, [])
