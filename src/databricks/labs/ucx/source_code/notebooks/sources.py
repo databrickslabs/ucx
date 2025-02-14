@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 
 class Notebook(SourceContainer):
-    """
+    """A notebook source code container.
 
     TODO:
         Let `Notebook` inherit from `LocalFile`
