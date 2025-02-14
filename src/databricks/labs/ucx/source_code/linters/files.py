@@ -86,26 +86,23 @@ class NotebookLinter:
                 linter = self._context.linter(cell.language.language)
             except ValueError:  # Language is not supported (yet)
                 continue
+            fixed_code = cell.original_code  # For default fixing
+            tree = self._python_tree_cache.get((self._notebook.path, cell))  # For Python fixing
             is_python_cell = isinstance(cell, PythonCell)
-            tree: Tree | None = None  # For Python fixing
-            if is_python_cell:
-                tree = self._python_tree_cache[(self._notebook.path, cell)]
+            if is_python_cell and tree:
                 advices = cast(PythonLinter, linter).lint_tree(tree)
             else:
                 advices = linter.lint(cell.original_code)
-            fixed_code = cell.original_code  # For default fixing
             for advice in advices:
                 fixer = self._context.fixer(cell.language.language, advice.code)
                 if not fixer:
                     continue
                 if is_python_cell and tree:
-                    # By calling `apply_tree` directly, we chain fixes on the same tree
+                    # By calling `apply_tree` instead of `apply`, we chain fixes on the same tree
                     tree = cast(PythonFixer, fixer).apply_tree(tree)
                 else:
                     fixed_code = fixer.apply(fixed_code)
-            if tree:
-                fixed_code = tree.node.as_string()
-            cell.migrated_code = fixed_code
+            cell.migrated_code = tree.node.as_string() if tree else fixed_code
         self._notebook.back_up_original_and_flush_migrated_code()
         return
 
