@@ -128,7 +128,7 @@ class LinterWalker(DependencyGraphWalker[LocatedAdvice]):
             yield LocatedAdvice(advice, dependency.path)
 
 
-class FixerWalker(DependencyGraphWalker[LocatedAdvice]):
+class FixerWalker(DependencyGraphWalker[None]):
     """Fix the dependencies in the graph."""
 
     def __init__(self, graph: DependencyGraph, path_lookup: PathLookup, context_factory: Callable[[], LinterContext]):
@@ -144,11 +144,12 @@ class FixerWalker(DependencyGraphWalker[LocatedAdvice]):
         dependency: Dependency,
         path_lookup: PathLookup,
         inherited_tree: Tree | None,
-    ) -> None:
+    ) -> Iterable[None]:
         """Fix the dependency."""
         # FileLinter determines which file/notebook linter to use
         linter = FileLinter(dependency, path_lookup, self._context_factory(), inherited_tree)
         linter.apply()
+        yield from ()
 
 
 S = TypeVar("S", bound=SourceInfo)
