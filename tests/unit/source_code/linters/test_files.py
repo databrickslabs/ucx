@@ -267,6 +267,37 @@ def test_notebook_linter_applies_migrated_table_with_rename(tmp_path, migration_
     assert "brand.new.stuff" in contents
 
 
+def test_notebook_linter_applies_two_migrated_table_with_rename(tmp_path, migration_index, mock_path_lookup) -> None:
+    """The table should be migrated to the new table names as defined in the migration index."""
+    path = tmp_path / "notebook.py"
+    source = "# Databricks notebook source\nspark.table('old.things')\nspark.table('other.matters')"
+    path.write_text(source)
+    notebook = Notebook.parse(path, source, Language.PYTHON)
+    linter = NotebookLinter(notebook, mock_path_lookup, LinterContext(migration_index))
+
+    linter.apply()
+
+    contents = path.read_text()
+    assert "old.things" not in contents
+    assert "brand.new.stuff" in contents
+    assert "some.certain.issues" in contents
+
+
+def test_notebook_linter_applies_no_op_for_non_migrated_table(tmp_path, migration_index, mock_path_lookup) -> None:
+    """The table should not be migrated to the new table name as defined in the migration index."""
+    path = tmp_path / "notebook.py"
+    source = "# Databricks notebook source\nspark.table('not.migrated.table')"
+    path.write_text(source)
+    notebook = Notebook.parse(path, source, Language.PYTHON)
+    linter = NotebookLinter(notebook, mock_path_lookup, LinterContext(migration_index))
+
+    linter.apply()
+
+    contents = path.read_text()
+    assert "not.migrated.table" in contents
+    assert "brand.new.stuff" not in contents
+
+
 @pytest.mark.xfail(reason="https://github.com/databrickslabs/ucx/issues/3556")
 def test_notebook_linter_lints_source_yielding_parse_failures(migration_index, mock_path_lookup) -> None:
     source = """
