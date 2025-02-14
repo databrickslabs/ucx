@@ -59,7 +59,7 @@ class LocalCodeLinter:
         walker = LinterWalker(maybe_graph.graph, self._path_lookup, self._context_factory)
         yield from walker
 
-    def apply(self, path: Path) -> Iterable[LocatedAdvice]:
+    def apply(self, path: Path) -> None:
         """Apply local code fixes to become Unity Catalog compatible.
 
         Parameters :
@@ -73,7 +73,7 @@ class LocalCodeLinter:
             return
         assert maybe_graph.graph
         walker = FixerWalker(maybe_graph.graph, self._path_lookup, self._context_factory)
-        yield from walker
+        list(walker)  # Nothing to yield
 
     def _build_dependency_graph_from_path(self, path: Path) -> MaybeGraph:
         """Build a dependency graph from the path.
