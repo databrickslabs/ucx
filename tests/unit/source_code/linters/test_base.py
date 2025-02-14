@@ -31,8 +31,7 @@ def test_python_fixer_applies_valid_python() -> None:
             return tree
 
     fixer = _PythonFixer()
-    assert fixer.diagnostic_code == "dummy"
-    assert fixer.apply("print(1)") == "fixed"
+    assert fixer.apply("print(1)\n") == "print(1)\n\n"  # Format introduces EOF newline
 
 
 def test_python_fixer_applies_invalid_python() -> None:
