@@ -36,7 +36,7 @@ def test_local_code_linter_walks_directory(mock_path_lookup, local_code_linter) 
     # TODO remove sample paths and clean up test when the paths is no longer needed
     mock_path_lookup.append_path(Path(_samples_path(SourceContainer)))
     path = Path(__file__).parent / "../samples" / "simulate-sys-path"
-    advices = list(local_code_linter.lint_path(path))
+    advices = list(local_code_linter.lint(path))
     assert len(mock_path_lookup.successfully_resolved_paths) > 10
     assert not advices
 
@@ -45,7 +45,7 @@ def test_local_code_linter_lints_children_in_context(mock_path_lookup, local_cod
     # TODO remove sample paths and clean up test when the paths is no longer needed
     mock_path_lookup.append_path(Path(_samples_path(SourceContainer)))
     path = Path(__file__).parent.parent / "samples" / "parent-child-context"
-    advices = list(local_code_linter.lint_path(path))
+    advices = list(local_code_linter.lint(path))
     assert mock_path_lookup.successfully_resolved_paths == {path, Path("parent.py"), Path("child.py")}
     assert not advices
 
@@ -71,7 +71,7 @@ def test_local_code_linter_lints_import_from_known_list(tmp_path, mock_path_look
     content = "import pyspark.sql.functions"  # Has known issues
     path = tmp_path / "file.py"
     path.write_text(content)
-    located_advices = list(local_code_linter.lint_path(path))
+    located_advices = list(local_code_linter.lint(path))
 
     assert located_advices == expected_located_advices
 
@@ -89,7 +89,7 @@ def test_local_code_linter_lints_known_s3fs_problems(local_code_linter, mock_pat
         -1,
     )
     path = mock_path_lookup.resolve(Path("leaf9.py"))
-    located_advices = list(local_code_linter.lint_path(path))
+    located_advices = list(local_code_linter.lint(path))
     assert located_advices == [LocatedAdvice(expected, Path(known_url + "#s3fs"))]
 
 
@@ -133,5 +133,5 @@ def test_local_code_linter_lints_known_s3fs_problems_from_source_code(
     expected = [LocatedAdvice(advice, Path(f"{known_url}#{module_name}"))] if advice else []
     path = tmp_path / "file.py"
     path.write_text(source_code)
-    located_advices = list(local_code_linter.lint_path(path))
+    located_advices = list(local_code_linter.lint(path))
     assert located_advices == expected

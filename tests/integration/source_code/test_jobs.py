@@ -3,13 +3,11 @@ import shutil
 from collections.abc import Callable
 from dataclasses import replace
 from datetime import timedelta, datetime, timezone
-from io import StringIO
 from pathlib import Path
 from unittest.mock import create_autospec
 
 import pytest
 from databricks.labs.blueprint.paths import DBFSPath, WorkspacePath
-from databricks.labs.blueprint.tui import Prompts
 from databricks.labs.pytester.fixtures.baseline import factory
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
@@ -175,7 +173,7 @@ def test_workflow_linter_lints_job_with_import_pypi_library(simple_ctx, make_job
     assert len([problem for problem in problems if problem.message == problem_message]) == 0
 
 
-def test_lint_local_code(simple_ctx):
+def test_lint_local_code(simple_ctx) -> None:
     # no need to connect
     session_state = CurrentSessionState()
     linter_context = LinterContext(TableMigrationIndex([]), session_state)
@@ -191,7 +189,7 @@ def test_lint_local_code(simple_ctx):
         light_ctx.dependency_resolver,
         lambda: linter_context,
     )
-    problems = linter.lint(Prompts(), path_to_scan, StringIO())
+    problems = list(linter.lint(path_to_scan))
     assert len(problems) > 0
 
 
