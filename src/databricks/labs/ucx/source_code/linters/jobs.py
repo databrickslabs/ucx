@@ -25,7 +25,7 @@ from databricks.labs.ucx.source_code.graph import DependencyResolver, Dependency
 from databricks.labs.ucx.source_code.jobs import JobProblem, WorkflowTask, WorkflowTaskContainer
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.linters.graph_walkers import (
-    LintingWalker,
+    LinterWalker,
     DfsaCollectorWalker,
     TablesCollectorWalker,
 )
@@ -173,7 +173,7 @@ class WorkflowLinter:
         return graph, located_advices, session_state
 
     def _lint_task(self, graph: DependencyGraph, session_state: CurrentSessionState) -> Iterable[LocatedAdvice]:
-        walker = LintingWalker(graph, self._path_lookup, lambda: LinterContext(self._migration_index, session_state))
+        walker = LinterWalker(graph, self._path_lookup, lambda: LinterContext(self._migration_index, session_state))
         yield from walker
 
     def _collect_task_dfsas(

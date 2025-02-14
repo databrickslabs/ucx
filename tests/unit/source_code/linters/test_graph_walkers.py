@@ -11,7 +11,7 @@ from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.linters.graph_walkers import (
     DependencyGraphWalker,
     DfsaCollectorWalker,
-    LintingWalker,
+    LinterWalker,
 )
 from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader
@@ -94,7 +94,7 @@ def test_linting_walker_populates_paths(simple_dependency_resolver, mock_path_lo
     root = Dependency(NotebookLoader(), path)
     xgraph = DependencyGraph(root, None, simple_dependency_resolver, mock_path_lookup, CurrentSessionState())
     current_session = CurrentSessionState()
-    walker = LintingWalker(xgraph, mock_path_lookup, lambda: LinterContext(migration_index, current_session))
+    walker = LinterWalker(xgraph, mock_path_lookup, lambda: LinterContext(migration_index, current_session))
     advices = 0
     for advice in walker:
         advices += 1

@@ -104,7 +104,7 @@ class DependencyGraphWalker(abc.ABC, Generic[T]):
         return list(itertools.chain(*lists))
 
 
-class LintingWalker(DependencyGraphWalker[LocatedAdvice]):
+class LinterWalker(DependencyGraphWalker[LocatedAdvice]):
     """Lint the dependencies in the graph."""
 
     def __init__(self, graph: DependencyGraph, path_lookup: PathLookup, context_factory: Callable[[], LinterContext]):
@@ -126,6 +126,29 @@ class LintingWalker(DependencyGraphWalker[LocatedAdvice]):
         linter = FileLinter(dependency, path_lookup, self._context_factory(), inherited_tree)
         for advice in linter.lint():
             yield LocatedAdvice(advice, dependency.path)
+
+
+class FixerWalker(DependencyGraphWalker[LocatedAdvice]):
+    """Fix the dependencies in the graph."""
+
+    def __init__(self, graph: DependencyGraph, path_lookup: PathLookup, context_factory: Callable[[], LinterContext]):
+        super().__init__(graph, path_lookup)
+        self._context_factory = context_factory
+
+    def _log_walk_one(self, dependency: Dependency) -> None:
+        """Log fixing a dependency"""
+        logger.info(f"Fixing dependency: {dependency}")
+
+    def _process_dependency(
+        self,
+        dependency: Dependency,
+        path_lookup: PathLookup,
+        inherited_tree: Tree | None,
+    ) -> None:
+        """Fix the dependency."""
+        # FileLinter determines which file/notebook linter to use
+        linter = FileLinter(dependency, path_lookup, self._context_factory(), inherited_tree)
+        linter.apply()
 
 
 S = TypeVar("S", bound=SourceInfo)

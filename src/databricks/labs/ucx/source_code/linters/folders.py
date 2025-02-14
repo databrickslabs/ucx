@@ -14,7 +14,7 @@ from databricks.labs.ucx.source_code.graph import DependencyResolver, Dependency
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.folders import FolderLoader
 from databricks.labs.ucx.source_code.files import FileLoader
-from databricks.labs.ucx.source_code.linters.graph_walkers import LintingWalker
+from databricks.labs.ucx.source_code.linters.graph_walkers import LinterWalker
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
@@ -80,5 +80,5 @@ class LocalCodeLinter:
         for problem in problems:
             yield problem.as_located_advice()
             return
-        walker = LintingWalker(graph, self._path_lookup, self._context_factory)
+        walker = LinterWalker(graph, self._path_lookup, self._context_factory)
         yield from walker
