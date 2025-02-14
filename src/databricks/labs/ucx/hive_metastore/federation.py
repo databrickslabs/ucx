@@ -3,7 +3,6 @@ import logging
 import re
 from dataclasses import dataclass, replace
 from functools import cached_property
-from typing import ClassVar
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.tui import Prompts
@@ -78,9 +77,18 @@ class HiveMetastoreFederation(SecretsMixin):
         self._enable_hms_federation = enable_hms_federation
         self._config = config
 
-    # Supported databases and version for HMS Federation
-    supported_database_versions: ClassVar[dict[str, list[str]]] = {
-        "mysql": ["2.3", "0.13"],
+    # Supported databases
+    supported_databases_port: dict[str, int] = {
+        "mysql": 3306,
+        "postgresql": 5432,
+        "mssql": 1433,
+    }
+
+    # Supported versions
+    supported_hms_versions: set = {
+        "0.13",
+        "2.3",
+        "3.1",
     }
 
     def create_from_cli(self, prompts: Prompts) -> None:
@@ -132,14 +140,13 @@ class HiveMetastoreFederation(SecretsMixin):
             logger.info(f'Wrong Hive Metastore Database Version Format: {version}')
             return None
         major_minor_version = major_minor_match.group(1)
+        # Verify HMS version
+        if major_minor_version not in self.supported_hms_versions:
+            logger.info(
+                f'Unsupported Hive Metastore Version: {version}. We currently support: {self.supported_hms_versions}'
+            )
+            return None
         external_hms = replace(self._split_jdbc_url(jdbc_url), version=major_minor_version)
-        supported_versions = self.supported_database_versions.get(external_hms.database_type)
-        if not supported_versions:
-            logger.info(f'Unsupported Hive Metastore: {external_hms.database_type}')
-            return None
-        if major_minor_version not in supported_versions:
-            logger.info(f'Unsupported Hive Metastore Version: {external_hms.database_type} - {version}')
-            return None
 
         if not external_hms.user:
             external_hms = replace(
@@ -159,18 +166,22 @@ class HiveMetastoreFederation(SecretsMixin):
     def _split_jdbc_url(cls, jdbc_url: str) -> ExternalHmsInfo:
         # Define the regex pattern to match the JDBC URL components
         pattern = re.compile(
-            r'jdbc:(?P<db_type>[a-zA-Z0-9]+)://(?P<host>[^:/]+):(?P<port>\d+)/(?P<database>[^?]+)(\?user=(?P<user>[^&]+)&password=(?P<password>[^&]+))?'
+            r'jdbc:(?P<db_type>[a-zA-Z0-9]+)://(?P<host>[^:/]+)(:(?P<port>\d+))?(/(?P<database>[^?^;]+))?([?;](?P<parameters>.+))?'
         )
         match = pattern.match(jdbc_url)
         if not match:
             raise ValueError(f'Unsupported JDBC URL: {jdbc_url}')
 
+        params = {}
+        if match.group('parameters'):
+            params = dict(param.split('=') for param in re.split(r"[;&]",match.group('parameters')))
+
         db_type = match.group('db_type')
         host = match.group('host')
-        port = match.group('port')
-        database = match.group('database')
-        user = match.group('user')
-        password = match.group('password')
+        port = match.group('port') or cls.supported_databases_port.get(db_type)
+        database = match.group('database') or params.get("database")
+        user = params.get('user')
+        password = params.get('password')
 
         return ExternalHmsInfo(db_type, host, port, database, user, password, None)
 
