@@ -81,7 +81,7 @@ class HiveMetastoreFederation(SecretsMixin):
     supported_databases_port: dict[str, int] = {
         "mysql": 3306,
         "postgresql": 5432,
-        "mssql": 1433,
+        "sqlserver": 1433,
     }
 
     # Supported versions
@@ -166,7 +166,7 @@ class HiveMetastoreFederation(SecretsMixin):
     def _split_jdbc_url(cls, jdbc_url: str) -> ExternalHmsInfo:
         # Define the regex pattern to match the JDBC URL components
         pattern = re.compile(
-            r'jdbc:(?P<db_type>[a-zA-Z0-9]+)://(?P<host>[^:/]+)(:(?P<port>\d+))?(/(?P<database>[^?^;]+))?([?;](?P<parameters>.+))?'
+            r'jdbc:(?P<db_type>[a-zA-Z0-9]+)://(?P<host>[^:/?;]+)(:(?P<port>\d+))?(/(?P<database>[^?^;]+))?([?;](?P<parameters>.+))?'
         )
         match = pattern.match(jdbc_url)
         if not match:
@@ -174,11 +174,13 @@ class HiveMetastoreFederation(SecretsMixin):
 
         params = {}
         if match.group('parameters'):
-            params = dict(param.split('=') for param in re.split(r"[;&]",match.group('parameters')))
+            params = dict(param.split('=') for param in re.split(r"[;&]", match.group('parameters')))
 
         db_type = match.group('db_type')
+        port = match.group('port') or str(cls.supported_databases_port.get(db_type))
+        if not port:
+            raise ValueError(f"Can't identify Port for {db_type}")
         host = match.group('host')
-        port = match.group('port') or cls.supported_databases_port.get(db_type)
         database = match.group('database') or params.get("database")
         user = params.get('user')
         password = params.get('password')
