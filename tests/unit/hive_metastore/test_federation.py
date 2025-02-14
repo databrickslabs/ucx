@@ -1,4 +1,5 @@
 import base64
+import pytest
 from unittest.mock import create_autospec, call
 
 from databricks.labs.blueprint.installation import MockInstallation
@@ -87,7 +88,59 @@ def test_create_federated_catalog_int(mock_installation):
     assert calls == workspace_client.grants.method_calls
 
 
-def test_create_federated_catalog_ext(mock_installation):
+@pytest.mark.parametrize(
+    "config, expected",
+    [
+        (
+            {
+                "spark.hadoop.javax.jdo.option.ConnectionPassword": "{{secrets/secret_scope/secret_key}}",
+                "spark.hadoop.javax.jdo.option.ConnectionURL": "jdbc:mysql://hostname.us-east-2.rds.amazonaws.com:3306/metastore",
+                "spark.hadoop.javax.jdo.option.ConnectionUserName": "foo",
+                "spark.sql.hive.metastore.version": "2.3.0",
+            },
+            {
+                'database': 'metastore',
+                'db_type': 'mysql',
+                'host': 'hostname.us-east-2.rds.amazonaws.com',
+                'password': 'bar',
+                'port': '3306',
+                'user': 'foo',
+                'version': '2.3',
+            },
+        ),
+        (
+            {
+                "spark.hadoop.javax.jdo.option.ConnectionURL": "jdbc:mysql://hostname.us-east-2.rds.amazonaws.com:3306/metastore?user=foo&password=bar",
+                "spark.sql.hive.metastore.version": "3.1.2",
+            },
+            {
+                'database': 'metastore',
+                'db_type': 'mysql',
+                'host': 'hostname.us-east-2.rds.amazonaws.com',
+                'password': 'bar',
+                'port': '3306',
+                'user': 'foo',
+                'version': '3.1',
+            },
+        ),
+        (
+            {
+                "spark.hadoop.javax.jdo.option.ConnectionURL": "jdbc:sqlserver://teststableip.database.windows.net;database=teststableip;user=teststableip@teststableip;password=bar",
+                "spark.sql.hive.metastore.version": "3.1.2",
+            },
+            {
+                'database': 'teststableip',
+                'db_type': 'sqlserver',
+                'host': 'teststableip.database.windows.net',
+                'password': 'bar',
+                'port': '1433',
+                'user': 'teststableip@teststableip',
+                'version': '3.1',
+            },
+        ),
+    ],
+)
+def test_create_federated_catalog_ext(mock_installation, config, expected):
     workspace_client = create_autospec(WorkspaceClient)
     external_locations = create_autospec(ExternalLocations)
     workspace_info = create_autospec(WorkspaceInfo)
@@ -109,14 +162,7 @@ def test_create_federated_catalog_ext(mock_installation):
     )
     mock_installation.load = lambda _: WorkspaceConfig(
         inventory_database='ucx',
-        spark_conf={
-            "spark.hadoop.javax.jdo.option.ConnectionDriverName": "org.mariadb.jdbc.Driver",
-            "spark.hadoop.javax.jdo.option.ConnectionPassword": "{{secrets/secret_scope/secret_key}}",
-            "spark.hadoop.javax.jdo.option.ConnectionURL": "jdbc:mysql://hostname.us-east-2.rds.amazonaws.com:3306/metastore",
-            "spark.hadoop.javax.jdo.option.ConnectionUserName": "foo",
-            "spark.sql.hive.metastore.jars": "maven",
-            "spark.sql.hive.metastore.version": "2.3.0",
-        },
+        spark_conf=config,
     )
 
     hms_fed = HiveMetastoreFederation(
@@ -134,15 +180,7 @@ def test_create_federated_catalog_ext(mock_installation):
     workspace_client.connections.create.assert_called_with(
         name='fed_source',
         connection_type=ConnectionType.HIVE_METASTORE,
-        options={
-            'database': 'metastore',
-            'db_type': 'mysql',
-            'host': 'hostname.us-east-2.rds.amazonaws.com',
-            'password': 'bar',
-            'port': '3306',
-            'user': 'foo',
-            'version': '2.3',
-        },
+        options=expected,
     )
     workspace_client.catalogs.create.assert_called_with(
         name='a',
