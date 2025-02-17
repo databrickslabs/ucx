@@ -1,11 +1,14 @@
 import dataclasses
 import logging
+import urllib.parse
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from typing import TypeVar
 
 from astroid import Attribute, Call, Const, Name, NodeNG  # type: ignore
+
+from databricks.labs.ucx import GITHUB_URL
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex, TableMigrationStatus
 from databricks.labs.ucx.source_code.base import (
     Advice,
@@ -20,6 +23,7 @@ from databricks.labs.ucx.source_code.base import (
 from databricks.labs.ucx.source_code.linters.base import (
     SqlLinter,
     Fixer,
+    PythonFixer,
     PythonLinter,
     DfsaPyCollector,
     TablePyCollector,
@@ -33,7 +37,6 @@ from databricks.labs.ucx.source_code.python.python_infer import InferredValue
 from databricks.labs.ucx.source_code.linters.from_table import FromTableSqlLinter
 from databricks.labs.ucx.source_code.python.python_ast import (
     MatchingVisitor,
-    MaybeTree,
     Tree,
     TreeHelper,
 )
@@ -170,8 +173,20 @@ class SparkCallMatcher(_TableNameMatcher):
 
     def apply(self, from_table: FromTableSqlLinter, index: TableMigrationIndex, node: Call) -> None:
         table_arg = self._get_table_arg(node)
-        assert isinstance(table_arg, Const)
-        # TODO locate constant when value is inferred
+        if not isinstance(table_arg, Const):
+            # TODO: https://github.com/databrickslabs/ucx/issues/3695
+            source_code = node.as_string()
+            new_issue_url = (
+                f"{GITHUB_URL}/issues/new?title=Autofix+the+following+Python+code"
+                "&labels=migrate/code,needs-triage&type=Feature"
+                "&body=%23+Desired+behaviour%0A%0AAutofix+following+Python+code"
+                "%0A%0A%60%60%60+python%0ATODO:+Add+relevant+source+code%0A"
+                f"{urllib.parse.quote_plus(source_code)}%0A%60%60%60"
+            )
+            logger.warning(
+                f"Cannot fix the following Python code: {source_code}. Please report this issue at {new_issue_url}"
+            )
+            return
         info = UsedTable.parse(table_arg.value, from_table.schema)
         dst = self._find_dest(index, info)
         if dst is not None:
@@ -393,7 +408,7 @@ class SparkTableNameMatchers:
         return self._matchers
 
 
-class SparkTableNamePyLinter(PythonLinter, Fixer, TablePyCollector):
+class SparkTableNamePyLinter(PythonLinter, PythonFixer, TablePyCollector):
     """Linter for table name references in PySpark
 
     Examples:
@@ -427,21 +442,15 @@ class SparkTableNamePyLinter(PythonLinter, Fixer, TablePyCollector):
             assert isinstance(node, Call)
             yield from matcher.lint(self._from_table, self._index, self._session_state, node)
 
-    def apply(self, code: str) -> str:
-        maybe_tree = MaybeTree.from_source_code(code)
-        if not maybe_tree.tree:
-            assert maybe_tree.failure is not None
-            logger.warning(maybe_tree.failure.message)
-            return code
-        tree = maybe_tree.tree
-        # we won't be doing it like this in production, but for the sake of the example
+    def apply_tree(self, tree: Tree) -> Tree:
+        """Apply the fixes to the AST tree."""
         for node in tree.walk():
             matcher = self._find_matcher(node)
             if matcher is None:
                 continue
             assert isinstance(node, Call)
             matcher.apply(self._from_table, self._index, node)
-        return tree.node.as_string()
+        return tree
 
     def _find_matcher(self, node: NodeNG) -> _TableNameMatcher | None:
         if not isinstance(node, Call):
@@ -476,7 +485,7 @@ class _SparkSqlAnalyzer:
             yield call_node, query
 
 
-class _SparkSqlPyLinter(_SparkSqlAnalyzer, PythonLinter, Fixer):
+class _SparkSqlPyLinter(_SparkSqlAnalyzer, PythonLinter, PythonFixer):
     """Linter for SparkSQL used within PySpark."""
 
     def __init__(self, sql_linter: SqlLinter, sql_fixer: Fixer | None):
@@ -503,15 +512,10 @@ class _SparkSqlPyLinter(_SparkSqlAnalyzer, PythonLinter, Fixer):
                     code = self.diagnostic_code
                 yield dataclasses.replace(advice.replace_from_node(call_node), code=code)
 
-    def apply(self, code: str) -> str:
+    def apply_tree(self, tree: Tree) -> Tree:
+        """Apply the fixes to the AST tree."""
         if not self._sql_fixer:
-            return code
-        maybe_tree = MaybeTree.from_source_code(code)
-        if maybe_tree.failure:
-            logger.warning(maybe_tree.failure.message)
-            return code
-        assert maybe_tree.tree is not None
-        tree = maybe_tree.tree
+            return tree
         for _call_node, query in self._visit_call_nodes(tree):
             if not isinstance(query, Const) or not isinstance(query.value, str):
                 continue
@@ -519,7 +523,7 @@ class _SparkSqlPyLinter(_SparkSqlAnalyzer, PythonLinter, Fixer):
             # this requires changing 'apply' API in order to check advice fragment location
             new_query = self._sql_fixer.apply(query.value)
             query.value = new_query
-        return tree.node.as_string()
+        return tree
 
 
 class FromTableSqlPyLinter(_SparkSqlPyLinter):

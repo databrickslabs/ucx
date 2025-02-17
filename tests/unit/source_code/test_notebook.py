@@ -101,9 +101,8 @@ def test_notebook_rebuilds_same_code(source: tuple[str, Language, list[str]]) ->
     assert len(sources) == 1
     notebook = Notebook.parse(Path(path), sources[0], source[1])
     assert notebook is not None
-    new_source = notebook.to_migrated_code()
     # ignore trailing whitespaces
-    actual_purified = re.sub(r'\s+$', '', new_source, flags=re.MULTILINE)
+    actual_purified = re.sub(r'\s+$', '', notebook.migrated_code, flags=re.MULTILINE)
     expected_purified = re.sub(r'\s+$', '', sources[0], flags=re.MULTILINE)
     assert actual_purified == expected_purified
 

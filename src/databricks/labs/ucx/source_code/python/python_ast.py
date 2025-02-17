@@ -29,9 +29,9 @@ from astroid import (  # type: ignore
 )
 from astroid.exceptions import AstroidSyntaxError  # type: ignore
 
-from databricks.labs.ucx.source_code.base import (
-    Failure,
-)
+from databricks.labs.ucx import GITHUB_URL
+from databricks.labs.ucx.source_code.base import Failure
+
 
 logger = logging.getLogger(__name__)
 missing_handlers: set[str] = set()
@@ -101,8 +101,8 @@ class MaybeTree:
                 end_col=(e.error.end_offset or 2) - 1,
             )
         new_issue_url = (
-            "https://github.com/databrickslabs/ucx/issues/new?title=[BUG]:+Python+parse+error"
-            "&labels=migrate/code,needs-triage,bug"
+            f"{GITHUB_URL}/issues/new?title=Python+parse+error"
+            "&labels=migrate/code,needs-triage&type=Bug"
             "&body=%23+Current+behaviour%0A%0ACannot+parse+the+following+Python+code"
             f"%0A%0A%60%60%60+python%0A{urllib.parse.quote_plus(source_code)}%0A%60%60%60"
         )
