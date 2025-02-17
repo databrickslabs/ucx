@@ -111,7 +111,7 @@ def test_fixer_walker_resolves_paths(mock_path_lookup, simple_dependency_resolve
     path = mock_path_lookup.resolve(Path("parent-child-context/child.py"))
     dependency = Dependency(FileLoader(), path)
     graph = DependencyGraph(dependency, None, simple_dependency_resolver, mock_path_lookup, CurrentSessionState())
-    walker = FixerWalker(graph, mock_path_lookup, lambda: LinterContext())
+    walker = FixerWalker(graph, mock_path_lookup, LinterContext)
 
     list(walker)
 
