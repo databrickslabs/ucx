@@ -408,7 +408,7 @@ def safe_read_text(path: Path, size: int = -1) -> str | None:
     """
     try:
         return read_text(path, size=size)
-    except (FileNotFoundError, UnicodeDecodeError, PermissionError) as e:
+    except (OSError, UnicodeError) as e:
         logger.warning(f"Could not read file: {path}", exc_info=e)
         return None
 
