@@ -906,30 +906,30 @@ def test_migrate_external_tables_with_spn_azure(
     assert match
 
 
-def test_migration_index_deleted_source(make_table, runtime_ctx, sql_backend, make_catalog, make_schema, caplog):
-    src_table = make_table()
-    dst_catalog = make_catalog()
-    dst_schema = make_schema(catalog_name=dst_catalog.name)
-    # Create table in the destination schema
-    sql_backend.execute(f"CREATE TABLE {dst_schema.full_name}.fake_table (id INT)")
+def test_migration_index_includes_deleted_source(caplog, runtime_ctx) -> None:
+    """The migration index should include a source table that was deleted.
 
-    # Set the target table with non-existing source
-    sql_backend.execute(
-        f"ALTER TABLE {dst_schema.full_name}.fake_table SET "
-        f"TBLPROPERTIES('upgraded_from' = '{src_table.full_name}');"
-    )
-    # Get the latest migration index
+    The source table is included in the index to avoid re-migration.
+    """
+    src_table = runtime_ctx.make_table()
+    dst_catalog = runtime_ctx.make_catalog()
+    dst_table = runtime_ctx.make_table(catalog_name=dst_catalog.name)
+
+    # Pretend the destination table was upgraded from source table
+    statement = f"ALTER TABLE {dst_table.full_name} SET TBLPROPERTIES('upgraded_from' = '{src_table.full_name}');"
+    runtime_ctx.sql_backend.execute(statement)
     tables = runtime_ctx.tables_crawler.snapshot()
 
-    # drop the source table
-    sql_backend.execute(f"DROP TABLE {src_table.full_name}")
-    # Assert tables contains the source table
-    assert src_table.full_name in [table.full_name for table in tables]
+    assert src_table.full_name in [table.full_name for table in tables], "Sanity check that the source table is there"
 
-    migration_index = runtime_ctx.tables_migrator.index(force_refresh=True)
-    assert migration_index
-    # Assert that an error message was recorded containing a line with the text "which does no longer exist"
+    # Drop table to simulate source table was deleted
+    runtime_ctx.sql_backend.execute(f"DROP TABLE {src_table.full_name}")
+    with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.hive_metastore.table_migrate"):
+        table_migration_index = runtime_ctx.tables_migrator.index(force_refresh=True)
+
+    # The source table should still be in the index to avoid re-migration
+    assert table_migration_index.is_migrated(src_table.schema_name, src_table.name)
     expected_message = (
         f"failed-to-migrate: {src_table.schema_name}.{src_table.name} set as a source does no longer exist"
     )
-    assert any(expected_message in record.message for record in caplog.records)
+    assert expected_message in caplog.messages
