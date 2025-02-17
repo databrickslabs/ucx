@@ -16,15 +16,12 @@ from databricks.sdk.service.compute import Library, PythonPyPiLibrary
 from databricks.sdk.service.pipelines import NotebookLibrary
 from databricks.sdk.service.workspace import ImportFormat, Language
 
-from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.source_code.base import CurrentSessionState, LineageAtom
 from databricks.labs.ucx.source_code.directfs_access import DirectFsAccess
 from databricks.labs.ucx.source_code.graph import Dependency
 from databricks.labs.ucx.source_code.known import UNKNOWN, KnownList
 from databricks.labs.ucx.source_code.folders import FolderLoader
 from databricks.labs.ucx.source_code.files import FileLoader
-from databricks.labs.ucx.source_code.linters.folders import LocalCodeLinter
-from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.sdk.service import jobs, compute, pipelines
