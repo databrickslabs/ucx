@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from typing import TypeVar
 
 from astroid import Attribute, Call, Const, Name, NodeNG  # type: ignore
+
+from databricks.labs.ucx import GITHUB_URL
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex, TableMigrationStatus
 from databricks.labs.ucx.source_code.base import (
     Advice,
@@ -175,7 +177,7 @@ class SparkCallMatcher(_TableNameMatcher):
             # TODO: https://github.com/databrickslabs/ucx/issues/3695
             source_code = node.as_string()
             new_issue_url = (
-                "https://github.com/databrickslabs/ucx/issues/new?title=Autofix+the+following+Python+code"
+                f"{GITHUB_URL}/issues/new?title=Autofix+the+following+Python+code"
                 "&labels=migrate/code,needs-triage&type=Feature"
                 "&body=%23+Desired+behaviour%0A%0AAutofix+following+Python+code"
                 "%0A%0A%60%60%60+python%0ATODO:+Add+relevant+source+code%0A"
