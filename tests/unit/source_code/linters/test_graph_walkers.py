@@ -8,7 +8,6 @@ import pytest
 from databricks.labs.ucx.source_code.base import CurrentSessionState, DirectFsAccess
 from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph
 from databricks.labs.ucx.source_code.files import FileLoader
-from databricks.labs.ucx.source_code.folders import FolderLoader
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.linters.graph_walkers import (
     DependencyGraphWalker,
@@ -92,7 +91,9 @@ def test_graph_walker_logs_analyzing_dependency_in_debug(
     assert f"Analyzing dependency: {grand_parent_graph.dependency}" in caplog.messages
 
 
-def test_linter_walker_yields_advices_with_known_paths(simple_dependency_resolver, mock_path_lookup, migration_index) -> None:
+def test_linter_walker_yields_advices_with_known_paths(
+    simple_dependency_resolver, mock_path_lookup, migration_index
+) -> None:
     """The linter walker should yield advices with known paths."""
     path = mock_path_lookup.resolve(Path("functional/values_across_notebooks_dbutils_notebook_run.py"))
     dependency = Dependency(NotebookLoader(), path)
