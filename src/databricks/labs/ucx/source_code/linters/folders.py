@@ -84,15 +84,19 @@ class LocalCodeLinter:
             MaybeGraph : If the loading fails, the returned maybe graph contains a problem. Otherwise, returned maybe
             graph contains the graph.
         """
-        is_dir = path.is_dir()
+        resolved_path = self._path_lookup.resolve(path)
+        if not resolved_path:
+            problem = DependencyProblem("path-not-found", "Path not found", source_path=path)
+            return MaybeGraph(None, [problem])
+        is_dir = resolved_path.is_dir()
         loader: DependencyLoader
-        if is_a_notebook(path):
+        if is_a_notebook(resolved_path):
             loader = self._notebook_loader
-        elif path.is_dir():
+        elif is_dir:
             loader = self._folder_loader
         else:
             loader = self._file_loader
-        root_dependency = Dependency(loader, path, not is_dir)  # don't inherit context when traversing folders
+        root_dependency = Dependency(loader, resolved_path, not is_dir)  # don't inherit context when traversing folders
         container = root_dependency.load(self._path_lookup)
         if container is None:
             problem = DependencyProblem("dependency-not-found", "Dependency not found", source_path=path)
