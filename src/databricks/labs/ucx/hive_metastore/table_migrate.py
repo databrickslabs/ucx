@@ -66,7 +66,7 @@ class TablesMigrator:
             if not migration_index.is_migrated(crawled_table.database, crawled_table.name):
                 logger.warning(f"remained-hive-metastore-table: {crawled_table.key}")
 
-    def index(self, *, force_refresh: bool = False):
+    def index(self, *, force_refresh: bool = False) -> TableMigrationIndex:
         return self._migration_status_refresher.index(force_refresh=force_refresh)
 
     def convert_managed_hms_to_external(
