@@ -19,7 +19,6 @@ from databricks.labs.ucx.contexts.account_cli import AccountContext
 from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext, LocalCheckoutContext
 from databricks.labs.ucx.hive_metastore.tables import What
 from databricks.labs.ucx.install import AccountInstaller
-from databricks.labs.ucx.source_code.linters.folders import LocalCodeLinter
 from databricks.labs.ucx.workspace_access.groups import AccountGroupLookup
 
 ucx = App(__file__)
@@ -605,16 +604,6 @@ def revert_cluster_remap(w: WorkspaceClient, prompts: Prompts):
     ctx.cluster_access.revert_cluster_remap(cluster_list, cluster_ids)
 
 
-@ucx.command
-def migrate_local_code(w: WorkspaceClient, prompts: Prompts):
-    """Fix the code files based on their language."""
-    ctx = LocalCheckoutContext(w)
-    working_directory = Path.cwd()
-    if not prompts.confirm("Do you want to apply UC migration to all files in the current directory?"):
-        return
-    ctx.local_file_migrator.apply(working_directory)
-
-
 @ucx.command(is_account=True)
 def show_all_metastores(a: AccountClient, workspace_id: str | None = None):
     """Show all metastores in the account"""
@@ -873,13 +862,43 @@ def download(
 
 @ucx.command
 def lint_local_code(
-    w: WorkspaceClient, prompts: Prompts, path: str | None = None, ctx: LocalCheckoutContext | None = None
+    w: WorkspaceClient,
+    prompts: Prompts,
+    path: Path | str | None = None,
+    ctx: LocalCheckoutContext | None = None,
 ):
     """Lint local code files looking for problems."""
     if ctx is None:
         ctx = LocalCheckoutContext(w)
-    linter: LocalCodeLinter = ctx.local_code_linter
-    linter.lint(prompts, None if path is None else Path(path))
+    if not path:
+        response = prompts.question(
+            "Which file or directory do you want to lint?",
+            default=Path.cwd().as_posix(),
+            validate=lambda p_: Path(p_).exists(),
+        )
+        assert response
+        path = Path(response)
+    for advice in ctx.local_code_linter.lint(Path(path)):
+        print(advice)
+
+
+@ucx.command
+def migrate_local_code(
+    w: WorkspaceClient, prompts: Prompts, path: Path | str | None = None, ctx: LocalCheckoutContext | None = None
+):
+    """Fix the code files based on their language."""
+    if ctx is None:
+        ctx = LocalCheckoutContext(w)
+    if not path:
+        response = prompts.question(
+            "Which file or directory do you want to lint?",
+            default=Path.cwd().as_posix(),
+            validate=lambda p_: Path(p_).exists(),
+        )
+        assert response
+        path = Path(response)
+    for advice in ctx.local_code_linter.apply(Path(path)):
+        print(advice)
 
 
 @ucx.command

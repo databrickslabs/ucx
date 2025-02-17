@@ -172,7 +172,7 @@ def _lint_dir(solacc: _SolaccContext, soldir: Path):
     # lint solution
     advices, unparseable_advices = [], []
     start_timestamp = datetime.now(timezone.utc)
-    for located_advice in ctx.local_code_linter.lint_path(soldir):
+    for located_advice in ctx.local_code_linter.lint(soldir):
         print(located_advice)  # defaults to writing to sys.stdout
         advices.append(located_advice)
         if located_advice.advice.code == 'parse-error':
