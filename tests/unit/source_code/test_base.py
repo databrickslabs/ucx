@@ -16,6 +16,7 @@ from databricks.labs.ucx.source_code.base import (
     back_up_path,
     revert_back_up_path,
     safe_write_text,
+    safe_read_text,
     write_text,
 )
 from databricks.labs.ucx.source_code.linters.base import Fixer
@@ -107,6 +108,46 @@ def test_fixer_is_never_supported_for_diagnostic_empty_code() -> None:
 
     assert not fixer.is_supported("test")
     assert not fixer.is_supported("other-code")
+
+
+def test_safe_read_text(tmp_path) -> None:
+    """Should read the contents of a file."""
+    path = tmp_path / "file.txt"
+    path.write_text("contents")
+
+    contents = safe_read_text(path)
+
+    assert contents == "contents"
+
+
+def test_safe_read_text_handles_non_existing_file() -> None:
+    """Should return None when the file does not exist."""
+    contents = safe_read_text(Path("non-existing-file.txt"))
+    assert contents is None
+
+
+def test_safe_read_text_handles_directory(tmp_path) -> None:
+    """Should return None when the path is a directory."""
+    contents = safe_read_text(tmp_path)
+    assert contents is None
+
+
+@pytest.mark.parametrize(
+    "os_error",
+    [
+        PermissionError("Permission denied"),
+        FileNotFoundError("File not found"),
+        UnicodeDecodeError("utf-8", b"\x80\x81\x82", 0, 1, "invalid start byte"),
+    ],
+)
+def test_safe_read_text_handles_os_errors(os_error: OSError) -> None:
+    """Should return None when an OSError occurs."""
+    path = create_autospec(Path)
+    path.open.side_effect = os_error
+
+    contents = safe_read_text(path)
+
+    assert contents is None
 
 
 def test_write_text_to_non_existing_file(tmp_path) -> None:
