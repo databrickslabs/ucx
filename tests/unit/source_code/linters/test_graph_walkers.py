@@ -89,17 +89,17 @@ def test_graph_walker_logs_analyzing_dependency_in_debug(
     assert f"Analyzing dependency: {grand_parent_graph.dependency}" in caplog.messages
 
 
-def test_linting_walker_populates_paths(simple_dependency_resolver, mock_path_lookup, migration_index) -> None:
+def test_linter_walker_yields_advices_with_known_paths(simple_dependency_resolver, mock_path_lookup, migration_index) -> None:
+    """The linter walker should yield advices with known paths."""
     path = mock_path_lookup.resolve(Path("functional/values_across_notebooks_dbutils_notebook_run.py"))
-    root = Dependency(NotebookLoader(), path)
-    xgraph = DependencyGraph(root, None, simple_dependency_resolver, mock_path_lookup, CurrentSessionState())
-    current_session = CurrentSessionState()
-    walker = LinterWalker(xgraph, mock_path_lookup, lambda: LinterContext(migration_index, current_session))
-    advices = 0
-    for advice in walker:
-        advices += 1
-        assert "UNKNOWN" not in advice.path.as_posix()
+    dependency = Dependency(NotebookLoader(), path)
+    graph = DependencyGraph(dependency, None, simple_dependency_resolver, mock_path_lookup, CurrentSessionState())
+    walker = LinterWalker(graph, mock_path_lookup, lambda: LinterContext(migration_index))
+
+    advices = list(walker)
+
     assert advices
+    assert not any(advice.has_missing_path() for advice in advices)
 
 
 class _TestCollectorWalker(DfsaCollectorWalker):
