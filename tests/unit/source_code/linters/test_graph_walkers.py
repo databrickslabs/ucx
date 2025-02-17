@@ -7,10 +7,13 @@ import pytest
 
 from databricks.labs.ucx.source_code.base import CurrentSessionState, DirectFsAccess
 from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph
+from databricks.labs.ucx.source_code.files import FileLoader
+from databricks.labs.ucx.source_code.folders import FolderLoader
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.linters.graph_walkers import (
     DependencyGraphWalker,
     DfsaCollectorWalker,
+    FixerWalker,
     LinterWalker,
 )
 from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage
@@ -100,6 +103,18 @@ def test_linter_walker_yields_advices_with_known_paths(simple_dependency_resolve
 
     assert advices
     assert not any(advice.has_missing_path() for advice in advices)
+
+
+def test_fixer_walker_resolves_paths(mock_path_lookup, simple_dependency_resolver) -> None:
+    """The fixer walker should resolve paths (when FileLinter loads the dependency)."""
+    path = mock_path_lookup.resolve(Path("parent-child-context/child.py"))
+    dependency = Dependency(FileLoader(), path)
+    graph = DependencyGraph(dependency, None, simple_dependency_resolver, mock_path_lookup, CurrentSessionState())
+    walker = FixerWalker(graph, mock_path_lookup, lambda: LinterContext())
+
+    list(walker)
+
+    assert path in mock_path_lookup.successfully_resolved_paths
 
 
 class _TestCollectorWalker(DfsaCollectorWalker):
