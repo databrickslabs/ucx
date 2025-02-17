@@ -106,23 +106,18 @@ def test_permission_for_files_anonymous_func(sql_backend, runtime_ctx, make_grou
     tacl_support = TableAclSupport(grants, sql_backend)
     apply_tasks(tacl_support, [MigratedGroup.partial_info(old, new)])
 
-    any_file_actual = {}
-    for any_file_grant in grants.grants(any_file=True):
-        any_file_actual[any_file_grant.principal] = any_file_grant.action_type
+    any_file_actual = {grant.principal: grant.action_type for grant in grants.grants(any_file=True)}
+    assert old.display_name in any_file_actual, "Old group misses ANY FILE permission"
+    assert new.display_name in any_file_actual, "New group misses ANY FILE permission"
+    assert any_file_actual[old.display_name] == any_file_actual[new.display_name], "ANY FILE permissions differ"
 
-    # both old and new group have permissions
-    assert old.display_name in any_file_actual
-    assert new.display_name in any_file_actual
-    assert any_file_actual[old.display_name] == any_file_actual[new.display_name]
-
-    anonymous_function_actual = {}
-    for ano_func_grant in grants.grants(anonymous_function=True):
-        anonymous_function_actual[ano_func_grant.principal] = ano_func_grant.action_type
-
-    assert old.display_name in anonymous_function_actual
-    assert new.display_name in anonymous_function_actual
-    assert anonymous_function_actual[new.display_name] == "SELECT"
-    assert anonymous_function_actual[old.display_name] == anonymous_function_actual[new.display_name]
+    anonymous_function_actual = {grant.principal: grant.action_type for grant in grants.grants(anonymous_function=True)}
+    assert old.display_name in anonymous_function_actual, "Old group misses ANONYMOUS FUNCTION permission"
+    assert new.display_name in anonymous_function_actual, "New group misses ANONYMOUS FUNCTION permission"
+    assert anonymous_function_actual[new.display_name] == "SELECT", "New group misses SELECT permission"
+    assert (
+        anonymous_function_actual[old.display_name] == anonymous_function_actual[new.display_name]
+    ), "ANONYMOUS FUNCTION permissions differ"
 
 
 def test_hms2hms_owner_permissions(sql_backend, runtime_ctx, make_group_pair):
