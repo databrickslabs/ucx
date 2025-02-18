@@ -35,19 +35,19 @@ def test_grants_with_permission_migration_api(runtime_ctx, migrated_group) -> No
     ctx.sql_backend.execute(f"ALTER SCHEMA {schema.name} OWNER TO `{migrated_group.name_in_workspace}`")
     ctx.sql_backend.execute(f"GRANT SELECT ON TABLE {table.full_name} TO `{migrated_group.name_in_workspace}`")
 
-    original_table_grants = {"a": ctx.grants_crawler.for_table_info(table)}
-    assert {"SELECT"} == original_table_grants["a"][migrated_group.name_in_workspace]
+    original_table_grants = ctx.grants_crawler.for_table_info(table)
+    assert {"SELECT"} == original_table_grants[migrated_group.name_in_workspace]
 
-    original_schema_grants = {"a": ctx.grants_crawler.for_schema_info(schema)}
-    assert {"USAGE", "OWN"} == original_schema_grants["a"][migrated_group.name_in_workspace]
+    original_schema_grants = ctx.grants_crawler.for_schema_info(schema)
+    assert {"USAGE", "OWN"} == original_schema_grants[migrated_group.name_in_workspace]
 
     MigrationState([migrated_group]).apply_to_groups_with_different_names(runtime_ctx.workspace_client)
 
-    new_table_grants = {"a": ctx.grants_crawler.for_table_info(table)}
-    assert {"SELECT"} == new_table_grants["a"][migrated_group.name_in_account]
+    new_table_grants = ctx.grants_crawler.for_table_info(table)
+    assert {"SELECT"} == new_table_grants[migrated_group.name_in_account]
 
-    new_schema_grants = {"a": ctx.grants_crawler.for_schema_info(schema)}
-    assert {"USAGE", "OWN"} == new_schema_grants["a"][migrated_group.name_in_account]
+    new_schema_grants = ctx.grants_crawler.for_schema_info(schema)
+    assert {"USAGE", "OWN"} == new_schema_grants[migrated_group.name_in_account]
 
 
 def test_permission_for_files_anonymous_func_migration_api(runtime_ctx, migrated_group) -> None:
