@@ -301,7 +301,12 @@ class GrantsCrawler(CrawlerBase[Grant]):
             principal_permissions[grant.principal].add(grant.action_type)
         return principal_permissions
 
-    def for_schema_info(self, schema: SchemaInfo):
+    def for_schema_info(self, schema: SchemaInfo) -> dict[str, set[str]]:
+        """Get the grants for a schema.
+
+        Returns :
+            dict[str, set[str]] : A dictionary of principal to set of action types.
+        """
         principal_permissions = defaultdict(set)
         for grant in self.grants(catalog=schema.catalog_name, database=schema.name):
             principal_permissions[grant.principal].add(grant.action_type)
