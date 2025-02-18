@@ -4,8 +4,6 @@ Part of this application is deployed as [Databricks Workflows](https://docs.data
 You can view the status of deployed workflows via the [`workflows` command](/docs/reference/commands#workflows).
 Failed workflows can be fixed with the [`repair-run` command](/docs/reference/commands#repair-run).
 
-
-
 ## Assessment workflow
 
 ![ucx_assessment_workflow](/img/ucx_assessment_workflow.png)
@@ -93,8 +91,6 @@ Proceed to the [group migration workflow](/docs/reference/workflows#group-migrat
 The UCX assessment workflow is designed to only run once, re-running will **not** update the existing results. If the
 inventory and findings for a workspace need to be updated then first reinstall UCX by [uninstalling](/docs/installation#uninstall-ucx)
 and [installing](/docs/installation) it again.
-
-
 
 ## Group migration workflow
 
@@ -238,9 +234,6 @@ The output is processed and displayed in the migration dashboard using the in `r
   - run the scan tables in mounts [workflow](/docs/reference/workflows/#experimental-migration-progress-workflow)
   - run the [`create-table-mapping` command](/docs/reference/commands#create-table-mapping)
     - or manually create a `mapping.csv` file in Workspace -> Applications -> ucx
-
-
-
 
 ## [EXPERIMENTAL] Migration Progress Workflow
 
