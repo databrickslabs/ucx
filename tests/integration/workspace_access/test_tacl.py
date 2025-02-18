@@ -2,13 +2,28 @@ import json
 import logging
 from collections import defaultdict
 
+import pytest
+from databricks.labs.lsql.backends import CommandExecutionBackend, SqlBackend
+
 from databricks.labs.ucx.workspace_access.base import Permissions
 from databricks.labs.ucx.workspace_access.groups import MigratedGroup, MigrationState
 from databricks.labs.ucx.workspace_access.tacl import TableAclSupport
 
 from . import apply_tasks
 
+
 logger = logging.getLogger(__name__)
+
+
+@pytest.fixture
+def sql_backend(ws, env_or_skip) -> SqlBackend:
+    """Ensure the SQL backend in this module is table access control list enabled.
+
+    We have a separate (legacy) cluster for table access control list. This
+    ensures the tests in this module to be closer to the assessment workflow.
+    """
+    cluster_id = env_or_skip("TEST_LEGACY_TABLE_ACL_CLUSTER_ID")
+    return CommandExecutionBackend(ws, cluster_id)
 
 
 def test_grants_with_permission_migration_api(runtime_ctx, migrated_group) -> None:
