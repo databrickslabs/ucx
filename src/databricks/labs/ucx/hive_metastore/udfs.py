@@ -51,11 +51,11 @@ class UdfsCrawler(CrawlerBase[Udf]):
             schema: The schema name for the inventory persistence.
         """
         super().__init__(sql_backend, "hive_metastore", schema, "udfs", Udf)
-        self._include_database = include_databases
+        self._include_databases = include_databases
 
     def _all_databases(self) -> list[str]:
-        if self._include_database is not None:
-            return self._include_database
+        if self._include_databases is not None:
+            return self._include_databases
         return [row[0] for row in self._fetch("SHOW DATABASES")]
 
     def _try_fetch(self) -> Iterable[Udf]:

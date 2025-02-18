@@ -419,11 +419,11 @@ class TablesCrawler(CrawlerBase[Table]):
             schema: The schema name for the inventory persistence.
         """
         super().__init__(sql_backend, "hive_metastore", schema, "tables", Table)
-        self._include_database = include_databases
+        self._include_databases = include_databases
 
     def _all_databases(self) -> list[str]:
-        if self._include_database is not None:
-            return self._include_database
+        if self._include_databases is not None:
+            return self._include_databases
         databases = []
         for row in self._fetch("SHOW DATABASES"):
             database = row[0]
@@ -564,7 +564,7 @@ class FasterTableScanCrawler(TablesCrawler):
 
     def __init__(self, sql_backend: SqlBackend, schema, include_databases: list[str] | None = None):
         self._sql_backend = sql_backend
-        self._include_database = include_databases
+        self._include_databases = include_databases
 
         # pylint: disable-next=import-error,import-outside-toplevel
         from pyspark.sql.session import SparkSession  # type: ignore[import-not-found]
@@ -586,8 +586,8 @@ class FasterTableScanCrawler(TablesCrawler):
         return scala_option.get() if scala_option.isDefined() else None
 
     def _all_databases(self) -> list[str]:
-        if self._include_database:
-            return self._include_database
+        if self._include_databases:
+            return self._include_databases
         try:
             return list(self._iterator(self._external_catalog.listDatabases()))
         except Exception as err:  # pylint: disable=broad-exception-caught
