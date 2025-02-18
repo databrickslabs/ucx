@@ -252,11 +252,10 @@ def test_permission_for_udfs(runtime_ctx, make_group_pair) -> None:
 
 
 def test_verify_permission_for_udfs(runtime_ctx) -> None:
-    ctx = runtime_ctx
-    group = ctx.make_group()
-    schema = ctx.runtime_ctx.make_schema()
+    group = runtime_ctx.make_group()
+    schema = runtime_ctx.make_schema()
 
-    ctx.sql_backend.execute(f"GRANT SELECT ON SCHEMA {schema.name} TO `{group.display_name}`")
+    runtime_ctx.sql_backend.execute(f"GRANT SELECT ON SCHEMA {schema.name} TO `{group.display_name}`")
 
     item = Permissions(
         object_type="DATABASE",
@@ -271,7 +270,7 @@ def test_verify_permission_for_udfs(runtime_ctx) -> None:
         ),
     )
 
-    tacl_support = TableAclSupport(ctx.grants_crawler, ctx.sql_backend)
+    tacl_support = TableAclSupport(runtime_ctx.grants_crawler, runtime_ctx.sql_backend)
     task = tacl_support.get_verify_task(item)
     result = task()
 
