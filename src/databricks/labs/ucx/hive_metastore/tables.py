@@ -586,7 +586,7 @@ class FasterTableScanCrawler(TablesCrawler):
         return scala_option.get() if scala_option.isDefined() else None
 
     def _all_databases(self) -> list[str]:
-        if self._include_databases:
+        if self._include_databases is not None:
             return self._include_databases
         try:
             return list(self._iterator(self._external_catalog.listDatabases()))
