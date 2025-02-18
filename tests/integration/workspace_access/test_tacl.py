@@ -251,11 +251,12 @@ def test_permission_for_udfs(runtime_ctx, make_group_pair) -> None:
     assert {"READ_METADATA", "DENIED_SELECT"} == actual_udf_b_grants[group.name_in_account]
 
 
-def test_verify_permission_for_udfs(sql_backend, runtime_ctx, make_group):
-    group = make_group()
-    schema = runtime_ctx.make_schema()
+def test_verify_permission_for_udfs(runtime_ctx) -> None:
+    ctx = runtime_ctx
+    group = ctx.make_group()
+    schema = ctx.runtime_ctx.make_schema()
 
-    sql_backend.execute(f"GRANT SELECT ON SCHEMA {schema.name} TO `{group.display_name}`")
+    ctx.sql_backend.execute(f"GRANT SELECT ON SCHEMA {schema.name} TO `{group.display_name}`")
 
     item = Permissions(
         object_type="DATABASE",
@@ -270,9 +271,7 @@ def test_verify_permission_for_udfs(sql_backend, runtime_ctx, make_group):
         ),
     )
 
-    grants = runtime_ctx.grants_crawler
-
-    tacl_support = TableAclSupport(grants, sql_backend)
+    tacl_support = TableAclSupport(ctx.grants_crawler, ctx.sql_backend)
     task = tacl_support.get_verify_task(item)
     result = task()
 
