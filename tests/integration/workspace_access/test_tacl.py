@@ -50,26 +50,24 @@ def test_grants_with_permission_migration_api(runtime_ctx, migrated_group) -> No
     assert {"USAGE", "OWN"} == new_schema_grants["a"][migrated_group.name_in_account]
 
 
-def test_permission_for_files_anonymous_func_migration_api(ws, sql_backend, runtime_ctx, migrated_group):
-    sql_backend.execute(f"GRANT READ_METADATA ON ANY FILE TO `{migrated_group.name_in_workspace}`")
-    sql_backend.execute(f"GRANT SELECT ON ANONYMOUS FUNCTION TO `{migrated_group.name_in_workspace}`")
+def test_permission_for_files_anonymous_func_migration_api(runtime_ctx, migrated_group) -> None:
+    # TODO: Move migrated group into `runtime_ctx` and follow the `make_` pattern
+    ctx = runtime_ctx
+    ctx.sql_backend.execute(f"GRANT READ_METADATA ON ANY FILE TO `{migrated_group.name_in_workspace}`")
+    ctx.sql_backend.execute(f"GRANT SELECT ON ANONYMOUS FUNCTION TO `{migrated_group.name_in_workspace}`")
 
-    grants = runtime_ctx.grants_crawler
+    MigrationState([migrated_group]).apply_to_groups_with_different_names(ctx.workspace_client)
 
-    MigrationState([migrated_group]).apply_to_groups_with_different_names(ws)
+    # Ignoring database, table and UDF grants by replacing the created_databases with an empty list
+    grants = ctx.replace(created_databases=[]).grants_crawler
 
-    any_file_actual = {}
-    for any_file_grant in grants.grants(any_file=True):
-        any_file_actual[any_file_grant.principal] = any_file_grant.action_type
-
-    # both old and new group have permissions
+    any_file_actual = {grant.principal: grant.action_type for grant in grants.grants(any_file=True)}
+    # Since the using the migrate permissions API, the group name in workspace should not have the permissions anymore
     assert migrated_group.name_in_workspace not in any_file_actual
     assert migrated_group.name_in_account in any_file_actual
 
-    anonymous_function_actual = {}
-    for ano_func_grant in grants.grants(anonymous_function=True):
-        anonymous_function_actual[ano_func_grant.principal] = ano_func_grant.action_type
-
+    anonymous_function_actual = {grant.principal: grant.action_type for grant in grants.grants(anonymous_function=True)}
+    # Since the using the migrate permissions API, the group name in workspace should not have the permissions anymore
     assert migrated_group.name_in_workspace not in anonymous_function_actual
     assert migrated_group.name_in_account in anonymous_function_actual
     assert anonymous_function_actual[migrated_group.name_in_account] == "SELECT"
