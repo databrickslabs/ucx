@@ -662,7 +662,7 @@ class MockRuntimeContext(
         Overrides the FasterTableScanCrawler with TablesCrawler used as DBR is not available while running integration tests
         :return: TablesCrawler
         """
-        return TablesCrawler(self.sql_backend, self.inventory_database, self.config.include_databases)
+        return TablesCrawler(self.sql_backend, self.inventory_database, include_databases=self.config.include_databases)
 
     def save_tables(self, is_hiveserde: bool = False):
         # populate the tables crawled, as it is used by get_tables_to_migrate in the migrate-tables workflow

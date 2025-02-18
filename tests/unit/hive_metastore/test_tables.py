@@ -372,7 +372,7 @@ def test_tables_crawler_should_filter_by_database():
         "SHOW TABLES FROM `hive_metastore`.`database_2`": [("", "table1", "")],
     }
     backend = MockBackend(rows=rows)
-    tables_crawler = TablesCrawler(backend, "default", ["database"])
+    tables_crawler = TablesCrawler(backend, "default", include_databases=["database"])
     results = tables_crawler.snapshot()
     assert len(results) == 2
     assert sorted(backend.queries) == sorted(

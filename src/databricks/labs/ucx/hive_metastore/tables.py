@@ -410,7 +410,7 @@ class MigrationCount:
 
 
 class TablesCrawler(CrawlerBase[Table]):
-    def __init__(self, sql_backend: SqlBackend, schema, include_databases: list[str] | None = None):
+    def __init__(self, sql_backend: SqlBackend, schema, *, include_databases: list[str] | None = None):
         """
         Initializes a TablesCrawler instance.
 
@@ -562,14 +562,14 @@ class FasterTableScanCrawler(TablesCrawler):
     Databricks workspace.
     """
 
-    def __init__(self, sql_backend: SqlBackend, schema, include_databases: list[str] | None = None):
+    def __init__(self, sql_backend: SqlBackend, schema, *, include_databases: list[str] | None = None):
         self._sql_backend = sql_backend
         self._include_databases = include_databases
 
         # pylint: disable-next=import-error,import-outside-toplevel
         from pyspark.sql.session import SparkSession  # type: ignore[import-not-found]
 
-        super().__init__(sql_backend, schema, include_databases)
+        super().__init__(sql_backend, schema, include_databases=include_databases)
         self._spark = SparkSession.builder.getOrCreate()
 
     @cached_property

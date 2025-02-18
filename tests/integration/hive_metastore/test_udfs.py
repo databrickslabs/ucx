@@ -18,7 +18,7 @@ def test_describe_all_udfs_in_databases(ws, sql_backend, inventory_schema, make_
     hive_udf = make_udf(schema_name=schema_a.name, hive_udf=True)
     make_udf(schema_name=schema_b.name)
 
-    udfs_crawler = UdfsCrawler(sql_backend, inventory_schema, [schema_a.name, schema_b.name])
+    udfs_crawler = UdfsCrawler(sql_backend, inventory_schema, include_databases=[schema_a.name, schema_b.name])
     udfs = udfs_crawler.snapshot()
 
     assert len(udfs) == 3

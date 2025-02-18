@@ -254,7 +254,7 @@ class GlobalContext(abc.ABC):
 
     @cached_property
     def grants_crawler(self) -> GrantsCrawler:
-        return GrantsCrawler(self.tables_crawler, self.udfs_crawler, self.config.include_databases)
+        return GrantsCrawler(self.tables_crawler, self.udfs_crawler, include_databases=self.config.include_databases)
 
     @cached_property
     def grant_ownership(self) -> GrantOwnership:
@@ -262,7 +262,7 @@ class GlobalContext(abc.ABC):
 
     @cached_property
     def udfs_crawler(self) -> UdfsCrawler:
-        return UdfsCrawler(self.sql_backend, self.inventory_database, self.config.include_databases)
+        return UdfsCrawler(self.sql_backend, self.inventory_database, include_databases=self.config.include_databases)
 
     @cached_property
     def udf_ownership(self) -> UdfOwnership:
@@ -274,7 +274,7 @@ class GlobalContext(abc.ABC):
 
     @cached_property
     def tables_crawler(self) -> TablesCrawler:
-        return TablesCrawler(self.sql_backend, self.inventory_database, self.config.include_databases)
+        return TablesCrawler(self.sql_backend, self.inventory_database, include_databases=self.config.include_databases)
 
     @cached_property
     def jobs_crawler(self) -> JobsCrawler:

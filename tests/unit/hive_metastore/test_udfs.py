@@ -47,7 +47,7 @@ def test_tables_crawler_should_filter_by_database():
         "SHOW USER FUNCTIONS FROM `hive_metastore`.`database`": SHOW_FUNCTIONS[("hive_metastore.database.function1",),],
     }
     backend = MockBackend(rows=rows)
-    udf_crawler = UdfsCrawler(backend, "default", ["database"])
+    udf_crawler = UdfsCrawler(backend, "default", include_databases=["database"])
     results = udf_crawler.snapshot()
     assert len(results) == 1
 

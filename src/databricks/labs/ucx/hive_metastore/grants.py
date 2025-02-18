@@ -218,7 +218,7 @@ CLUSTER_WITHOUT_ACL_FRAGMENT = "Table Access Control is not enabled on this clus
 class GrantsCrawler(CrawlerBase[Grant]):
     """Crawler that captures access controls that relate to data and other securable objects."""
 
-    def __init__(self, tables_crawler: TablesCrawler, udf: UdfsCrawler, include_databases: list[str] | None = None):
+    def __init__(self, tables_crawler: TablesCrawler, udf: UdfsCrawler, *, include_databases: list[str] | None = None):
         assert tables_crawler._sql_backend == udf._sql_backend
         assert tables_crawler._catalog == udf._catalog
         assert tables_crawler._schema == udf._schema

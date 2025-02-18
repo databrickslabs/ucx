@@ -34,7 +34,7 @@ def test_describe_all_tables_in_databases(ws, sql_backend, inventory_schema, mak
     schema_c = make_schema(catalog_name="hive_metastore")
     make_table(schema_name=schema_c.name)
 
-    tables = TablesCrawler(sql_backend, inventory_schema, [schema_a.name, schema_b.name])
+    tables = TablesCrawler(sql_backend, inventory_schema, include_databases=[schema_a.name, schema_b.name])
 
     all_tables = {}
     for table in tables.snapshot():
@@ -75,7 +75,7 @@ def test_partitioned_tables(ws, sql_backend, make_schema, make_table):
 
     inventory_schema = make_schema(catalog_name="hive_metastore")
 
-    tables = TablesCrawler(sql_backend, inventory_schema.name, [schema.name])
+    tables = TablesCrawler(sql_backend, inventory_schema.name, include_databases=[schema.name])
 
     all_tables = {}
     for table in tables.snapshot():

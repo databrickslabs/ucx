@@ -121,7 +121,9 @@ class RuntimeContext(GlobalContext):
     def tables_crawler(self) -> TablesCrawler:
         # Warning: Not all runtime contexts support the fast-scan implementation; it requires the JVM bridge to Spark
         # and that's not always available.
-        return FasterTableScanCrawler(self.sql_backend, self.inventory_database, self.config.include_databases)
+        return FasterTableScanCrawler(
+            self.sql_backend, self.inventory_database, include_databases=self.config.include_databases
+        )
 
     @cached_property
     def tables_in_mounts(self) -> TablesInMounts:
