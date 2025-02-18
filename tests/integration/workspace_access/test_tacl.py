@@ -11,27 +11,27 @@ from . import apply_tasks
 logger = logging.getLogger(__name__)
 
 
-def test_grants_with_permission_migration_api(runtime_ctx, ws, migrated_group, sql_backend):
-    schema_a = runtime_ctx.make_schema()
-    table_a = runtime_ctx.make_table(schema_name=schema_a.name)
-    sql_backend.execute(f"GRANT USAGE ON SCHEMA {schema_a.name} TO `{migrated_group.name_in_workspace}`")
-    sql_backend.execute(f"ALTER SCHEMA {schema_a.name} OWNER TO `{migrated_group.name_in_workspace}`")
-    sql_backend.execute(f"GRANT SELECT ON TABLE {table_a.full_name} TO `{migrated_group.name_in_workspace}`")
+def test_grants_with_permission_migration_api(runtime_ctx, migrated_group) -> None:
+    # TODO: Move migrated group into `runtime_ctx` and follow the `make_` pattern
+    ctx = runtime_ctx
+    schema = ctx.make_schema()
+    table = ctx.make_table(schema_name=schema.name)
+    ctx.sql_backend.execute(f"GRANT USAGE ON SCHEMA {schema.name} TO `{migrated_group.name_in_workspace}`")
+    ctx.sql_backend.execute(f"ALTER SCHEMA {schema.name} OWNER TO `{migrated_group.name_in_workspace}`")
+    ctx.sql_backend.execute(f"GRANT SELECT ON TABLE {table.full_name} TO `{migrated_group.name_in_workspace}`")
 
-    grants = runtime_ctx.grants_crawler
-
-    original_table_grants = {"a": grants.for_table_info(table_a)}
+    original_table_grants = {"a": ctx.grants_crawler.for_table_info(table)}
     assert {"SELECT"} == original_table_grants["a"][migrated_group.name_in_workspace]
 
-    original_schema_grants = {"a": grants.for_schema_info(schema_a)}
+    original_schema_grants = {"a": ctx.grants_crawler.for_schema_info(schema)}
     assert {"USAGE", "OWN"} == original_schema_grants["a"][migrated_group.name_in_workspace]
 
-    MigrationState([migrated_group]).apply_to_groups_with_different_names(ws)
+    MigrationState([migrated_group]).apply_to_groups_with_different_names(runtime_ctx.workspace_client)
 
-    new_table_grants = {"a": grants.for_table_info(table_a)}
+    new_table_grants = {"a": ctx.grants_crawler.for_table_info(table)}
     assert {"SELECT"} == new_table_grants["a"][migrated_group.name_in_account]
 
-    new_schema_grants = {"a": grants.for_schema_info(schema_a)}
+    new_schema_grants = {"a": ctx.grants_crawler.for_schema_info(schema)}
     assert {"USAGE", "OWN"} == new_schema_grants["a"][migrated_group.name_in_account]
 
 
@@ -104,6 +104,7 @@ def test_permission_for_files_anonymous_func(runtime_ctx) -> None:
     grants = runtime_ctx.replace(created_databases=[]).grants_crawler
 
     tacl_support = TableAclSupport(grants, runtime_ctx.sql_backend)
+    tacl_support.get_crawler_tasks()
     apply_tasks(tacl_support, [MigratedGroup.partial_info(old, new)])
 
     any_file_actual = {grant.principal: grant.action_type for grant in grants.grants(any_file=True)}
