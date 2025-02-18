@@ -82,7 +82,9 @@ def test_permission_for_udfs_migration_api(runtime_ctx, migrated_group) -> None:
 
     ctx.sql_backend.execute(f"GRANT SELECT ON FUNCTION {udf_a.full_name} TO `{migrated_group.name_in_workspace}`")
     ctx.sql_backend.execute(f"ALTER FUNCTION {udf_a.full_name} OWNER TO `{migrated_group.name_in_workspace}`")
-    ctx.sql_backend.execute(f"GRANT READ_METADATA ON FUNCTION {udf_b.full_name} TO `{migrated_group.name_in_workspace}`")
+    ctx.sql_backend.execute(
+        f"GRANT READ_METADATA ON FUNCTION {udf_b.full_name} TO `{migrated_group.name_in_workspace}`"
+    )
 
     grants = runtime_ctx.grants_crawler
 
@@ -133,33 +135,35 @@ def test_permission_for_files_anonymous_func(runtime_ctx) -> None:
     ), "ANONYMOUS FUNCTION permissions differ"
 
 
-def test_hms2hms_owner_permissions(sql_backend, runtime_ctx, make_group_pair):
+def test_hms2hms_owner_permissions(runtime_ctx, make_group_pair) -> None:
+    # TODO: Move `make_group_pair` into `runtime_ctx`
+    ctx = runtime_ctx
     first = make_group_pair()
     second = make_group_pair()
     third = make_group_pair()
 
-    schema_a = runtime_ctx.make_schema()
-    schema_b = runtime_ctx.make_schema()
-    schema_c = runtime_ctx.make_schema()
-    table_a = runtime_ctx.make_table(schema_name=schema_a.name)
-    table_b = runtime_ctx.make_table(schema_name=schema_b.name)
-    table_c = runtime_ctx.make_table(schema_name=schema_b.name, external=True)
+    schema_a = ctx.make_schema()
+    schema_b = ctx.make_schema()
+    schema_c = ctx.make_schema()
+    table_a = ctx.make_table(schema_name=schema_a.name)
+    table_b = ctx.make_table(schema_name=schema_b.name)
+    table_c = ctx.make_table(schema_name=schema_b.name, external=True)
 
-    sql_backend.execute(f"GRANT USAGE ON SCHEMA {schema_a.name} TO `{first.name_in_workspace}`")
-    sql_backend.execute(f"ALTER SCHEMA {schema_a.name} OWNER TO `{first.name_in_workspace}`")
-    sql_backend.execute(f"GRANT ALL PRIVILEGES ON SCHEMA {schema_b.name} TO `{second.name_in_workspace}`")
-    sql_backend.execute(
+    ctx.sql_backend.execute(f"GRANT USAGE ON SCHEMA {schema_a.name} TO `{first.name_in_workspace}`")
+    ctx.sql_backend.execute(f"ALTER SCHEMA {schema_a.name} OWNER TO `{first.name_in_workspace}`")
+    ctx.sql_backend.execute(f"GRANT ALL PRIVILEGES ON SCHEMA {schema_b.name} TO `{second.name_in_workspace}`")
+    ctx.sql_backend.execute(
         f"GRANT USAGE, SELECT, MODIFY, CREATE, READ_METADATA, CREATE_NAMED_FUNCTION ON SCHEMA {schema_c.name} TO "
         f"`{third.name_in_workspace}`"
     )
-    sql_backend.execute(f"GRANT SELECT ON TABLE {table_a.full_name} TO `{first.name_in_workspace}`")
-    sql_backend.execute(
+    ctx.sql_backend.execute(f"GRANT SELECT ON TABLE {table_a.full_name} TO `{first.name_in_workspace}`")
+    ctx.sql_backend.execute(
         f"GRANT SELECT, MODIFY, READ_METADATA ON TABLE {table_b.full_name} TO `{second.name_in_workspace}`"
     )
-    sql_backend.execute(f"ALTER TABLE {table_b.full_name} OWNER TO `{second.name_in_workspace}`")
-    sql_backend.execute(f"GRANT SELECT, MODIFY ON TABLE {table_c.full_name} TO `{third.name_in_workspace}`")
+    ctx.sql_backend.execute(f"ALTER TABLE {table_b.full_name} OWNER TO `{second.name_in_workspace}`")
+    ctx.sql_backend.execute(f"GRANT SELECT, MODIFY ON TABLE {table_c.full_name} TO `{third.name_in_workspace}`")
 
-    grants = runtime_ctx.grants_crawler
+    grants = ctx.grants_crawler
 
     original_table_grants = {
         "a": grants.for_table_info(table_a),
@@ -179,7 +183,7 @@ def test_hms2hms_owner_permissions(sql_backend, runtime_ctx, make_group_pair):
         "b"
     ][second.name_in_workspace]
 
-    tacl_support = TableAclSupport(grants, sql_backend)
+    tacl_support = TableAclSupport(grants, ctx.sql_backend)
 
     apply_tasks(tacl_support, [first, second, third])
 
