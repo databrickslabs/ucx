@@ -216,29 +216,28 @@ def test_hms2hms_owner_permissions(runtime_ctx, make_group_pair) -> None:
     }, second.name_in_account
 
 
-def test_permission_for_udfs(sql_backend, runtime_ctx, make_group_pair):
+def test_permission_for_udfs(runtime_ctx, make_group_pair) -> None:
+    # TODO: Move `make_group_pair` into `runtime_ctx`
+    ctx = runtime_ctx
     group = make_group_pair()
-    schema = runtime_ctx.make_schema()
-    udf_a = runtime_ctx.make_udf(schema_name=schema.name)
-    udf_b = runtime_ctx.make_udf(schema_name=schema.name)
+    schema = ctx.make_schema()
+    udf_a = ctx.make_udf(schema_name=schema.name)
+    udf_b = ctx.make_udf(schema_name=schema.name)
 
-    sql_backend.execute(f"GRANT SELECT ON FUNCTION {udf_a.full_name} TO `{group.name_in_workspace}`")
-    sql_backend.execute(f"ALTER FUNCTION {udf_a.full_name} OWNER TO `{group.name_in_workspace}`")
-    sql_backend.execute(f"GRANT READ_METADATA ON FUNCTION {udf_b.full_name} TO `{group.name_in_workspace}`")
-    sql_backend.execute(f"DENY `SELECT` ON FUNCTION {udf_b.full_name} TO `{group.name_in_workspace}`")
+    ctx.sql_backend.execute(f"GRANT SELECT ON FUNCTION {udf_a.full_name} TO `{group.name_in_workspace}`")
+    ctx.sql_backend.execute(f"ALTER FUNCTION {udf_a.full_name} OWNER TO `{group.name_in_workspace}`")
+    ctx.sql_backend.execute(f"GRANT READ_METADATA ON FUNCTION {udf_b.full_name} TO `{group.name_in_workspace}`")
+    ctx.sql_backend.execute(f"DENY `SELECT` ON FUNCTION {udf_b.full_name} TO `{group.name_in_workspace}`")
 
-    grants = runtime_ctx.grants_crawler
+    grants = ctx.grants_crawler
 
-    all_initial_grants = set()
-    for grant in grants.snapshot():
-        all_initial_grants.add(f"{grant.principal}.{grant.object_key}:{grant.action_type}")
-
+    all_initial_grants = {f"{grant.principal}.{grant.object_key}:{grant.action_type}" for grant in grants.snapshot()}
     assert f"{group.name_in_workspace}.{udf_a.full_name}:SELECT" in all_initial_grants
     assert f"{group.name_in_workspace}.{udf_a.full_name}:OWN" in all_initial_grants
     assert f"{group.name_in_workspace}.{udf_b.full_name}:READ_METADATA" in all_initial_grants
     assert f"{group.name_in_workspace}.{udf_b.full_name}:DENIED_SELECT" in all_initial_grants
 
-    tacl_support = TableAclSupport(grants, sql_backend)
+    tacl_support = TableAclSupport(grants, ctx.sql_backend)
     apply_tasks(tacl_support, [group])
 
     actual_udf_a_grants = defaultdict(set)
