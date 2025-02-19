@@ -141,24 +141,24 @@ class HiveMetastoreFederation(SecretsMixin):
         if not version:
             logger.info('Hive Metastore version not found')
             return None
-        major_minor_match = re.match(r'(^\d+\.\d+)', version)
-        if not major_minor_match:
+        major_minor_match = re.match(r'(^(?P<major>\d+)\.(?P<minor>\d+))', version)
+        if not major_minor_match or not major_minor_match.group('major') or not major_minor_match.group('minor'):
             logger.info(f'Wrong Hive Metastore Database Version Format: {version}')
             return None
-        major_minor_version = major_minor_match.group(1)
         try:
-            major_minor = (int(major_minor_version.split(".")[0]), int(major_minor_version.split(".")[1]))
+            major = int(major_minor_match.group('major'))
+            minor = int(major_minor_match.group('minor'))
         except ValueError:
             logger.info(f'Wrong Hive Metastore Database Version Format: {version}')
             return None
 
         # Verify HMS version
-        if major_minor not in self.supported_hms_versions:
+        if (major, minor) not in self.supported_hms_versions:
             logger.info(
                 f'Unsupported Hive Metastore Version: {version}. We currently support: {self.supported_hms_versions}'
             )
             return None
-        external_hms = replace(self._split_jdbc_url(jdbc_url), version=major_minor_version)
+        external_hms = replace(self._split_jdbc_url(jdbc_url), version=f'{major}.{minor}')
 
         if not external_hms.user:
             external_hms = replace(
