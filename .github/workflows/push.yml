@@ -90,7 +90,7 @@ jobs:
 
 
   docs_build:
-    name: build docusaurus
+    name: Build Docusaurus
     runs-on:
       group: databrickslabs-protected-runner-group
       labels: linux-ubuntu-latest
@@ -107,13 +107,12 @@ jobs:
           cache: yarn
           cache-dependency-path: docs/ucx/yarn.lock # need to put the lockfile path explicitly
 
-      - name: install dependencies
+      - name: Install Dependencies
         run: yarn install --frozen-lockfile
       - name: build website
         run: yarn build
 
-      - name: install documentation
-        run: make docs-install
-
-      - name: build documentation
-        run: make docs-build
+      - name: Upload Build Artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs/ucx/build
