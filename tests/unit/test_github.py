@@ -27,3 +27,18 @@ def test_construct_new_issue_url_makes_url_safe() -> None:
     """Test that the URL is properly URL-encoded."""
     url = construct_new_issue_url(IssueType.FEATURE, "title", "body with spaces")
     assert "body+with+spaces" in url
+
+
+def test_construct_new_issue_url_advanced() -> None:
+    """Test that the URL is properly constructed with advanced parameters."""
+    expected = (
+        f"{GITHUB_URL}/issues/new?"
+        "type=Feature"
+        "&title=Autofix+the+following+Python+code"
+        "&body=%23+Desired+behaviour%0A%0AAutofix+following+Python+code"
+        "%0A%0A%60%60%60+python%0ATODO%3A+Add+relevant+source+code%0A%60%60%60"
+        "&labels=migrate%2Fcode%2Cneeds-triage"
+    )
+    body = "# Desired behaviour\n\nAutofix following Python code\n\n" "``` python\nTODO: Add relevant source code\n```"
+    url = construct_new_issue_url(IssueType.FEATURE, "Autofix the following Python code", body, labels={"migrate/code"})
+    assert url == expected

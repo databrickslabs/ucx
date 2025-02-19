@@ -28,5 +28,11 @@ def construct_new_issue_url(
     """
     labels = labels or set()
     labels.add("needs-triage")
-    query = urllib.parse.quote_plus(f"type={issue_type.value}&title={title}&body={body}&labels={','.join(labels)}")
+    parameters = {
+        "type": issue_type.value,
+        "title": title,
+        "body": body,
+        "labels": ",".join(sorted(labels)),
+    }
+    query = "&".join(f"{key}={urllib.parse.quote_plus(value)}" for key, value in parameters.items())
     return f"{GITHUB_URL}/issues/new?{query}"
