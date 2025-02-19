@@ -1,7 +1,5 @@
 from enum import Enum
 
-from typing import Literal
-
 DOCS_URL = "https://databrickslabs.github.io/ucx/docs/"
 GITHUB_URL = "https://github.com/databrickslabs/ucx"
 
