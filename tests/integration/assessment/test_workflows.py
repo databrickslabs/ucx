@@ -25,6 +25,9 @@ def test_running_real_assessment_job(
         ),
     )
 
+    installation_ctx.sql_backend.execute(f"GRANT READ_METADATA ON ANY FILE TO `{ws_group.display_name}`")
+    installation_ctx.sql_backend.execute(f"GRANT SELECT ON ANONYMOUS FUNCTION TO `{ws_group.display_name}`")
+
     source_schema = installation_ctx.make_schema(catalog_name="hive_metastore")
     managed_table = installation_ctx.make_table(schema_name=source_schema.name)
     external_table = installation_ctx.make_table(schema_name=source_schema.name, external=True)
