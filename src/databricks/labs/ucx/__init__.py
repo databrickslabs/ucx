@@ -21,5 +21,3 @@ ua.with_extra("ucx", __version__)
 ua.with_product("ucx", __version__)
 
 
-DOCS_URL = "https://databrickslabs.github.io/ucx/docs/"
-GITHUB_URL = "https://github.com/databrickslabs/ucx"

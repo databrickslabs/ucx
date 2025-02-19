@@ -8,7 +8,7 @@ from typing import TypeVar
 
 from astroid import Attribute, Call, Const, Name, NodeNG  # type: ignore
 
-from databricks.labs.ucx import GITHUB_URL
+from databricks.labs.ucx.github import GITHUB_URL
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex, TableMigrationStatus
 from databricks.labs.ucx.source_code.base import (
     Advice,

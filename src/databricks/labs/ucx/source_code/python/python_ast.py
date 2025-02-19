@@ -29,7 +29,7 @@ from astroid import (  # type: ignore
 )
 from astroid.exceptions import AstroidSyntaxError  # type: ignore
 
-from databricks.labs.ucx import GITHUB_URL
+from databricks.labs.ucx.github import GITHUB_URL
 from databricks.labs.ucx.source_code.base import Failure
 
 

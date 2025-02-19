@@ -48,7 +48,7 @@ from databricks.sdk.service.sql import (
 )
 from databricks.sdk.useragent import with_extra
 
-from databricks.labs.ucx import DOCS_URL, GITHUB_URL
+from databricks.labs.ucx.github import DOCS_URL, GITHUB_URL
 from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalInfo
 from databricks.labs.ucx.assessment.clusters import ClusterInfo, PolicyInfo

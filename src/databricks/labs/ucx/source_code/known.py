@@ -14,7 +14,7 @@ from pathlib import Path
 
 from databricks.labs.blueprint.entrypoint import get_logger
 
-from databricks.labs.ucx import GITHUB_URL
+from databricks.labs.ucx.github import GITHUB_URL
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.source_code.base import Advice, CurrentSessionState
 from databricks.labs.ucx.source_code.graph import (
