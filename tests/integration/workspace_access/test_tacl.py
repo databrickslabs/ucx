@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 @pytest.fixture
-def sql_backend(ws, env_or_skip) -> SqlBackend:
+def sql_backend_acl(ws, env_or_skip) -> SqlBackend:
     """Ensure the SQL backend in this module is table access control list enabled.
 
     We have a separate (legacy) cluster for table access control list. This
@@ -106,19 +106,23 @@ def test_permission_for_udfs_migration_api(runtime_ctx, migrated_group) -> None:
     assert {"READ_METADATA"} == actual_udf_b_grants[migrated_group.name_in_account]
 
 
-def test_permission_for_files_anonymous_func(runtime_ctx) -> None:
-    old = runtime_ctx.make_group()
-    new = runtime_ctx.make_group()
-    logger.debug(f"old={old.display_name}, new={new.display_name}")
+def test_permission_for_files_anonymous_func(runtime_ctx, sql_backend_acl) -> None:
+    # The table and UDF are not directly used by this test, but prevent the table and UDF crawler to crawl when grants
+    # crawler is invoked
+    runtime_ctx.make_table()
+    runtime_ctx.make_udf()
+    runtime_ctx.tables_crawler.snapshot(force_refresh=True)
+    runtime_ctx.udfs_crawler.snapshot(force_refresh=True)
 
+    old, new = runtime_ctx.make_group(), runtime_ctx.make_group()
     runtime_ctx.sql_backend.execute(f"GRANT READ_METADATA ON ANY FILE TO `{old.display_name}`")
     runtime_ctx.sql_backend.execute(f"GRANT SELECT ON ANONYMOUS FUNCTION TO `{old.display_name}`")
 
+    # Crawling grants require a table access control list enabled cluster
     # Ignoring database, table and UDF grants by replacing the created_databases with an empty list
-    grants = runtime_ctx.replace(created_databases=[]).grants_crawler
+    grants = runtime_ctx.replace(sql_backend=sql_backend_acl, created_databases=[]).grants_crawler
 
     tacl_support = TableAclSupport(grants, runtime_ctx.sql_backend)
-    tacl_support.get_crawler_tasks()
     apply_tasks(tacl_support, [MigratedGroup.partial_info(old, new)])
 
     any_file_actual = {grant.principal: grant.action_type for grant in grants.grants(any_file=True)}
