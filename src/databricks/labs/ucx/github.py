@@ -1,6 +1,27 @@
+from enum import Enum
+
+from typing import Literal
+
 DOCS_URL = "https://databrickslabs.github.io/ucx/docs/"
 GITHUB_URL = "https://github.com/databrickslabs/ucx"
 
 
-def construct_new_issue_url() -> str:
-    return f"{GITHUB_URL}/issues/new"
+class IssueType(Enum):
+    """The issue type"""
+
+    FEATURE = "Feature"
+    BUG = "Bug"
+    TASK = "Task"
+
+
+def construct_new_issue_url(
+    issue_type: IssueType,
+    title: str,
+    body: str,
+) -> str:
+    """Construct a new issue URL.
+
+    References:
+    - https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/creating-an-issue#creating-an-issue-from-a-url-query
+    """
+    return f"{GITHUB_URL}/issues/new?type={issue_type.value}&title={title}&body={body}"

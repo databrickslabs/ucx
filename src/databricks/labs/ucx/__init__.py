@@ -19,5 +19,3 @@ ua.with_extra("ucx", __version__)
 
 # Add ucx/<version> for re-packaging of ucx, where product name is omitted
 ua.with_product("ucx", __version__)
-
-
