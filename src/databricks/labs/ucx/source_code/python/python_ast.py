@@ -4,7 +4,6 @@ import builtins
 import logging
 import sys
 import re
-import urllib.parse
 from abc import ABC
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -29,7 +28,7 @@ from astroid import (  # type: ignore
 )
 from astroid.exceptions import AstroidSyntaxError  # type: ignore
 
-from databricks.labs.ucx.github import GITHUB_URL
+from databricks.labs.ucx.github import IssueType, construct_new_issue_url
 from databricks.labs.ucx.source_code.base import Failure
 
 
@@ -100,12 +99,8 @@ class MaybeTree:
                 end_line=(e.error.end_lineno or 2) - 1,
                 end_col=(e.error.end_offset or 2) - 1,
             )
-        new_issue_url = (
-            f"{GITHUB_URL}/issues/new?title=Python+parse+error"
-            "&labels=migrate/code,needs-triage&type=Bug"
-            "&body=%23+Current+behaviour%0A%0ACannot+parse+the+following+Python+code"
-            f"%0A%0A%60%60%60+python%0A{urllib.parse.quote_plus(source_code)}%0A%60%60%60"
-        )
+        body = "# Desired behaviour\n\nCannot parse the follow Python code\n\n``` python\n{source_code}\n```"
+        new_issue_url = construct_new_issue_url(IssueType.BUG, "Python parse error", body)
         return Failure(
             code="python-parse-error",
             message=(
