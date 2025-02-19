@@ -21,3 +21,9 @@ def test_construct_new_issue_url_always_has_needs_triage_label(labels: set[str] 
     """Test that the URL always has the `needs-triage` label."""
     url = construct_new_issue_url(IssueType.FEATURE, "title", "body", labels=labels)
     assert "needs-triage" in url
+
+
+def test_construct_new_issue_url_makes_url_safe() -> None:
+    """Test that the URL is properly URL-encoded."""
+    url = construct_new_issue_url(IssueType.FEATURE, "title", "body with spaces")
+    assert "body+with+spaces" in url

@@ -1,4 +1,6 @@
 from enum import Enum
+import urllib.parse
+
 
 DOCS_URL = "https://databrickslabs.github.io/ucx/docs/"
 GITHUB_URL = "https://github.com/databrickslabs/ucx"
@@ -26,4 +28,5 @@ def construct_new_issue_url(
     """
     labels = labels or set()
     labels.add("needs-triage")
-    return f"{GITHUB_URL}/issues/new?type={issue_type.value}&title={title}&body={body}&labels={','.join(labels)}"
+    query = urllib.parse.quote_plus(f"type={issue_type.value}&title={title}&body={body}&labels={','.join(labels)}")
+    return f"{GITHUB_URL}/issues/new?{query}"
