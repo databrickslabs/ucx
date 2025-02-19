@@ -527,7 +527,10 @@ for i in range(10):
         ),
         # Test for mount calls inside a function
         (
-            """variable = searchPath('/mnt/something/', some_variable)""",
+            """
+            def searchPath(rep, dateAlternative = None):
+                return dbutils.fs.ls(rep)
+            variable = searchPath('/mnt/something/', some_variable)""",
             [
                 Deprecation(
                     code='direct-filesystem-access',
