@@ -1,6 +1,6 @@
 import pytest
 
-from databricks.labs.ucx.github import GITHUB_URL, IssueType, construct_new_issue_url
+from databricks.labs.ucx.github import IssueType, construct_new_issue_url
 
 
 def test_construct_new_issue_url_starts_with_github_url() -> None:
@@ -32,7 +32,7 @@ def test_construct_new_issue_url_makes_url_safe() -> None:
 def test_construct_new_issue_url_advanced() -> None:
     """Test that the URL is properly constructed with advanced parameters."""
     expected = (
-        f"https://github.com/databrickslabs/ucx/issues/new"
+        "https://github.com/databrickslabs/ucx/issues/new"
         "?type=Feature"
         "&title=Autofix+the+following+Python+code"
         "&body=%23+Desired+behaviour%0A%0AAutofix+following+Python+code"
