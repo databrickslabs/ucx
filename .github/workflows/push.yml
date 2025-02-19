@@ -94,25 +94,28 @@ jobs:
     runs-on:
       group: databrickslabs-protected-runner-group
       labels: linux-ubuntu-latest
-    defaults:
-      run:
-        working-directory: docs/ucx
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: yarn
-          cache-dependency-path: docs/ucx/yarn.lock # need to put the lockfile path explicitly
 
       - name: Install Dependencies
         run: yarn install --frozen-lockfile
       - name: build website
         run: yarn build
 
-      - name: Upload Build Artifact
-        uses: actions/upload-pages-artifact@v3
+      - name: Install Python
+        uses: actions/setup-python@v5
         with:
-          path: docs/ucx/build
+          cache: 'pip'
+          cache-dependency-path: '**/pyproject.toml'
+          python-version: ${{ matrix.pyVersion }}
+
+      - name: Install hatch
+        run: pip install hatch==$HATCH_VERSION
+
+      - name: Install Docs
+        run: make docs-install
+
+      - name: Build Docs
+        run: make docs-build
