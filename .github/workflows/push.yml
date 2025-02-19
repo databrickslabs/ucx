@@ -90,7 +90,7 @@ jobs:
 
 
   docs_build:
-    name: Build Docusaurus
+    name: build docusaurus
     runs-on:
       group: databrickslabs-protected-runner-group
       labels: linux-ubuntu-latest
