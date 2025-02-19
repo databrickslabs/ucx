@@ -39,6 +39,6 @@ def test_construct_new_issue_url_advanced() -> None:
         "%0A%0A%60%60%60+python%0ATODO%3A+Add+relevant+source+code%0A%60%60%60"
         "&labels=migrate%2Fcode%2Cneeds-triage"
     )
-    body = "# Desired behaviour\n\nAutofix following Python code\n\n" "``` python\nTODO: Add relevant source code\n```"
+    body = "# Desired behaviour\n\nAutofix following Python code\n\n``` python\nTODO: Add relevant source code\n```"
     url = construct_new_issue_url(IssueType.FEATURE, "Autofix the following Python code", body, labels={"migrate/code"})
     assert url == expected
