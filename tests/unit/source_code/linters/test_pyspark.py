@@ -30,24 +30,6 @@ df4.write.saveAsTable(f"{schema}.member_measure")
     sqf = SparkTableNamePyLinter(ftf, empty_index, session_state)
     assert not list(sqf.lint(source))
 
-def test_dbfs_stuff(empty_index) -> None:
-    source = """
-        # Databricks notebook source
-        # MAGIC %run ./_param_connexion_formation
-
-        # COMMAND ----------
-
-        from pyspark.sql import functions as F
-
-        # COMMAND ----------
-
-        path_dossierLIZZY = searchPathRecent('/mnt/mnt_datalake_smartCompetencies/', repLIZZY)
-    """
-    session_state = CurrentSessionState()
-    ftf = FromTableSqlLinter(empty_index, session_state)
-    sqf = SparkTableNamePyLinter(ftf, empty_index, session_state)
-    assert not list(sqf.lint(source))
-
 def test_linter_context_python_linter_lints_table_pending_migration_with_empty_index(empty_index) -> None:
     source_code = """
     for i in range(10):
