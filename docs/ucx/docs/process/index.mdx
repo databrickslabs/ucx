@@ -8,7 +8,7 @@ On a high level, the steps in migration process are:
 1. [assessment](/docs/reference/workflows#assessment-workflow)
 2. [group migration](/docs/reference/workflows#group-migration-workflow)
 3. [table migration](/docs/process/#table-migration-process)
-4. [HMS Federation](/docs/process/#hms-federation)
+4. [HMS Federation](/docs/process/#hive-metastore-federation-process)
 5. [data reconciliation](/docs/reference/workflows#post-migration-data-reconciliation-workflow)
 6. [code migration](/docs/reference/commands#code-migration-commands)
 7. [delta live table pipeline migration](/docs/process#delta-live-table-pipeline-migration-process)
@@ -291,7 +291,7 @@ The [`revert-migrated-tables` command](/docs/reference/commands#revert-migrated-
 the `upgraded_to` property on the source object. Use this command to allow for migrating a table or view again.
 
 
-## HMS Federation
+## Hive Metastore Federation Process
 
 Hive Metastore (HMS) Federation is a feature that allows HMS to be federated to a catalog.
 More information is available in the [Databricks documentation](https://docs.databricks.com/en/data-governance/unity-catalog/hms-federation/index.html).
