@@ -176,6 +176,7 @@ class SparkCallMatcher(_TableNameMatcher):
         if not isinstance(table_arg, Const):
             # TODO: https://github.com/databrickslabs/ucx/issues/3695
             source_code = node.as_string()
+            # https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/creating-an-issue#creating-an-issue-from-a-url-query
             new_issue_url = (
                 f"{GITHUB_URL}/issues/new?title=Autofix+the+following+Python+code"
                 "&labels=migrate/code,needs-triage&type=Feature"
