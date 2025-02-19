@@ -87,3 +87,33 @@ jobs:
         run: |
           # Exit with status code 1 if there are differences (i.e. unformatted files)
           git diff --exit-code
+
+
+  docs_build:
+    name: build docusaurus
+    runs-on:
+      group: databrickslabs-protected-runner-group
+      labels: linux-ubuntu-latest
+    defaults:
+      run:
+        working-directory: docs/ucx
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+          cache-dependency-path: docs/ucx/yarn.lock # need to put the lockfile path explicitly
+
+      - name: install dependencies
+        run: yarn install --frozen-lockfile
+      - name: build website
+        run: yarn build
+
+      - name: install documentation
+        run: make docs-install
+
+      - name: build documentation
+        run: make docs-build
