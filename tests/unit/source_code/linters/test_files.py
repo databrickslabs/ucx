@@ -2,7 +2,6 @@ from pathlib import Path
 from unittest.mock import create_autospec
 
 import pytest
-from databricks.labs.blueprint.tui import MockPrompts
 
 
 from databricks.sdk.service.workspace import Language
@@ -206,11 +205,10 @@ def test_known_issues(path: Path, migration_index) -> None:
         file_loader,
         folder_loader,
         path_lookup,
-        session_state,
         resolver,
         lambda: LinterContext(migration_index, session_state),
     )
-    advices = linter.lint(MockPrompts({}), path)
+    advices = linter.lint(path)
     for advice in advices:
         print(repr(advice))
 

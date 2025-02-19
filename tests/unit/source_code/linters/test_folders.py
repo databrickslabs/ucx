@@ -2,15 +2,14 @@ from pathlib import Path
 
 import pytest
 
-from databricks.labs.ucx.source_code.base import Advisory, CurrentSessionState, LocatedAdvice
+from databricks.labs.ucx.source_code.base import Advisory, LocatedAdvice
 from databricks.labs.ucx.source_code.files import FileLoader, ImportFileResolver
 from databricks.labs.ucx.source_code.folders import FolderLoader
-from databricks.labs.ucx.source_code.graph import DependencyResolver, SourceContainer
+from databricks.labs.ucx.source_code.graph import DependencyResolver
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.linters.folders import LocalCodeLinter
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader, NotebookResolver
 from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
-from tests.unit import _samples_path
 
 
 @pytest.fixture()
@@ -19,7 +18,6 @@ def local_code_linter(mock_path_lookup, migration_index):
     file_loader = FileLoader()
     folder_loader = FolderLoader(notebook_loader, file_loader)
     pip_resolver = PythonLibraryResolver()
-    session_state = CurrentSessionState()
     import_file_resolver = ImportFileResolver(file_loader)
     resolver = DependencyResolver(
         pip_resolver,
@@ -28,32 +26,40 @@ def local_code_linter(mock_path_lookup, migration_index):
         import_file_resolver,
         mock_path_lookup,
     )
-    return LocalCodeLinter(
+    linter = LocalCodeLinter(
         notebook_loader,
         file_loader,
         folder_loader,
         mock_path_lookup,
-        session_state,
         resolver,
         lambda: LinterContext(migration_index),
     )
+    return linter
 
 
-def test_local_code_linter_walks_directory(mock_path_lookup, local_code_linter) -> None:
-    # TODO remove sample paths and clean up test when the paths is no longer needed
-    mock_path_lookup.append_path(Path(_samples_path(SourceContainer)))
-    path = Path(__file__).parent / "../samples" / "simulate-sys-path"
-    advices = list(local_code_linter.lint_path(path))
+def test_local_code_linter_lint_walks_directory(mock_path_lookup, local_code_linter) -> None:
+    advices = list(local_code_linter.lint(Path("simulate-sys-path/")))
     assert len(mock_path_lookup.successfully_resolved_paths) > 10
     assert not advices
 
 
-def test_local_code_linter_lints_children_in_context(mock_path_lookup, local_code_linter) -> None:
-    # TODO remove sample paths and clean up test when the paths is no longer needed
-    mock_path_lookup.append_path(Path(_samples_path(SourceContainer)))
-    path = Path(__file__).parent.parent / "samples" / "parent-child-context"
-    advices = list(local_code_linter.lint_path(path))
-    assert mock_path_lookup.successfully_resolved_paths == {path, Path("parent.py"), Path("child.py")}
+def test_local_code_linter_apply_walks_directory(mock_path_lookup, local_code_linter) -> None:
+    advices = list(local_code_linter.apply(Path("simulate-sys-path/")))
+    assert len(mock_path_lookup.successfully_resolved_paths) > 10
+    assert not advices
+
+
+def test_local_code_linter_lints_child_in_context(mock_path_lookup, local_code_linter) -> None:
+    expected = {Path("parent-child-context/parent.py"), Path("child.py")}
+    advices = list(local_code_linter.lint(Path("parent-child-context/parent.py")))
+    assert not expected - mock_path_lookup.successfully_resolved_paths
+    assert not advices
+
+
+def test_local_code_linter_applies_child_in_context(mock_path_lookup, local_code_linter) -> None:
+    expected = {Path("parent-child-context/parent.py"), Path("child.py")}
+    advices = list(local_code_linter.apply(Path("parent-child-context/parent.py")))
+    assert not expected - mock_path_lookup.successfully_resolved_paths
     assert not advices
 
 
@@ -78,7 +84,7 @@ def test_local_code_linter_lints_import_from_known_list(tmp_path, mock_path_look
     content = "import pyspark.sql.functions"  # Has known issues
     path = tmp_path / "file.py"
     path.write_text(content)
-    located_advices = list(local_code_linter.lint_path(path))
+    located_advices = list(local_code_linter.lint(path))
 
     assert located_advices == expected_located_advices
 
@@ -96,7 +102,7 @@ def test_local_code_linter_lints_known_s3fs_problems(local_code_linter, mock_pat
         -1,
     )
     path = mock_path_lookup.resolve(Path("leaf9.py"))
-    located_advices = list(local_code_linter.lint_path(path))
+    located_advices = list(local_code_linter.lint(path))
     assert located_advices == [LocatedAdvice(expected, Path(known_url + "#s3fs"))]
 
 
@@ -140,5 +146,5 @@ def test_local_code_linter_lints_known_s3fs_problems_from_source_code(
     expected = [LocatedAdvice(advice, Path(f"{known_url}#{module_name}"))] if advice else []
     path = tmp_path / "file.py"
     path.write_text(source_code)
-    located_advices = list(local_code_linter.lint_path(path))
+    located_advices = list(local_code_linter.lint(path))
     assert located_advices == expected
