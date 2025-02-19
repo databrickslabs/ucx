@@ -30,6 +30,23 @@ df4.write.saveAsTable(f"{schema}.member_measure")
     sqf = SparkTableNamePyLinter(ftf, empty_index, session_state)
     assert not list(sqf.lint(source))
 
+def test_dbfs_stuff(empty_index) -> None:
+    source = """
+        # Databricks notebook source
+        # MAGIC %run ./_param_connexion_formation
+
+        # COMMAND ----------
+
+        from pyspark.sql import functions as F
+
+        # COMMAND ----------
+
+        path_dossierLIZZY = searchPathRecent('/mnt/mnt_datalake_smartCompetencies/', repLIZZY)
+    """
+    session_state = CurrentSessionState()
+    ftf = FromTableSqlLinter(empty_index, session_state)
+    sqf = SparkTableNamePyLinter(ftf, empty_index, session_state)
+    assert not list(sqf.lint(source))
 
 def test_linter_context_python_linter_lints_table_pending_migration_with_empty_index(empty_index) -> None:
     source_code = """
@@ -526,6 +543,20 @@ for i in range(10):
                 )
             ],
         ),
+        # Test for mount calls inside a function
+        (
+            """variable = searchPath('/mnt/something/', some_variable)""",
+            [
+                Deprecation(
+                    code='direct-filesystem-access',
+                    message="The use of direct filesystem references is deprecated: /mnt/something/",
+                    start_line=0,
+                    start_col=0,
+                    end_line=0,
+                    end_col=41,
+                )
+            ],
+        ),
     ],
 )
 def test_spark_cloud_direct_access(empty_index, code, expected) -> None:
@@ -656,3 +687,4 @@ def test_spark_collect_tables_ignores_dfsas(source_code, expected, migration_ind
     for used_table in used_tables:
         actual = (used_table.catalog_name, used_table.schema_name, used_table.table_name)
         assert actual in expected
+
