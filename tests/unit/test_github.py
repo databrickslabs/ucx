@@ -6,7 +6,7 @@ from databricks.labs.ucx.github import GITHUB_URL, IssueType, construct_new_issu
 def test_construct_new_issue_url_starts_with_github_url() -> None:
     """Test that the URL starts with the GitHub URL."""
     url = construct_new_issue_url(IssueType.FEATURE, "title", "body")
-    assert url.startswith(GITHUB_URL)
+    assert url.startswith("https://github.com/databrickslabs/ucx")
 
 
 def test_construct_new_issue_url_with_labels() -> None:
@@ -32,8 +32,8 @@ def test_construct_new_issue_url_makes_url_safe() -> None:
 def test_construct_new_issue_url_advanced() -> None:
     """Test that the URL is properly constructed with advanced parameters."""
     expected = (
-        f"{GITHUB_URL}/issues/new?"
-        "type=Feature"
+        f"https://github.com/databrickslabs/ucx/issues/new"
+        "?type=Feature"
         "&title=Autofix+the+following+Python+code"
         "&body=%23+Desired+behaviour%0A%0AAutofix+following+Python+code"
         "%0A%0A%60%60%60+python%0ATODO%3A+Add+relevant+source+code%0A%60%60%60"
