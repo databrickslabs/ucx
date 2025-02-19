@@ -2,9 +2,9 @@
 # and https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/syntax-for-githubs-form-schema
 name: Bug Report
 description: Something is not working with UCX
-title: "[BUG]: "
-labels: ["bug", "needs-triage"]
+labels: ["needs-triage"]
 projects: ["databrickslabs/13"]
+type: Bug
 # assignees:
 #   - ucx-write
 body:

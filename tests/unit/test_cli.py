@@ -42,6 +42,7 @@ from databricks.labs.ucx.cli import (
     installations,
     join_collection,
     logs,
+    lint_local_code,
     manual_workspace_info,
     migrate_acls,
     migrate_credentials,
@@ -74,7 +75,7 @@ from databricks.labs.ucx.hive_metastore import TablesCrawler, ExternalLocations
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocation
 from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.progress.install import VerifyProgressTracking
-from databricks.labs.ucx.source_code.linters.folders import LocalFileMigrator
+from databricks.labs.ucx.source_code.linters.folders import LocalCodeLinter
 from databricks.labs.ucx.source_code.linters.redash import Redash
 
 
@@ -948,20 +949,20 @@ def test_relay_logs(ws, caplog) -> None:
     assert 'Something is logged' in caplog.messages
 
 
-def test_migrate_local_code(ws):
+def test_lint_local_code(ws) -> None:
     prompts = MockPrompts({'.*': 'yes'})
-    with patch.object(LocalFileMigrator, 'apply') as mock_apply:
-        migrate_local_code(ws, prompts)
+    with patch.object(LocalCodeLinter, 'lint') as mock_apply:
+        lint_local_code(ws, prompts, Path.cwd().as_posix())
 
         mock_apply.assert_called_once_with(Path.cwd())
 
 
-def test_migrate_local_code_aborted_via_prompt(ws):
-    prompts = MockPrompts({'.*apply UC migration to all files.*': 'no'})
-    with patch.object(LocalFileMigrator, 'apply') as mock_apply:
-        migrate_local_code(ws, prompts)
+def test_migrate_local_code(ws) -> None:
+    prompts = MockPrompts({'.*': 'yes'})
+    with patch.object(LocalCodeLinter, 'apply') as mock_apply:
+        migrate_local_code(ws, prompts, Path.cwd().as_posix())
 
-        mock_apply.assert_not_called()
+        mock_apply.assert_called_once_with(Path.cwd())
 
 
 def test_show_all_metastores(acc_client, caplog):

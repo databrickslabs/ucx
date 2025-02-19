@@ -1,3 +1,5 @@
+from collections.abc import Callable
+
 from .base import (
     SchemaComparator,
     SchemaComparisonEntry,
@@ -9,8 +11,14 @@ from .base import (
 
 
 class StandardSchemaComparator(SchemaComparator):
-    def __init__(self, metadata_retriever: TableMetadataRetriever):
+    def __init__(self, metadata_retriever: TableMetadataRetriever, *, case_sensitive: bool = False):
         self._metadata_retriever = metadata_retriever
+        self._case_sensitive = case_sensitive
+
+    def _column_name_transformer(self) -> Callable[[str], str]:
+        if self._case_sensitive:
+            return lambda _: _
+        return str.lower
 
     def compare_schema(self, source: TableIdentifier, target: TableIdentifier) -> SchemaComparisonResult:
         """
@@ -26,8 +34,12 @@ class StandardSchemaComparator(SchemaComparator):
         return SchemaComparisonResult(is_matching, comparison_result)
 
     def _eval_schema_diffs(self, source: TableIdentifier, target: TableIdentifier) -> list[SchemaComparisonEntry]:
-        source_metadata = self._metadata_retriever.get_metadata(source)
-        target_metadata = self._metadata_retriever.get_metadata(target)
+        source_metadata = self._metadata_retriever.get_metadata(
+            source, column_name_transformer=self._column_name_transformer()
+        )
+        target_metadata = self._metadata_retriever.get_metadata(
+            target, column_name_transformer=self._column_name_transformer()
+        )
         # Combine the sets of column names for both the source and target tables
         # to create a set of all unique column names from both tables.
         source_column_names = {column.name for column in source_metadata.columns}
