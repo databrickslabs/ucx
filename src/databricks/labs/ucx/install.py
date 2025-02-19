@@ -48,7 +48,7 @@ from databricks.sdk.service.sql import (
 )
 from databricks.sdk.useragent import with_extra
 
-from databricks.labs.ucx.github import DOCS_URL, GITHUB_URL
+from databricks.labs.ucx.github import DOCS_URL
 from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalInfo
 from databricks.labs.ucx.assessment.clusters import ClusterInfo, PolicyInfo
@@ -219,7 +219,7 @@ class WorkspaceInstaller(WorkspaceContext):
             if isinstance(err.__cause__, RequestsConnectionError):
                 logger.warning(
                     f"Cannot connect with {self.workspace_client.config.host} see "
-                    f"{GITHUB_URL}#network-connectivity-issues for help: {err}"
+                    f"{DOCS_URL}#reference/common_challenges/#network-connectivity-issues for help: {err}"
                 )
             raise err
         return config
