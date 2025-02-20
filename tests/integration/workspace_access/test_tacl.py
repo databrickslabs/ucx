@@ -290,8 +290,8 @@ def test_verify_permission_for_udfs(
     _prepare_context: Callable[[MockRuntimeContext], MockRuntimeContext],
 ) -> None:
     ctx = _prepare_context(runtime_ctx)
-    group = ctx.make_group()
-    schema = ctx.make_schema()
+    group, schema = ctx.make_group(), ctx.make_schema()
+    assert schema.full_name, "Schema should have a full name"
 
     ctx.sql_backend.execute(f"GRANT SELECT ON SCHEMA {schema.name} TO `{group.display_name}`")
 
