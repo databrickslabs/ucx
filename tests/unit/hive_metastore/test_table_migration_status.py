@@ -133,7 +133,7 @@ def test_table_migration_status_refresher_scope(
     def schemas_list(catalog_name: str) -> Iterable[SchemaInfo]:
         schemas = [
             SchemaInfo(catalog_name="test1", name="test1"),
-            SchemaInfo(catalog_name="test1", name="test2"),
+            SchemaInfo(catalog_name="test2", name="test2"),
         ]
         for schema in schemas:
             if schema.catalog_name == catalog_name:
@@ -165,9 +165,9 @@ def test_table_migration_status_refresher_scope(
     tables_crawler = create_autospec(TablesCrawler)
     refresher = TableMigrationStatusRefresher(ws, mock_backend, "test", tables_crawler)
 
-    seen_tables = refresher.get_seen_tables(scope={"test1.test1.test1"})
-
-    assert seen_tables == {"test1.test1.test1": "test1"}
-    ws.catalogs.list.assert_called_once() # System is NOT called
+    # Test with scope
+    assert refresher.get_seen_tables(scope={"test1.test1.test1"}) == {"test1.test1.test1": "test1"}
+    # Test without scope
+    assert refresher.get_seen_tables() == {"test1.test1.test1": "test1", "test2.test2.test2": "test2"}
     ws.tables.list.assert_called()
     tables_crawler.snapshot.assert_not_called()
