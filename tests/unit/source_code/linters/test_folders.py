@@ -1,3 +1,4 @@
+import shutil
 from pathlib import Path
 
 import pytest
@@ -43,8 +44,14 @@ def test_local_code_linter_lint_walks_directory(mock_path_lookup, local_code_lin
     assert not advices
 
 
-def test_local_code_linter_apply_walks_directory(mock_path_lookup, local_code_linter) -> None:
-    advices = list(local_code_linter.apply(Path("simulate-sys-path/")))
+def test_local_code_linter_apply_walks_directory(tmp_path, mock_path_lookup, local_code_linter) -> None:
+    # Copy the parent-child-context directory to a temporary directory so that fixes are cleaned up after the test
+    source_path = mock_path_lookup.resolve(Path("simulate-sys-path/"))
+    destination_path = tmp_path / "simulate-sys-path"
+    copied_path = shutil.copytree(source_path, destination_path)
+
+    advices = list(local_code_linter.apply(copied_path))
+
     assert len(mock_path_lookup.successfully_resolved_paths) > 10
     assert not advices
 
@@ -56,10 +63,22 @@ def test_local_code_linter_lints_child_in_context(mock_path_lookup, local_code_l
     assert not advices
 
 
-def test_local_code_linter_applies_child_in_context(mock_path_lookup, local_code_linter) -> None:
-    expected = {Path("parent-child-context/parent.py"), Path("child.py")}
-    advices = list(local_code_linter.apply(Path("parent-child-context/parent.py")))
-    assert not expected - mock_path_lookup.successfully_resolved_paths
+def test_local_code_linter_applies_child_in_context(tmp_path, mock_path_lookup, local_code_linter) -> None:
+    # Copy the parent-child-context directory to a temporary directory so that fixes are cleaned up after the test
+    source_path = mock_path_lookup.resolve(Path("parent-child-context/"))
+    destination_path = tmp_path / "parent-child-context"
+    copied_path = shutil.copytree(source_path, destination_path)
+
+    parent_path = copied_path / "parent.py"
+    child_path = copied_path / "child.py"
+    # 1./2. The full parent and child paths are expected to be resolved to read the notebooks
+    # 3. The relative child path is expected to be resolved as it is defined in the parent notebook
+    # 4. The parent-child-context directory is resolved at the top of this test
+    expected = {parent_path, child_path, Path("child.py"), Path("parent-child-context")}
+
+    advices = list(local_code_linter.apply(parent_path))
+
+    assert mock_path_lookup.successfully_resolved_paths == expected
     assert not advices
 
 
