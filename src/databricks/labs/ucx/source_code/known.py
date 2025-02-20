@@ -14,6 +14,7 @@ from pathlib import Path
 
 from databricks.labs.blueprint.entrypoint import get_logger
 
+from databricks.labs.ucx.github import GITHUB_URL
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.source_code.base import Advice, CurrentSessionState
 from databricks.labs.ucx.source_code.graph import (
@@ -24,6 +25,7 @@ from databricks.labs.ucx.source_code.graph import (
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 logger = logging.getLogger(__name__)
+KNOWN_URL = f"{GITHUB_URL}/blob/main/src/databricks/labs/ucx/source_code/known.json"
 
 """
 Known libraries that are not in known.json
@@ -282,10 +284,9 @@ class KnownDependency(Dependency):
     """A dependency for known libraries, see :class:KnownList."""
 
     def __init__(self, module_name: str, problems: list[KnownProblem]):
-        known_url = "https://github.com/databrickslabs/ucx/blob/main/src/databricks/labs/ucx/source_code/known.json"
         # Note that Github does not support navigating JSON files, hence the #<module_name> does nothing.
         # https://docs.github.com/en/repositories/working-with-files/using-files/navigating-code-on-github
-        super().__init__(KnownLoader(), Path(f"{known_url}#{module_name}"), inherits_context=False)
+        super().__init__(KnownLoader(), Path(f"{KNOWN_URL}#{module_name}"), inherits_context=False)
         self._module_name = module_name
         self.problems = problems
 

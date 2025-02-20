@@ -17,7 +17,7 @@ from databricks.labs.ucx.source_code.base import (
 from databricks.labs.ucx.source_code.files import LocalFile
 from databricks.labs.ucx.source_code.graph import Dependency
 from databricks.labs.ucx.source_code.known import KnownDependency
-from databricks.labs.ucx.source_code.linters.base import PythonLinter
+from databricks.labs.ucx.source_code.linters.base import PythonFixer, PythonLinter
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.linters.imports import SysPathChange, UnresolvedPath
 from databricks.labs.ucx.source_code.notebooks.cells import (
@@ -26,7 +26,6 @@ from databricks.labs.ucx.source_code.notebooks.cells import (
     RunCell,
     RunCommand,
 )
-from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader
 from databricks.labs.ucx.source_code.notebooks.magic import MagicLine
 from databricks.labs.ucx.source_code.notebooks.sources import Notebook
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
@@ -42,7 +41,11 @@ class NotebookLinter:
     """
 
     def __init__(
-        self, notebook: Notebook, path_lookup: PathLookup, context: LinterContext, parent_tree: Tree | None = None
+        self,
+        notebook: Notebook,
+        path_lookup: PathLookup,
+        context: LinterContext,
+        parent_tree: Tree | None = None,
     ):
         self._context: LinterContext = context
         self._path_lookup = path_lookup
@@ -74,6 +77,37 @@ class NotebookLinter:
                     start_line=advice.start_line + cell.original_offset,
                     end_line=advice.end_line + cell.original_offset,
                 )
+        return
+
+    def apply(self) -> None:
+        """Apply changes to the notebook."""
+        maybe_tree = self._parse_notebook(self._notebook, parent_tree=self._parent_tree)
+        if maybe_tree and maybe_tree.failure:
+            logger.warning("Failed to parse the notebook, run linter for more details.")
+            return
+        for cell in self._notebook.cells:
+            try:
+                linter = self._context.linter(cell.language.language)
+            except ValueError:  # Language is not supported (yet)
+                continue
+            fixed_code = cell.original_code  # For default fixing
+            tree = self._python_tree_cache.get((self._notebook.path, cell))  # For Python fixing
+            is_python_cell = isinstance(cell, PythonCell)
+            if is_python_cell and tree:
+                advices = cast(PythonLinter, linter).lint_tree(tree)
+            else:
+                advices = linter.lint(cell.original_code)
+            for advice in advices:
+                fixer = self._context.fixer(cell.language.language, advice.code)
+                if not fixer:
+                    continue
+                if is_python_cell and tree:
+                    # By calling `apply_tree` instead of `apply`, we chain fixes on the same tree
+                    tree = cast(PythonFixer, fixer).apply_tree(tree)
+                else:
+                    fixed_code = fixer.apply(fixed_code)
+            cell.migrated_code = tree.node.as_string() if tree else fixed_code
+        self._notebook.back_up_original_and_flush_migrated_code()
         return
 
     def _parse_notebook(self, notebook: Notebook, *, parent_tree: Tree) -> MaybeTree | None:
@@ -264,6 +298,8 @@ class FileLinter:
         source_container = self._dependency.load(self._path_lookup)
         if isinstance(source_container, LocalFile):
             self._apply_file(source_container)
+        elif isinstance(source_container, Notebook):
+            self._apply_notebook(source_container)
 
     def _apply_file(self, local_file: LocalFile) -> None:
         """Apply changes to a local file."""
@@ -271,43 +307,7 @@ class FileLinter:
         local_file.migrated_code = fixed_code
         local_file.back_up_original_and_flush_migrated_code()
 
-
-class NotebookMigrator:
-    def __init__(self, languages: LinterContext):
-        # TODO: move languages to `apply`
-        self._languages = languages
-
-    def revert(self, path: Path) -> bool:
-        backup_path = path.with_suffix(".bak")
-        if not backup_path.exists():
-            return False
-        return path.write_text(backup_path.read_text()) > 0
-
-    def apply(self, path: Path) -> bool:
-        if not path.exists():
-            return False
-        dependency = Dependency(NotebookLoader(), path)
-        # TODO: the interface for this method has to be changed
-        lookup = PathLookup.from_sys_path(Path.cwd())
-        container = dependency.load(lookup)
-        assert isinstance(container, Notebook)
-        return self._apply(container)
-
-    def _apply(self, notebook: Notebook) -> bool:
-        changed = False
-        for cell in notebook.cells:
-            # %run is not a supported language, so this needs to come first
-            if isinstance(cell, RunCell):
-                # TODO migration data, see https://github.com/databrickslabs/ucx/issues/1327
-                continue
-            if not self._languages.is_supported(cell.language.language):
-                continue
-            migrated_code = self._languages.apply_fixes(cell.language.language, cell.original_code)
-            if migrated_code != cell.original_code:
-                cell.migrated_code = migrated_code
-                changed = True
-        if changed:
-            # TODO https://github.com/databrickslabs/ucx/issues/1327 store 'migrated' status
-            notebook.path.replace(notebook.path.with_suffix(".bak"))
-            notebook.path.write_text(notebook.to_migrated_code())
-        return changed
+    def _apply_notebook(self, notebook: Notebook) -> None:
+        """Apply changes to a notebook."""
+        notebook_linter = NotebookLinter(notebook, self._path_lookup, self._context, self._inherited_tree)
+        notebook_linter.apply()

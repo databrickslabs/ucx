@@ -13,7 +13,7 @@ from databricks.labs.ucx.source_code.folders import FolderLoader
 from databricks.labs.ucx.source_code.graph import Dependency, DependencyResolver, SourceContainer
 from databricks.labs.ucx.source_code.linters.base import PythonLinter
 from databricks.labs.ucx.source_code.linters.context import LinterContext
-from databricks.labs.ucx.source_code.linters.files import FileLinter, NotebookLinter, NotebookMigrator
+from databricks.labs.ucx.source_code.linters.files import FileLinter, NotebookLinter
 from databricks.labs.ucx.source_code.linters.folders import LocalCodeLinter
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader, NotebookResolver
 from databricks.labs.ucx.source_code.notebooks.sources import Notebook
@@ -142,20 +142,6 @@ def test_file_linter_applies_migrated(tmp_path, mock_path_lookup, migration_inde
     assert path.read_text().rstrip() == "df = spark.read.table('brand.new.stuff')"
 
 
-def test_notebook_migrator_ignores_unsupported_extensions() -> None:
-    languages = LinterContext(TableMigrationIndex([]))
-    migrator = NotebookMigrator(languages)
-    path = Path('unsupported.ext')
-    assert not migrator.apply(path)
-
-
-def test_notebook_migrator_supported_language_no_diagnostics(mock_path_lookup) -> None:
-    languages = LinterContext(TableMigrationIndex([]))
-    migrator = NotebookMigrator(languages)
-    path = mock_path_lookup.resolve(Path("root1.run.py"))
-    assert not migrator.apply(path)
-
-
 def test_triple_dot_import() -> None:
     file_resolver = ImportFileResolver(FileLoader())
     path_lookup = create_autospec(PathLookup)
@@ -266,6 +252,52 @@ def test_notebook_linter_lints_source_yielding_parse_failure(migration_index, mo
     ]
 
 
+def test_notebook_linter_applies_migrated_table_with_rename(tmp_path, migration_index, mock_path_lookup) -> None:
+    """The table should be migrated to the new table name as defined in the migration index."""
+    path = tmp_path / "notebook.py"
+    source = "# Databricks notebook source\nspark.table('old.things')"
+    path.write_text(source)
+    notebook = Notebook.parse(path, source, Language.PYTHON)
+    linter = NotebookLinter(notebook, mock_path_lookup, LinterContext(migration_index))
+
+    linter.apply()
+
+    contents = path.read_text()
+    assert "old.things" not in contents
+    assert "brand.new.stuff" in contents
+
+
+def test_notebook_linter_applies_two_migrated_table_with_rename(tmp_path, migration_index, mock_path_lookup) -> None:
+    """The table should be migrated to the new table names as defined in the migration index."""
+    path = tmp_path / "notebook.py"
+    source = "# Databricks notebook source\nspark.table('old.things')\nspark.table('other.matters')"
+    path.write_text(source)
+    notebook = Notebook.parse(path, source, Language.PYTHON)
+    linter = NotebookLinter(notebook, mock_path_lookup, LinterContext(migration_index))
+
+    linter.apply()
+
+    contents = path.read_text()
+    assert "old.things" not in contents
+    assert "brand.new.stuff" in contents
+    assert "some.certain.issues" in contents
+
+
+def test_notebook_linter_applies_no_op_for_non_migrated_table(tmp_path, migration_index, mock_path_lookup) -> None:
+    """The table should not be migrated to the new table name as defined in the migration index."""
+    path = tmp_path / "notebook.py"
+    source = "# Databricks notebook source\nspark.table('not.migrated.table')"
+    path.write_text(source)
+    notebook = Notebook.parse(path, source, Language.PYTHON)
+    linter = NotebookLinter(notebook, mock_path_lookup, LinterContext(migration_index))
+
+    linter.apply()
+
+    contents = path.read_text()
+    assert "not.migrated.table" in contents
+    assert "brand.new.stuff" not in contents
+
+
 @pytest.mark.xfail(reason="https://github.com/databrickslabs/ucx/issues/3556")
 def test_notebook_linter_lints_source_yielding_parse_failures(migration_index, mock_path_lookup) -> None:
     source = """
@@ -301,18 +333,37 @@ print(2
     ]
 
 
-def test_notebook_linter_lints_migrated_table(migration_index, mock_path_lookup) -> None:
+@pytest.mark.skip(reason="https://github.com/databrickslabs/ucx/issues/3695")
+def test_notebook_linter_lints_and_applies_migrated_table(tmp_path, migration_index, mock_path_lookup) -> None:
     """Regression test with the tests below."""
-    source = """
+    expected = """
 # Databricks notebook source
+table_name = 'brand.new.stuff'
 
-table_name = "old.things"  # Migrated table according to the migration index
+
 
 # COMMAND ----------
 
 spark.table(table_name)
+
+
 """.lstrip()
-    linter = _NotebookLinter.from_source_code(migration_index, mock_path_lookup, source, Language.PYTHON)
+    source_code = """
+# Databricks notebook source
+table_name = 'old.things'
+
+
+
+# COMMAND ----------
+
+spark.table(table_name)
+
+
+""".lstrip()
+    path = tmp_path / "notebook.py"
+    path.write_text(source_code)
+    notebook = Notebook.parse(path, source_code, Language.PYTHON)
+    linter = NotebookLinter(notebook, mock_path_lookup, LinterContext(migration_index))
 
     advices = list(linter.lint())
 
@@ -320,83 +371,141 @@ spark.table(table_name)
     assert advices[0] == Deprecation(
         code='table-migrated-to-uc-python',
         message='Table old.things is migrated to brand.new.stuff in Unity Catalog',
-        start_line=6,
+        start_line=7,
         start_col=0,
-        end_line=6,
+        end_line=7,
         end_col=23,
     )
 
+    linter.apply()
 
-def test_notebook_linter_lints_not_migrated_table(migration_index, mock_path_lookup) -> None:
+    assert path.read_text() == expected
+
+
+def test_notebook_linter_lints_and_applies_not_migrated_table(tmp_path, migration_index, mock_path_lookup) -> None:
     """Regression test with the tests above and below."""
-    source = """
+    source_code = """
 # Databricks notebook source
+table_name = 'not_migrated.table'
 
-table_name = "not_migrated.table"  # NOT a migrated table according to the migration index
+
 
 # COMMAND ----------
 
 spark.table(table_name)
+
+
 """.lstrip()
-    linter = _NotebookLinter.from_source_code(migration_index, mock_path_lookup, source, Language.PYTHON)
+    path = tmp_path / "notebook.py"
+    path.write_text(source_code)
+    notebook = Notebook.parse(path, source_code, Language.PYTHON)
+    linter = NotebookLinter(notebook, mock_path_lookup, LinterContext(migration_index))
 
     advices = list(linter.lint())
 
     assert not [advice for advice in advices if advice.code == "table-migrated-to-uc"]
 
+    linter.apply()
 
-def test_notebook_linter_lints_migrated_table_with_rename(migration_index, mock_path_lookup) -> None:
+    assert path.read_text() == source_code
+
+
+@pytest.mark.skip(reason="https://github.com/databrickslabs/ucx/issues/3695")
+def test_notebook_linter_lints_and_applies_migrated_table_with_rename(
+    tmp_path, migration_index, mock_path_lookup
+) -> None:
     """The spark.table should read the table defined above the call not below.
 
     This is a regression test with the tests above and below.
     """
-    source = """
+    expected = """
 # Databricks notebook source
+table_name = 'brand.new.stuff'
 
-table_name = "old.things"  # Migrated table according to the migration index
+
 
 # COMMAND ----------
 
 spark.table(table_name)
 
+
+
 # COMMAND ----------
 
-table_name = "not_migrated.table"  # NOT a migrated table according to the migration index
+table_name = 'not_migrated.table'
+
+
 """.lstrip()
-    linter = _NotebookLinter.from_source_code(migration_index, mock_path_lookup, source, Language.PYTHON)
+    source_code = """
+# Databricks notebook source
+table_name = 'old.things'
+
+
+
+# COMMAND ----------
+
+spark.table(table_name)
+
+
+# COMMAND ----------
+
+table_name = 'not_migrated.table'
+
+
+""".lstrip()
+    path = tmp_path / "notebook.py"
+    path.write_text(source_code)
+    notebook = Notebook.parse(path, source_code, Language.PYTHON)
+    linter = NotebookLinter(notebook, mock_path_lookup, LinterContext(migration_index))
 
     first_advice = next(iter(linter.lint()))
 
     assert first_advice == Deprecation(
         code='table-migrated-to-uc-python',
         message='Table old.things is migrated to brand.new.stuff in Unity Catalog',
-        start_line=6,
+        start_line=7,
         start_col=0,
-        end_line=6,
+        end_line=7,
         end_col=23,
     )
 
+    linter.apply()
 
-def test_notebook_linter_lints_not_migrated_table_with_rename(migration_index, mock_path_lookup) -> None:
+    assert path.read_text() == expected
+
+
+def test_notebook_linter_lints_not_migrated_table_with_rename(tmp_path, migration_index, mock_path_lookup) -> None:
     """The spark.table should read the table defined above the call not below.
 
     This is a regression test with the tests above.
     """
-    source = """
+    source_code = """
 # Databricks notebook source
+table_name = 'not_migrated.table'
 
-table_name = "not_migrated.table"  # NOT a migrated table according to the migration index
+
 
 # COMMAND ----------
 
 spark.table(table_name)
 
+
+
 # COMMAND ----------
 
-table_name = "old.things"  # Migrated table according to the migration index
+table_name = 'old.things'
+
+
 """.lstrip()
-    linter = _NotebookLinter.from_source_code(migration_index, mock_path_lookup, source, Language.PYTHON)
+    path = tmp_path / "notebook.py"
+    path.write_text(source_code)
+    notebook = Notebook.parse(path, source_code, Language.PYTHON)
+    linter = NotebookLinter(notebook, mock_path_lookup, LinterContext(migration_index))
 
     advices = list(linter.lint())
 
     assert not [advice for advice in advices if advice.code == "table-migrated-to-uc"]
+
+    linter.apply()
+
+    assert path.read_text() == source_code

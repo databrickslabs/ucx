@@ -27,6 +27,6 @@ def test_local_code_linter_lints_ucx(local_checkout_context, ucx_source_path) ->
     assert len(problems) > 0, "Found no problems while linting ucx"
 
 
-def test_local_code_migrator_fixes_ucx(local_checkout_context, ucx_source_path) -> None:
+def test_local_code_linter_applies_ucx(local_checkout_context, ucx_source_path) -> None:
     problems = list(local_checkout_context.local_code_linter.apply(ucx_source_path))
     assert len(problems) == 0, "Found no problems while fixing ucx"
