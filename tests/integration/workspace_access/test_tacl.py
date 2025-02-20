@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 @pytest.fixture
-def sql_backend_acl(ws, env_or_skip) -> SqlBackend:
+def _sql_backend_acl(ws, env_or_skip) -> SqlBackend:
     """Ensure the SQL backend in this module is table access control list enabled.
 
     We have a separate (legacy) cluster for table access control list. This
@@ -29,7 +29,7 @@ def sql_backend_acl(ws, env_or_skip) -> SqlBackend:
 
 
 @pytest.fixture
-def prepare_context_for_testing_grants(sql_backend_acl) -> Callable[[MockRuntimeContext], MockRuntimeContext]:
+def _prepare_context(_sql_backend_acl) -> Callable[[MockRuntimeContext], MockRuntimeContext]:
     """See inner :func:`prepare` function"""
 
     def prepare(context: MockRuntimeContext):
@@ -45,7 +45,7 @@ def prepare_context_for_testing_grants(sql_backend_acl) -> Callable[[MockRuntime
         context.make_udf()
         context.tables_crawler.snapshot(force_refresh=True)
         context.udfs_crawler.snapshot(force_refresh=True)
-        return context.replace(sql_backend=sql_backend_acl)
+        return context.replace(sql_backend=_sql_backend_acl)
 
     return prepare
 
@@ -53,10 +53,10 @@ def prepare_context_for_testing_grants(sql_backend_acl) -> Callable[[MockRuntime
 def test_grants_with_permission_migration_api(
     runtime_ctx: MockRuntimeContext,
     migrated_group,
-    prepare_context_for_testing_grants: Callable[[MockRuntimeContext], MockRuntimeContext],
+    _prepare_context: Callable[[MockRuntimeContext], MockRuntimeContext],
 ) -> None:
     # TODO: Move migrated group into `runtime_ctx` and follow the `make_` pattern
-    ctx = prepare_context_for_testing_grants(runtime_ctx)
+    ctx = _prepare_context(runtime_ctx)
     schema = ctx.make_schema()
     table = ctx.make_table(schema_name=schema.name)
     ctx.sql_backend.execute(f"GRANT USAGE ON SCHEMA {schema.name} TO `{migrated_group.name_in_workspace}`")
@@ -81,10 +81,10 @@ def test_grants_with_permission_migration_api(
 def test_permission_for_files_anonymous_func_migration_api(
     runtime_ctx: MockRuntimeContext,
     migrated_group,
-    prepare_context_for_testing_grants: Callable[[MockRuntimeContext], MockRuntimeContext],
+    _prepare_context: Callable[[MockRuntimeContext], MockRuntimeContext],
 ) -> None:
     # TODO: Move migrated group into `runtime_ctx` and follow the `make_` pattern
-    ctx = prepare_context_for_testing_grants(runtime_ctx)
+    ctx = _prepare_context(runtime_ctx)
     ctx.sql_backend.execute(f"GRANT READ_METADATA ON ANY FILE TO `{migrated_group.name_in_workspace}`")
     ctx.sql_backend.execute(f"GRANT SELECT ON ANONYMOUS FUNCTION TO `{migrated_group.name_in_workspace}`")
 
@@ -105,10 +105,10 @@ def test_permission_for_files_anonymous_func_migration_api(
 def test_permission_for_udfs_migration_api(
     runtime_ctx: MockRuntimeContext,
     migrated_group,
-    prepare_context_for_testing_grants: Callable[[MockRuntimeContext], MockRuntimeContext],
+    _prepare_context: Callable[[MockRuntimeContext], MockRuntimeContext],
 ) -> None:
     # TODO: Move migrated group into `runtime_ctx` and follow the `make_` pattern
-    ctx = prepare_context_for_testing_grants(runtime_ctx)
+    ctx = _prepare_context(runtime_ctx)
     schema = ctx.make_schema()
     udf_a = ctx.make_udf(schema_name=schema.name)
     udf_b = ctx.make_udf(schema_name=schema.name)
@@ -139,10 +139,10 @@ def test_permission_for_udfs_migration_api(
 
 def test_permission_for_files_anonymous_func(
     runtime_ctx: MockRuntimeContext,
-    prepare_context_for_testing_grants: Callable[[MockRuntimeContext], MockRuntimeContext],
+    _prepare_context: Callable[[MockRuntimeContext], MockRuntimeContext],
 ) -> None:
     """Test permission for any file and anonymous function to be migrated."""
-    ctx = prepare_context_for_testing_grants(runtime_ctx)
+    ctx = _prepare_context(runtime_ctx)
 
     old, new = ctx.make_group(), ctx.make_group()
     ctx.sql_backend.execute(f"GRANT READ_METADATA ON ANY FILE TO `{old.display_name}`")
@@ -168,10 +168,10 @@ def test_permission_for_files_anonymous_func(
 def test_hms2hms_owner_permissions(
     runtime_ctx: MockRuntimeContext,
     make_group_pair,
-    prepare_context_for_testing_grants: Callable[[MockRuntimeContext], MockRuntimeContext],
+    _prepare_context: Callable[[MockRuntimeContext], MockRuntimeContext],
 ) -> None:
     # TODO: Move `make_group_pair` into `runtime_ctx`
-    ctx = prepare_context_for_testing_grants(runtime_ctx)
+    ctx = _prepare_context(runtime_ctx)
     first = make_group_pair()
     second = make_group_pair()
     third = make_group_pair()
@@ -251,10 +251,10 @@ def test_hms2hms_owner_permissions(
 def test_permission_for_udfs(
     runtime_ctx: MockRuntimeContext,
     make_group_pair,
-    prepare_context_for_testing_grants: Callable[[MockRuntimeContext], MockRuntimeContext],
+    _prepare_context: Callable[[MockRuntimeContext], MockRuntimeContext],
 ) -> None:
     # TODO: Move `make_group_pair` into `runtime_ctx`
-    ctx = prepare_context_for_testing_grants(runtime_ctx)
+    ctx = _prepare_context(runtime_ctx)
     group = make_group_pair()
     schema = ctx.make_schema()
     udf_a = ctx.make_udf(schema_name=schema.name)
@@ -287,9 +287,9 @@ def test_permission_for_udfs(
 
 def test_verify_permission_for_udfs(
     runtime_ctx: MockRuntimeContext,
-    prepare_context_for_testing_grants: Callable[[MockRuntimeContext], MockRuntimeContext],
+    _prepare_context: Callable[[MockRuntimeContext], MockRuntimeContext],
 ) -> None:
-    ctx = prepare_context_for_testing_grants(runtime_ctx)
+    ctx = _prepare_context(runtime_ctx)
     group = ctx.make_group()
     schema = ctx.make_schema()
 
