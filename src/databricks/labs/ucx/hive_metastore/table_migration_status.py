@@ -92,7 +92,7 @@ class TableMigrationStatusRefresher(CrawlerBase[TableMigrationStatus]):
     def index(self, *, force_refresh: bool = False) -> TableMigrationIndex:
         return TableMigrationIndex(self.snapshot(force_refresh=force_refresh))
 
-    def get_seen_tables(self) -> dict[str, str]:
+    def get_seen_tables(self, *, scope: set[str] | None = None) -> dict[str, str]:
         seen_tables: dict[str, str] = {}
         for schema in self._iter_schemas():
             if schema.catalog_name is None or schema.name is None:
@@ -107,13 +107,14 @@ class TableMigrationStatusRefresher(CrawlerBase[TableMigrationStatus]):
                 logger.warning(f"Error while listing tables in schema: {schema.full_name}", exc_info=e)
                 continue
             for table in tables:
-                if not table.properties:
-                    continue
-                if "upgraded_from" not in table.properties:
-                    continue
                 if not table.full_name:
                     logger.warning(f"The table {table.name} in {schema.name} has no full name")
                     continue
+                if scope and table.full_name not in scope:
+                    continue
+                if not table.properties or "upgraded_from" not in table.properties:
+                    continue
+
                 seen_tables[table.full_name.lower()] = table.properties["upgraded_from"].lower()
         return seen_tables
 
