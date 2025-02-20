@@ -54,7 +54,7 @@ WITH iteractive_cluster_commands AS (
 )
 SELECT
   issue AS `Finding`,
-  COUNT(DISTINCT workspace_id) AS `# workspaces`, /* concat('<a href="https://github.com/databrickslabs/ucx/blob/main/docs/assessment.md#',replace(issue,' ','-'),'">',issue,'</a>') as link, */
+  COUNT(DISTINCT workspace_id) AS `# workspaces`, /* concat('<a href="https://databrickslabs.github.io/ucx/docs/reference/workflows/#assessment-workflow',replace(issue,' ','-'),'">',issue,'</a>') as link, */
   COUNT(DISTINCT notebook_id) AS `# notebooks`,
   COUNT(DISTINCT cluster_id) AS `# clusters`,
   COUNT(DISTINCT email) AS `# users`
