@@ -1,7 +1,7 @@
 import json
 import logging
 from collections import defaultdict
-from typing import Callable
+from collections.abc import Callable
 
 import pytest
 from databricks.labs.lsql.backends import CommandExecutionBackend, SqlBackend
