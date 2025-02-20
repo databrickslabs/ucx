@@ -119,3 +119,55 @@ def test_table_migration_status_refresher_get_seen_tables_skips_builtin_catalog(
     ws.schemas.list.assert_called_once_with(catalog_name="test")  # System is NOT called
     ws.tables.list.assert_called()
     tables_crawler.snapshot.assert_not_called()
+
+
+def test_table_migration_status_refresher_scope(
+    mock_backend
+) -> None:
+    ws = create_autospec(WorkspaceClient)
+    ws.catalogs.list.return_value = [
+        CatalogInfo(name="test1"),
+        CatalogInfo(name="test2"),
+    ]
+
+    def schemas_list(catalog_name: str) -> Iterable[SchemaInfo]:
+        schemas = [
+            SchemaInfo(catalog_name="test1", name="test1"),
+            SchemaInfo(catalog_name="test1", name="test2"),
+        ]
+        for schema in schemas:
+            if schema.catalog_name == catalog_name:
+                yield schema
+
+    def tables_list(catalog_name: str, schema_name: str) -> Iterable[TableInfo]:
+        tables = [
+            TableInfo(
+                full_name="test1.test1.test1",
+                catalog_name="test1",
+                schema_name="test1",
+                name="test1",
+                properties={"upgraded_from": "test1"},
+            ),
+            TableInfo(
+                full_name="test2.test2.test2",
+                catalog_name="test2",
+                schema_name="test2",
+                name="test2",
+                properties={"upgraded_from": "test2"},
+            ),
+        ]
+        for table in tables:
+            if table.catalog_name == catalog_name and table.schema_name == schema_name:
+                yield table
+
+    ws.schemas.list.side_effect = schemas_list
+    ws.tables.list.side_effect = tables_list
+    tables_crawler = create_autospec(TablesCrawler)
+    refresher = TableMigrationStatusRefresher(ws, mock_backend, "test", tables_crawler)
+
+    seen_tables = refresher.get_seen_tables(scope={"test1.test1.test1"})
+
+    assert seen_tables == {"test1.test1.test1": "test1"}
+    ws.catalogs.list.assert_called_once() # System is NOT called
+    ws.tables.list.assert_called()
+    tables_crawler.snapshot.assert_not_called()
