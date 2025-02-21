@@ -120,34 +120,30 @@ class JobsCrawler(CrawlerBase[JobInfo], JobsMixin, CheckClusterMixin):
         self._include_job_ids = include_job_ids
         self._exclude_job_ids = exclude_job_ids
 
-    def _list_jobs(self) -> Iterable[BaseJob | Job]:
+    def _list_jobs(self) -> Iterable[BaseJob]:
         """List the jobs.
 
         If include job ids is defined, we get the job definition for those ids.
         """
-        if self._include_job_ids is not None:
-            yield from self._get_jobs(*self._include_job_ids)
-            return
         try:
-            yield from self._ws.jobs.list(expand_tasks=True)
+            jobs = self._ws.jobs.list(expand_tasks=True)
         except DatabricksError as e:
             logger.error("Cannot list jobs", exc_info=e)
-            return []
-
-    def _get_jobs(self, *job_ids: int) -> Iterable[Job]:
-        """Get the job definitions for the given job ids."""
-        for job_id in job_ids:
-            job = self._get_job(job_id)
-            if job:
-                yield job
-
-    def _get_job(self, job_id: int) -> Job | None:
-        """Get a job"""
-        try:
-            return self._ws.jobs.get(job_id)
-        except DatabricksError as e:
-            logger.warning(f"Cannot get job: {job_id}", exc_info=e)
-            return None
+            return
+        while True:
+            try:
+                job = next(jobs)
+                if self._exclude_job_ids is not None and job.job_id in self._exclude_job_ids:
+                    continue
+                if self._include_job_ids is None:
+                    yield job
+                elif job.job_id in self._include_job_ids:
+                    yield job
+            except DatabricksError as e:
+                logger.error("Cannot list next jobs page", exc_info=e)
+                break
+            except StopIteration:
+                break
 
     def _crawl(self) -> Iterable[JobInfo]:
         all_jobs = list(self._list_jobs())
