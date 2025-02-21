@@ -119,7 +119,7 @@ class TableMigrationStatusRefresher(CrawlerBase[TableMigrationStatus]):
         tables: list = []
         table_lists = Threads.gather("list tables", tasks, self.API_LIMIT)
         # Combine tuple of lists to a list
-        for table_list in table_lists:
+        for table_list in table_lists[0]:
             tables.extend(table_list)
         for table in tables:
             if not isinstance(table, TableInfo):
