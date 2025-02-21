@@ -32,6 +32,25 @@ def test_job_crawler(ws, make_job, inventory_schema, sql_backend):
     assert int(results[0].job_id) == new_job.job_id
 
 
+def test_job_crawler_excludes_job(ws, make_job, inventory_schema, sql_backend) -> None:
+    """Test if the job crawler can exclude a job."""
+    new_job = make_job(spark_conf=_SPARK_CONF)
+    skip_job = make_job(spark_conf=_SPARK_CONF)
+    job_crawler = JobsCrawler(
+        ws,
+        sql_backend,
+        inventory_schema,
+        # Adding the skip job to the `include_job_ids` scope the crawler from not crawling all jobs while still testing
+        # the exclude job behaviour
+        include_job_ids=[new_job.job_id, skip_job.job_id],
+        exclude_job_ids=[skip_job.job_id],
+    )
+
+    jobs = job_crawler.snapshot()
+
+    assert not any(job.job_id == str(skip_job.job_id) for job in jobs)
+
+
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))
 def test_job_run_crawler(ws, env_or_skip, inventory_schema, sql_backend):
     cluster_id = env_or_skip("TEST_DEFAULT_CLUSTER_ID")
