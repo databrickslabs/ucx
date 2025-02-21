@@ -140,7 +140,7 @@ def test_job_crawler_exclude_job_ids_takes_preference_over_include_job_ids() -> 
         ]
     )
 
-    result = JobsCrawler(ws, MockBackend(), "ucx", include_job_ids=[1], exclude_job_ids=[2, 3]).snapshot(force_refresh=True)
+    result = JobsCrawler(ws, MockBackend(), "ucx", include_job_ids=[1, 2], exclude_job_ids=[2, 3]).snapshot(force_refresh=True)
 
     assert result == [JobInfo(job_id="1", success=1, failures="[]", job_name="Unknown")]
 
