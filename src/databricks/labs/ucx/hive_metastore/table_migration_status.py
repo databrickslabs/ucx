@@ -105,6 +105,7 @@ class TableMigrationStatusRefresher(CrawlerBase[TableMigrationStatus]):
             if (
                 schema.catalog_name is None
                 or schema.name is None
+                or schema.name == "information_schema"
                 or (schema_scope and (schema.catalog_name.lower(), schema.name.lower()) not in schema_scope)
             ):
                 continue
