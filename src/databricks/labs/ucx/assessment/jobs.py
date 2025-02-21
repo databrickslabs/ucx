@@ -94,12 +94,30 @@ class JobsMixin:
 
 
 class JobsCrawler(CrawlerBase[JobInfo], JobsMixin, CheckClusterMixin):
+    """Crawl jobs (workflows), assess them and store the result in the inventory.
+
+    Args :
+        ws (WorkspaceClient): The workspace client to crawl the jobs with.
+        sql_backend (SqlBackend): The SQL backend to store the results with.
+        schema (str): The schema to store the results in.
+        include_job_ids (list[int] | None): If provided, only include these job ids. Otherwise, include all jobs.
+        exclude_job_ids (list[int] | None): If provided, exclude these job ids. Otherwise, include all jobs. Note: We
+            prefer `include_job_ids` for more strict scoping, but sometimes it's easier to exclude a few jobs.
+    """
+
     def __init__(
-        self, ws: WorkspaceClient, sql_backend: SqlBackend, schema, *, include_job_ids: list[int] | None = None
+        self,
+        ws: WorkspaceClient,
+        sql_backend: SqlBackend,
+        schema,
+        *,
+        include_job_ids: list[int] | None = None,
+        exclude_job_ids: list[int] | None = None,
     ):
         super().__init__(sql_backend, "hive_metastore", schema, "jobs", JobInfo)
         self._ws = ws
         self._include_job_ids = include_job_ids
+        self._exclude_job_ids = exclude_job_ids
 
     def _crawl(self) -> Iterable[JobInfo]:
         all_jobs = list(self._ws.jobs.list(expand_tasks=True))
