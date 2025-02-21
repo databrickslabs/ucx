@@ -48,6 +48,8 @@ class AccountMetastores:
         # set the default catalog using the default_namespace setting API
         if default_catalog is not None:
             self._set_default_catalog(workspace_id, default_catalog)
+        logger.info(f"Metastore {metastore_id} assigned to workspace {workspace_id}")
+        logger.info("Run the 'create-ucx-catalog' command to create the UCX catalog in case it does not exist")
 
     def _get_region(self, workspace_id: int) -> str | None:
         workspace = self._ac.workspaces.get(workspace_id)
