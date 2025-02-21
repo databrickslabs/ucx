@@ -4,7 +4,7 @@ import pytest
 from databricks.labs.lsql.backends import MockBackend
 from databricks.labs.lsql.core import Row
 from databricks.labs.ucx.progress.history import ProgressEncoder
-from databricks.sdk.service.jobs import BaseJob, JobSettings
+from databricks.sdk.service.jobs import BaseJob, Job, JobSettings
 
 from databricks.labs.ucx.__about__ import __version__ as ucx_version
 from databricks.labs.ucx.assessment.jobs import JobInfo, JobOwnership, JobsCrawler, SubmitRunsCrawler
@@ -78,6 +78,40 @@ def test_job_crawler_creator():
     crawled_creators = [record.creator for record in result]
     assert len(expected_creators) == len(crawled_creators)
     assert set(expected_creators) == set(crawled_creators)
+
+
+def test_job_crawler_skips_all_jobs_with_empty_include_job_ids() -> None:
+    """If `include_job_ids` is empty, all jobs should be skipped."""
+    ws = mock_workspace_client()
+    ws.jobs.list.return_value = (
+        BaseJob(job_id=1, settings=JobSettings(), creator_user_name=None),
+        BaseJob(job_id=2, settings=JobSettings(), creator_user_name=""),
+        BaseJob(job_id=3, settings=JobSettings(), creator_user_name="bob"),
+    )
+
+    result = JobsCrawler(ws, MockBackend(), "ucx", include_job_ids=[]).snapshot(force_refresh=True)
+
+    assert not result
+
+
+def test_job_crawler_include_job_ids() -> None:
+    """Only jobs with IDs in `include_job_ids` should be crawled."""
+
+    def _get_job(job_id: int) -> Job:
+        """Mock getting a job"""
+        return Job(job_id=job_id, settings=JobSettings(), creator_user_name=None)
+
+    ws = mock_workspace_client()
+    ws.jobs.get.side_effect = _get_job
+    ws.jobs.list.return_value = (
+        BaseJob(job_id=1, settings=JobSettings(), creator_user_name=None),
+        BaseJob(job_id=2, settings=JobSettings(), creator_user_name=""),
+        BaseJob(job_id=3, settings=JobSettings(), creator_user_name="bob"),
+    )
+
+    result = JobsCrawler(ws, MockBackend(), "ucx", include_job_ids=[1]).snapshot(force_refresh=True)
+
+    assert result == [JobInfo(job_id="1", success=1, failures="[]", job_name="Unknown")]
 
 
 @pytest.mark.parametrize(
