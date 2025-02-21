@@ -424,7 +424,7 @@ class WorkspaceInstaller(WorkspaceContext):
             "databases in hive_metastore",
             default="<ALL>",
         )
-        if selected_databases != "<ALL>":
+        if selected_databases.lower not in ("<all>", "all"):
             return [x.strip() for x in selected_databases.split(",")]
         return None
 
