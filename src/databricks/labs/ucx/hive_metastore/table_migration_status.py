@@ -116,23 +116,22 @@ class TableMigrationStatusRefresher(CrawlerBase[TableMigrationStatus]):
                     schema.name,
                 )
             )
-            tables: list = []
-            table_lists = Threads.gather("list tables", tasks, self.API_LIMIT)
-            # Combine tuple of lists to a list
-            for table_list in table_lists[0]:
-                if table_list is not None:
-                    tables.extend(table_list)
-            for table in tables:
-                if not isinstance(table, TableInfo):
-                    logger.warning(f"Table {table} is not an instance of TableInfo")
-                    continue
-                if not table.full_name:
-                    logger.warning(f"The table {table.name} in {schema.name} has no full name")
-                    continue
-                if table_scope and table.full_name.lower() not in table_scope:
-                    continue
-                if not table.properties or "upgraded_from" not in table.properties:
-                    continue
+        tables: list = []
+        table_lists = Threads.gather("list tables", tasks, self.API_LIMIT)
+        # Combine tuple of lists to a list
+        for table_list in table_lists:
+            tables.extend(table_list)
+        for table in tables:
+            if not isinstance(table, TableInfo):
+                logger.warning(f"Table {table} is not an instance of TableInfo")
+                continue
+            if not table.full_name:
+                logger.warning(f"The table {table.name} in {schema.name} has no full name")
+                continue
+            if table_scope and table.full_name.lower() not in table_scope:
+                continue
+            if not table.properties or "upgraded_from" not in table.properties:
+                continue
 
                 seen_tables[table.full_name.lower()] = table.properties["upgraded_from"].lower()
         return seen_tables
