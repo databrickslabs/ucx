@@ -498,7 +498,7 @@ def test_migrate_already_upgraded_table_should_produce_no_queries(ws, mock_pyspa
     table_crawler = TablesCrawler(crawler_backend, "inventory_database")
     ws.catalogs.list.return_value = [CatalogInfo(name="cat1")]
     ws.schemas.list.return_value = [
-        SchemaInfo(catalog_name="cat1", name="test_schema1"),
+        SchemaInfo(catalog_name="cat1", name="schema1"),
     ]
     ws.tables.list.return_value = [
         TableInfo(
