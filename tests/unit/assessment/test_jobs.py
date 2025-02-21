@@ -133,6 +133,23 @@ def test_job_crawler_exclude_job_ids() -> None:
     assert result == [JobInfo(job_id="1", success=1, failures="[]", job_name="Unknown")]
 
 
+def test_job_crawler_exclude_job_ids_takes_preference_over_include_job_ids() -> None:
+    """The jobs with IDs in `exclude_job_ids` should be skipped, also when they are in include_job_ids."""
+
+    ws = mock_workspace_client()
+    ws.jobs.list.return_value = iter(
+        [
+            BaseJob(job_id=1, settings=JobSettings(), creator_user_name=None),
+            BaseJob(job_id=2, settings=JobSettings(), creator_user_name=""),
+            BaseJob(job_id=3, settings=JobSettings(), creator_user_name="bob"),
+        ]
+    )
+
+    result = JobsCrawler(ws, MockBackend(), "ucx", include_job_ids=[1], exclude_job_ids=[2, 3]).snapshot(force_refresh=True)
+
+    assert result == [JobInfo(job_id="1", success=1, failures="[]", job_name="Unknown")]
+
+
 @pytest.mark.parametrize(
     "jobruns_ids,cluster_ids,run_ids,failures",
     [
