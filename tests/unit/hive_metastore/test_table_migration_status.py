@@ -121,9 +121,7 @@ def test_table_migration_status_refresher_get_seen_tables_skips_builtin_catalog(
     tables_crawler.snapshot.assert_not_called()
 
 
-def test_table_migration_status_refresher_scope(
-    mock_backend
-) -> None:
+def test_table_migration_status_refresher_scope(mock_backend) -> None:
     ws = create_autospec(WorkspaceClient)
     ws.catalogs.list.return_value = [
         CatalogInfo(name="test1"),

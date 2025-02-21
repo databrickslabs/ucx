@@ -2,12 +2,14 @@ import datetime
 import logging
 from dataclasses import dataclass, replace
 from collections.abc import Iterable, KeysView
+from functools import partial
 from typing import ClassVar
 
+from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import DatabricksError, NotFound
-from databricks.sdk.service.catalog import CatalogInfo, CatalogInfoSecurableKind, SchemaInfo
+from databricks.sdk.service.catalog import CatalogInfo, CatalogInfoSecurableKind, SchemaInfo, TableInfo
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
@@ -94,19 +96,27 @@ class TableMigrationStatusRefresher(CrawlerBase[TableMigrationStatus]):
 
     def get_seen_tables(self, *, scope: set[str] | None = None) -> dict[str, str]:
         seen_tables: dict[str, str] = {}
+        tasks = []
         for schema in self._iter_schemas():
             if schema.catalog_name is None or schema.name is None:
                 continue
-            try:
-                # ws.tables.list returns Iterator[TableInfo], so we need to convert it to a list in order to catch the exception
-                tables = list(self._ws.tables.list(catalog_name=schema.catalog_name, schema_name=schema.name))
-            except NotFound:
-                logger.warning(f"Schema {schema.full_name} no longer exists. Skipping checking its migration status.")
-                continue
-            except DatabricksError as e:
-                logger.warning(f"Error while listing tables in schema: {schema.full_name}", exc_info=e)
-                continue
+            tasks.append(
+                partial(
+                    self._iter_tables,
+                    schema.catalog_name,
+                    schema.name,
+                )
+            )
+            tables: list = []
+            table_lists = Threads.gather("migrate tables", tasks)
+            # Combine tuple of lists to a list
+            for table_list in table_lists:
+                if table_list is not None:
+                    tables.extend(table_list)
             for table in tables:
+                if not isinstance(table, TableInfo):
+                    logger.warning(f"Table {table} is not an instance of TableInfo")
+                    continue
                 if not table.full_name:
                     logger.warning(f"The table {table.name} in {schema.name} has no full name")
                     continue
@@ -182,3 +192,14 @@ class TableMigrationStatusRefresher(CrawlerBase[TableMigrationStatus]):
             except DatabricksError as e:
                 logger.warning(f"Error while listing schemas in catalog: {catalog.name}", exc_info=e)
                 continue
+
+    def _iter_tables(self, catalog_name: str, schema_name: str) -> list[TableInfo]:
+        try:
+            # ws.tables.list returns Iterator[TableInfo], so we need to convert it to a list in order to catch the exception
+            return list(self._ws.tables.list(catalog_name=catalog_name, schema_name=schema_name))
+        except NotFound:
+            logger.warning(f"Schema {schema_name} no longer exists. Skipping checking its migration status.")
+            return []
+        except DatabricksError as e:
+            logger.warning(f"Error while listing tables in schema: {schema_name}", exc_info=e)
+            return []
