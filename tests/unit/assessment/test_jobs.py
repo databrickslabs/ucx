@@ -99,12 +99,7 @@ def test_job_crawler_skips_all_jobs_with_empty_include_job_ids() -> None:
 def test_job_crawler_include_job_ids() -> None:
     """Only jobs with IDs in `include_job_ids` should be crawled."""
 
-    def _get_job(job_id: int) -> Job:
-        """Mock getting a job"""
-        return Job(job_id=job_id, settings=JobSettings(), creator_user_name=None)
-
     ws = mock_workspace_client()
-    ws.jobs.get.side_effect = _get_job
     ws.jobs.list.return_value = iter([
         BaseJob(job_id=1, settings=JobSettings(), creator_user_name=None),
         BaseJob(job_id=2, settings=JobSettings(), creator_user_name=""),
