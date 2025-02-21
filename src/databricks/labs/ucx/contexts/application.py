@@ -283,6 +283,7 @@ class GlobalContext(abc.ABC):
             self.sql_backend,
             self.inventory_database,
             include_job_ids=self.config.include_job_ids,
+            exclude_job_ids=list(self.install_state.jobs.values()),
         )
 
     @cached_property
