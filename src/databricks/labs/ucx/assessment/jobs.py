@@ -123,7 +123,9 @@ class JobsCrawler(CrawlerBase[JobInfo], JobsMixin, CheckClusterMixin):
     def _list_jobs(self) -> Iterable[BaseJob]:
         """List the jobs.
 
-        If include job ids is defined, we get the job definition for those ids.
+        If provided, excludes jobs with id in `exclude_job_ids`.
+        If provided, exclude jobs with id not in `include_job_ids`.
+        If both provided, `exclude_job_ids` takes precedence.
         """
         try:
             jobs = self._ws.jobs.list(expand_tasks=True)
