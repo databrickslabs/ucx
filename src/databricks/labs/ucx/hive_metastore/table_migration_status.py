@@ -110,7 +110,7 @@ class TableMigrationStatusRefresher(CrawlerBase[TableMigrationStatus]):
             tables: list = []
             table_lists = Threads.gather("migrate tables", tasks)
             # Combine tuple of lists to a list
-            for table_list in table_lists:
+            for table_list in table_lists[0]:
                 if table_list is not None:
                     tables.extend(table_list)
             for table in tables:
@@ -198,7 +198,7 @@ class TableMigrationStatusRefresher(CrawlerBase[TableMigrationStatus]):
             # ws.tables.list returns Iterator[TableInfo], so we need to convert it to a list in order to catch the exception
             return list(self._ws.tables.list(catalog_name=catalog_name, schema_name=schema_name))
         except NotFound:
-            logger.warning(f"Schema {schema_name} no longer exists. Skipping checking its migration status.")
+            logger.warning(f"Schema {catalog_name}.{schema_name} no longer exists. Skipping checking its migration status.")
             return []
         except DatabricksError as e:
             logger.warning(f"Error while listing tables in schema: {schema_name}", exc_info=e)
