@@ -6,7 +6,7 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import BadRequest, DatabricksError, NotFound
 from databricks.sdk.service.catalog import CatalogInfoSecurableKind, CatalogInfo, SchemaInfo, TableInfo
 
-from databricks.labs.ucx.hive_metastore.tables import TablesCrawler
+from databricks.labs.ucx.hive_metastore.tables import TablesCrawler, Table
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationStatusRefresher
 
 
@@ -163,8 +163,9 @@ def test_table_migration_status_refresher_scope(mock_backend) -> None:
     tables_crawler = create_autospec(TablesCrawler)
     refresher = TableMigrationStatusRefresher(ws, mock_backend, "test", tables_crawler)
 
+    scope_table = Table("test1", "test1", "test1", "Table", "Delta")
     # Test with scope
-    assert refresher.get_seen_tables(scope={"test1.test1.test1"}) == {"test1.test1.test1": "test1"}
+    assert refresher.get_seen_tables(scope={scope_table}) == {"test1.test1.test1": "test1"}
     # Test without scope
     assert refresher.get_seen_tables() == {"test1.test1.test1": "test1", "test2.test2.test2": "test2"}
     ws.tables.list.assert_called()

@@ -13,9 +13,10 @@ from databricks.sdk.service.catalog import CatalogInfo, CatalogInfoSecurableKind
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
-from databricks.labs.ucx.hive_metastore.tables import TablesCrawler
+from databricks.labs.ucx.hive_metastore.tables import TablesCrawler, Table
 
 logger = logging.getLogger(__name__)
+
 
 @dataclass
 class TableMigrationStatus:
@@ -95,11 +96,17 @@ class TableMigrationStatusRefresher(CrawlerBase[TableMigrationStatus]):
     def index(self, *, force_refresh: bool = False) -> TableMigrationIndex:
         return TableMigrationIndex(self.snapshot(force_refresh=force_refresh))
 
-    def get_seen_tables(self, *, scope: set[str] | None = None) -> dict[str, str]:
+    def get_seen_tables(self, *, scope: set[Table] | None = None) -> dict[str, str]:
         seen_tables: dict[str, str] = {}
         tasks = []
+        schema_scope = {(table.catalog.lower(), table.database.lower()) for table in scope} if scope else None
+        table_scope = {table.full_name.lower() for table in scope} if scope else None
         for schema in self._iter_schemas():
-            if schema.catalog_name is None or schema.name is None:
+            if (
+                schema.catalog_name is None
+                or schema.name is None
+                or (schema_scope and (schema.catalog_name.lower(), schema.name.lower()) not in schema_scope)
+            ):
                 continue
             tasks.append(
                 partial(
@@ -121,7 +128,7 @@ class TableMigrationStatusRefresher(CrawlerBase[TableMigrationStatus]):
                 if not table.full_name:
                     logger.warning(f"The table {table.name} in {schema.name} has no full name")
                     continue
-                if scope and table.full_name not in scope:
+                if table_scope and table.full_name.lower() not in table_scope:
                     continue
                 if not table.properties or "upgraded_from" not in table.properties:
                     continue
@@ -183,7 +190,10 @@ class TableMigrationStatusRefresher(CrawlerBase[TableMigrationStatus]):
 
     def _iter_schemas(self) -> Iterable[SchemaInfo]:
         for catalog in self._iter_catalogs():
-            if catalog.name is None or catalog.catalog_type in (CatalogType.DELTASHARING_CATALOG, CatalogType.SYSTEM_CATALOG):
+            if catalog.name is None or catalog.catalog_type in (
+                CatalogType.DELTASHARING_CATALOG,
+                CatalogType.SYSTEM_CATALOG,
+            ):
                 continue
             try:
                 yield from self._ws.schemas.list(catalog_name=catalog.name)
@@ -199,7 +209,9 @@ class TableMigrationStatusRefresher(CrawlerBase[TableMigrationStatus]):
             # ws.tables.list returns Iterator[TableInfo], so we need to convert it to a list in order to catch the exception
             return list(self._ws.tables.list(catalog_name=catalog_name, schema_name=schema_name))
         except NotFound:
-            logger.warning(f"Schema {catalog_name}.{schema_name} no longer exists. Skipping checking its migration status.")
+            logger.warning(
+                f"Schema {catalog_name}.{schema_name} no longer exists. Skipping checking its migration status."
+            )
             return []
         except DatabricksError as e:
             logger.warning(f"Error while listing tables in schema: {schema_name}", exc_info=e)

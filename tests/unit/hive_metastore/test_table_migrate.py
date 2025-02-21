@@ -1043,24 +1043,24 @@ def test_table_status_seen_tables(caplog):
     table_crawler = create_autospec(TablesCrawler)
     client = create_autospec(WorkspaceClient)
     client.catalogs.list.return_value = [CatalogInfo(name="cat1"), CatalogInfo(name="deleted_cat")]
-    schemas = { "cat1":
-        [
+    schemas = {
+        "cat1": [
             SchemaInfo(catalog_name="cat1", name="schema1", full_name="cat1.schema1"),
             SchemaInfo(catalog_name="cat1", name="deleted_schema", full_name="cat1.deleted_schema"),
         ],
-        "deleted_cat":
-        None,
-}
+        "deleted_cat": None,
+    }
 
     def schema_list(catalog_name):
         schema = schemas[catalog_name]
         if not schema:
             raise NotFound()
         return schema
+
     client.schemas.list = schema_list
 
-    tables = { ("cat1", "schema1"):
-        [
+    tables = {
+        ("cat1", "schema1"): [
             TableInfo(
                 catalog_name="cat1",
                 schema_name="schema1",
@@ -1097,12 +1097,12 @@ def test_table_status_seen_tables(caplog):
         ],
         ("cat1", "deleted_schema"): None,
     }
+
     def table_list(catalog_name, schema_name):
         table = tables[(catalog_name, schema_name)]
         if not table:
             raise NotFound()
         return table
-
 
     client.tables.list = table_list
     table_status_crawler = TableMigrationStatusRefresher(client, backend, "ucx", table_crawler)
