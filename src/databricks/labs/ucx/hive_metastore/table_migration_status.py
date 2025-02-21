@@ -9,7 +9,7 @@ from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import DatabricksError, NotFound
-from databricks.sdk.service.catalog import CatalogInfo, CatalogInfoSecurableKind, SchemaInfo, TableInfo
+from databricks.sdk.service.catalog import CatalogInfo, CatalogInfoSecurableKind, SchemaInfo, TableInfo, CatalogType
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
@@ -183,7 +183,7 @@ class TableMigrationStatusRefresher(CrawlerBase[TableMigrationStatus]):
 
     def _iter_schemas(self) -> Iterable[SchemaInfo]:
         for catalog in self._iter_catalogs():
-            if catalog.name is None:
+            if catalog.name is None or catalog.catalog_type in (CatalogType.DELTASHARING_CATALOG, CatalogType.SYSTEM_CATALOG):
                 continue
             try:
                 yield from self._ws.schemas.list(catalog_name=catalog.name)
