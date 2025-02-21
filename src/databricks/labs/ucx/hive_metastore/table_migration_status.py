@@ -126,14 +126,14 @@ class TableMigrationStatusRefresher(CrawlerBase[TableMigrationStatus]):
                 logger.warning(f"Table {table} is not an instance of TableInfo")
                 continue
             if not table.full_name:
-                logger.warning(f"The table {table.name} in {schema.name} has no full name")
+                logger.warning(f"The table {table.name} in {table.schema_name} has no full name")
                 continue
             if table_scope and table.full_name.lower() not in table_scope:
                 continue
             if not table.properties or "upgraded_from" not in table.properties:
                 continue
 
-                seen_tables[table.full_name.lower()] = table.properties["upgraded_from"].lower()
+            seen_tables[table.full_name.lower()] = table.properties["upgraded_from"].lower()
         return seen_tables
 
     def is_migrated(self, schema: str, table: str) -> bool:
