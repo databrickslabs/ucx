@@ -85,7 +85,7 @@ class TableMigrationStatusRefresher(CrawlerBase[TableMigrationStatus]):
         CatalogInfoSecurableKind.CATALOG_SYSTEM,
     ]
 
-    API_LIMIT: ClassVar[int] = 20
+    API_LIMIT: ClassVar[int] = 25
 
     def __init__(self, ws: WorkspaceClient, sql_backend: SqlBackend, schema, tables_crawler: TablesCrawler):
         super().__init__(sql_backend, "hive_metastore", schema, "migration_status", TableMigrationStatus)
