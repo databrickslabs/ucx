@@ -17,7 +17,6 @@ from databricks.labs.ucx.hive_metastore.tables import TablesCrawler
 
 logger = logging.getLogger(__name__)
 
-
 @dataclass
 class TableMigrationStatus:
     src_schema: str
@@ -86,6 +85,8 @@ class TableMigrationStatusRefresher(CrawlerBase[TableMigrationStatus]):
         CatalogInfoSecurableKind.CATALOG_SYSTEM,
     ]
 
+    API_LIMIT: ClassVar[int] = 20
+
     def __init__(self, ws: WorkspaceClient, sql_backend: SqlBackend, schema, tables_crawler: TablesCrawler):
         super().__init__(sql_backend, "hive_metastore", schema, "migration_status", TableMigrationStatus)
         self._ws = ws
@@ -108,7 +109,7 @@ class TableMigrationStatusRefresher(CrawlerBase[TableMigrationStatus]):
                 )
             )
             tables: list = []
-            table_lists = Threads.gather("migrate tables", tasks)
+            table_lists = Threads.gather("migrate tables", tasks, self.API_LIMIT)
             # Combine tuple of lists to a list
             for table_list in table_lists[0]:
                 if table_list is not None:
