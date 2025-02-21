@@ -123,7 +123,7 @@ class TablesMigrator:
     ):
         tables_to_migrate = self._table_mapping.get_tables_to_migrate(self._tables_crawler, check_uc_table)
         tables_in_scope = filter(lambda t: t.src.what == what, tables_to_migrate)
-        self._init_seen_tables({t.rule.as_uc_table_key for t in tables_to_migrate})
+        self._init_seen_tables(scope={t.rule.as_uc_table_key for t in tables_to_migrate})
         tasks = []
         for table in tables_in_scope:
             tasks.append(
@@ -597,7 +597,7 @@ class TablesMigrator:
             print("To revert and delete Migrated Tables, add --delete_managed true flag to the command")
         return True
 
-    def _init_seen_tables(self, scope: set[str] | None = None):
+    def _init_seen_tables(self,*,  scope: set[str] | None = None):
         self._seen_tables = self._migration_status_refresher.get_seen_tables(scope=scope)
 
     def _sql_alter_to(self, table: Table, target_table_key: str):
