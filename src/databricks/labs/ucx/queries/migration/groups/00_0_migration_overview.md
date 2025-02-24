@@ -5,7 +5,7 @@ height: 5
 Workspace Group Migration
 =========================
 
-[Quick link to the group migration documentation.](https://github.com/databrickslabs/ucx/blob/main/docs/local-group-migration.md)
+[Quick link to the group migration documentation.](https://databrickslabs.github.io/ucx/docs/reference/workflows/#group-migration-workflow)
 
 Prerequisites for group migration are:
 
