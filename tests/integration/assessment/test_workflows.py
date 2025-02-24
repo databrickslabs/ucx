@@ -47,5 +47,5 @@ def test_running_real_assessment_job(
     assert actual_tables == expected_tables
 
     query = f"SELECT * FROM {installation_ctx.inventory_database}.workflow_problems"
-    for row in sql_backend.fetch(query):
-        assert row['path'] != 'UNKNOWN'
+    workflow_problems_without_path = [problem for problem in sql_backend.fetch(query) if problem["path"] == "UNKNOWN"]
+    assert not workflow_problems_without_path
