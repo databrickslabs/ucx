@@ -61,4 +61,4 @@ def test_dbutils_credentials_assumerole_is_not_supported(simple_ctx):
         dependency, None, simple_ctx.dependency_resolver, simple_ctx.path_lookup, CurrentSessionState()
     )
     problems = notebook.build_dependency_graph(parent)
-    assert not problems
+    assert problems
