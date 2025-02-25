@@ -589,6 +589,8 @@ class GlobalContext(abc.ABC):
     def workflow_linter(self) -> WorkflowLinter:
         return WorkflowLinter(
             self.workspace_client,
+            self.sql_backend,
+            self.inventory_database,
             self.jobs_crawler,
             self.dependency_resolver,
             self.path_lookup,
