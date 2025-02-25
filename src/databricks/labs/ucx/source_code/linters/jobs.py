@@ -47,7 +47,7 @@ class WorkflowLinter(CrawlerBase):
     - Direct file system access (DirectFsAccess)
     """
 
-    def __init__(
+    def __init__(  # pylint: disable=too-many-arguments
         self,
         ws: WorkspaceClient,
         sql_backend: SqlBackend,
