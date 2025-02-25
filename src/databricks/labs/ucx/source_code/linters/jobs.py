@@ -85,6 +85,8 @@ class WorkflowLinter(CrawlerBase):
         - Direct file system access (DirectFsAccess)
         """
         tasks = [functools.partial(self.lint_job, job.job_id) for job in self._jobs_crawler.snapshot()]
+        if not tasks:
+            return
         logger.info(f"Running {len(tasks)} linting tasks in parallel...")
         results, errors = Threads.gather("linting workflows", tasks)
         if errors:
