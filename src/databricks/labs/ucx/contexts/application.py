@@ -12,7 +12,7 @@ from databricks.labs.blueprint.tui import Prompts
 from databricks.labs.blueprint.wheels import ProductInfo, WheelsV2
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import AccountClient, WorkspaceClient, core
-from databricks.sdk.errors import NotFound
+from databricks.sdk.errors import DatabricksError
 from databricks.sdk.service import sql
 
 from databricks.labs.ucx.assessment.dashboards import DashboardOwnership
@@ -589,8 +589,8 @@ class GlobalContext(abc.ABC):
     def table_migration_index(self) -> TableMigrationIndex:
         try:
             index = self.tables_migrator.index()
-        except NotFound as e:
-            logger.warning("Table migration index is not found. Initializing empty index.", exc_info=e)
+        except DatabricksError as e:
+            logger.warning("Table migration cannot be loaded. Initializing empty index.", exc_info=e)
             index = TableMigrationIndex([])
         return index
 
