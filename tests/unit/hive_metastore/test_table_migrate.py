@@ -498,7 +498,7 @@ def test_migrate_already_upgraded_table_should_produce_no_queries(ws, mock_pyspa
     table_crawler = TablesCrawler(crawler_backend, "inventory_database")
     ws.catalogs.list.return_value = [CatalogInfo(name="cat1")]
     ws.schemas.list.return_value = [
-        SchemaInfo(catalog_name="cat1", name="test_schema1"),
+        SchemaInfo(catalog_name="cat1", name="schema1"),
     ]
     ws.tables.list.return_value = [
         TableInfo(
@@ -1043,15 +1043,24 @@ def test_table_status_seen_tables(caplog):
     table_crawler = create_autospec(TablesCrawler)
     client = create_autospec(WorkspaceClient)
     client.catalogs.list.return_value = [CatalogInfo(name="cat1"), CatalogInfo(name="deleted_cat")]
-    client.schemas.list.side_effect = [
-        [
+    schemas = {
+        "cat1": [
             SchemaInfo(catalog_name="cat1", name="schema1", full_name="cat1.schema1"),
             SchemaInfo(catalog_name="cat1", name="deleted_schema", full_name="cat1.deleted_schema"),
         ],
-        NotFound(),
-    ]
-    client.tables.list.side_effect = [
-        [
+        "deleted_cat": None,
+    }
+
+    def schema_list(catalog_name):
+        schema = schemas[catalog_name]
+        if not schema:
+            raise NotFound()
+        return schema
+
+    client.schemas.list = schema_list
+
+    tables = {
+        ("cat1", "schema1"): [
             TableInfo(
                 catalog_name="cat1",
                 schema_name="schema1",
@@ -1086,8 +1095,16 @@ def test_table_status_seen_tables(caplog):
                 properties={"upgraded_from": "hive_metastore.schema1.table2"},
             ),
         ],
-        NotFound(),
-    ]
+        ("cat1", "deleted_schema"): None,
+    }
+
+    def table_list(catalog_name, schema_name):
+        table = tables[(catalog_name, schema_name)]
+        if not table:
+            raise NotFound()
+        return table
+
+    client.tables.list = table_list
     table_status_crawler = TableMigrationStatusRefresher(client, backend, "ucx", table_crawler)
     seen_tables = table_status_crawler.get_seen_tables()
     assert seen_tables == {
