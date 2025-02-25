@@ -11,6 +11,9 @@ from databricks.labs.blueprint.installer import InstallState
 from databricks.labs.blueprint.tui import Prompts
 from databricks.labs.blueprint.wheels import ProductInfo, WheelsV2
 from databricks.labs.lsql.backends import SqlBackend
+from databricks.sdk import AccountClient, WorkspaceClient, core
+from databricks.sdk.errors import NotFound
+from databricks.sdk.service import sql
 
 from databricks.labs.ucx.assessment.dashboards import DashboardOwnership
 from databricks.labs.ucx.assessment.jobs import JobsCrawler
@@ -24,9 +27,6 @@ from databricks.labs.ucx.recon.schema_comparator import StandardSchemaComparator
 from databricks.labs.ucx.source_code.directfs_access import DirectFsAccessCrawler, DirectFsAccessOwnership
 from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
 from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
-from databricks.sdk import AccountClient, WorkspaceClient, core
-from databricks.sdk.service import sql
-
 from databricks.labs.ucx.account.workspaces import WorkspaceInfo
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
 from databricks.labs.ucx.assessment.dashboards import LakeviewDashboardCrawler, RedashDashboardCrawler
@@ -48,7 +48,6 @@ from databricks.labs.ucx.hive_metastore.grants import (
     PrincipalACL,
 )
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
-from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.hive_metastore.ownership import (
     TableMigrationOwnership,
     TableOwnership,
@@ -59,6 +58,7 @@ from databricks.labs.ucx.hive_metastore.table_migrate import (
     TableMigrationStatusRefresher,
     TablesMigrator,
 )
+from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.hive_metastore.table_move import TableMove
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler, UdfOwnership
 from databricks.labs.ucx.hive_metastore.verification import VerifyHasCatalog, VerifyHasMetastore
@@ -584,6 +584,15 @@ class GlobalContext(abc.ABC):
         return DependencyResolver(
             self.pip_resolver, self.notebook_resolver, self.file_resolver, self.file_resolver, self.path_lookup
         )
+
+    @cached_property
+    def table_migration_index(self) -> TableMigrationIndex:
+        try:
+            index = self.tables_migrator.index()
+        except NotFound as e:
+            logger.warning("Table migration index is not found. Initializing empty index.", exc_info=e)
+            index = TableMigrationIndex([])
+        return index
 
     @cached_property
     def workflow_linter(self) -> WorkflowLinter:
