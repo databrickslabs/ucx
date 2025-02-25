@@ -128,24 +128,13 @@ class JobsCrawler(CrawlerBase[JobInfo], JobsMixin, CheckClusterMixin):
         If both provided, `exclude_job_ids` takes precedence.
         """
         try:
-            jobs = self._ws.jobs.list(expand_tasks=True)
-        except DatabricksError as e:
-            logger.error("Cannot list jobs", exc_info=e)
-            return
-        while True:
-            try:
-                job = next(jobs)
+            for job in self._ws.jobs.list(expand_tasks=True):
                 if self._exclude_job_ids is not None and job.job_id in self._exclude_job_ids:
                     continue
-                if self._include_job_ids is None:
+                if self._include_job_ids is None or job.job_id in self._include_job_ids:
                     yield job
-                elif job.job_id in self._include_job_ids:
-                    yield job
-            except DatabricksError as e:
-                logger.error("Cannot list next jobs page", exc_info=e)
-                break
-            except StopIteration:
-                break
+        except DatabricksError as e:
+            logger.error("Cannot list jobs", exc_info=e)
 
     def _crawl(self) -> Iterable[JobInfo]:
         all_jobs = list(self._list_jobs())
