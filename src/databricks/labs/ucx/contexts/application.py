@@ -601,7 +601,7 @@ class GlobalContext(abc.ABC):
             self.jobs_crawler,
             self.dependency_resolver,
             self.path_lookup,
-            TableMigrationIndex([]),  # TODO: bring back self.tables_migrator.index()
+            self.table_migration_index,
             self.directfs_access_crawler_for_paths,
             self.used_tables_crawler_for_paths,
         )
