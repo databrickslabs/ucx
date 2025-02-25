@@ -92,10 +92,11 @@ class WorkflowLinter(CrawlerBase):
         if errors:
             error_messages = "\n".join([str(error) for error in errors])
             logger.warning(f"Errors occurred during linting:\n{error_messages}")
-        problems, dfsas, tables = zip(*results)
-        self._directfs_crawler.dump_all(dfsas)
-        self._used_tables_crawler.dump_all(tables)
-        yield from problems
+        if results:
+            problems, dfsas, tables = zip(*results)
+            self._directfs_crawler.dump_all(dfsas)
+            self._used_tables_crawler.dump_all(tables)
+            yield from problems
 
     def lint_job(self, job_id: int) -> tuple[list[JobProblem], list[DirectFsAccess], list[UsedTable]]:
         try:
