@@ -158,9 +158,6 @@ class JobsCrawler(CrawlerBase[JobInfo], JobsMixin, CheckClusterMixin):
             job_id = job.job_id
             if not job_id:
                 continue
-            if self._include_job_ids is not None and job_id not in self._include_job_ids:
-                logger.info(f"Skipping job_id={job_id}")
-                continue
             cluster_details = ClusterDetails.from_dict(cluster_config.as_dict())
             cluster_failures = self._check_cluster_failures(cluster_details, "Job cluster")
             cluster_failures.extend(self._check_jar_task(job.settings.tasks))
