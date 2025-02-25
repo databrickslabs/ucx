@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from importlib import metadata
 from pathlib import Path
 from urllib import parse
+from typing import ClassVar
 
 from databricks.labs.blueprint.paths import DBFSPath
 from databricks.sdk import WorkspaceClient
@@ -16,10 +17,10 @@ from databricks.sdk.service.compute import DataSecurityMode
 from databricks.sdk.service.jobs import Source
 
 from databricks.labs.ucx.assessment.crawlers import runtime_version_tuple
+from databricks.labs.ucx.assessment.jobs import JobInfo, JobOwnership
+from databricks.labs.ucx.framework.owners import AdministratorLocator, Ownership, WorkspacePathOwnership
 from databricks.labs.ucx.mixins.cached_workspace_path import WorkspaceCache, InvalidPath
-from databricks.labs.ucx.source_code.base import (
-    LineageAtom,
-)
+from databricks.labs.ucx.source_code.base import LineageAtom
 from databricks.labs.ucx.source_code.graph import (
     Dependency,
     DependencyGraph,
@@ -45,9 +46,24 @@ class JobProblem:
     end_line: int
     end_col: int
 
+    __id_attributes__: ClassVar[tuple[str, ...]] = (
+        "job_id",
+        "task_key",
+        "path",
+        "code",
+        "start_line",
+        "start_col",
+        "end_line",
+        "end_col",
+    )
+
     def as_message(self) -> str:
         message = f"{self.path}:{self.start_line} [{self.code}] {self.message}"
         return message
+
+    def has_missing_path(self) -> bool:
+        """Flag if the path is missing, or not."""
+        return self.path == Path("<MISSING_SOURCE_PATH>")  # Reusing flag from DependencyProblem
 
 
 class WorkflowTask(Dependency):
@@ -358,3 +374,31 @@ class WorkflowTaskContainer(SourceContainer):
         self._spark_version = new_cluster.spark_version
         self._data_security_mode = new_cluster.data_security_mode
         return []
+
+
+class JobProblemOwnership(Ownership[JobProblem]):
+    """Determine ownership of job (workflow) problems.
+
+    This is the job creator (if known).
+    """
+
+    def __init__(
+        self,
+        administrator_locator: AdministratorLocator,
+        ws: WorkspaceClient,
+        workspace_path_ownership: WorkspacePathOwnership,
+        job_ownership: JobOwnership,
+    ) -> None:
+        super().__init__(administrator_locator)
+        self._ws = ws
+        self._workspace_path_ownership = workspace_path_ownership
+        self._job_ownership = job_ownership
+
+    def _maybe_direct_owner(self, record: JobProblem) -> str | None:
+        if not record.has_missing_path():
+            return self._workspace_path_ownership.owner_of_path(record.path)
+        try:
+            job = self._ws.jobs.get(record.job_id)
+            return self._job_ownership.owner_of(JobInfo.from_job(job))
+        except DatabricksError:
+            return None

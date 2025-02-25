@@ -4,7 +4,6 @@ import logging
 
 from collections.abc import Iterable
 from datetime import datetime, timezone
-from pathlib import Path
 
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend
@@ -111,8 +110,6 @@ class WorkflowLinter(CrawlerBase):
             logger.warning(f"Found job problems:\n{problem_messages}")
         return problems, dfsas, tables
 
-    _UNKNOWN = Path('<UNKNOWN>')
-
     def _lint_job(self, job: jobs.Job) -> tuple[list[JobProblem], list[DirectFsAccess], list[UsedTable]]:
         problems: list[JobProblem] = []
         dfsas: list[DirectFsAccess] = []
@@ -127,12 +124,11 @@ class WorkflowLinter(CrawlerBase):
             if not advices:
                 advices = self._lint_task(graph, session_state)
             for advice in advices:
-                absolute_path = "UNKNOWN" if advice.has_missing_path() else advice.path.absolute().as_posix()
                 job_problem = JobProblem(
                     job_id=job.job_id,
                     job_name=job.settings.name,
                     task_key=task.task_key,
-                    path=absolute_path,
+                    path=advice.path.as_posix(),
                     code=advice.advice.code,
                     message=advice.advice.message,
                     start_line=advice.advice.start_line,

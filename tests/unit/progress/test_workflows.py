@@ -109,7 +109,11 @@ def test_migration_progress_assess_dashboards_calls_query_linter_refresh_report(
 
 def test_migration_progress_assess_workflows_calls_workflow_linter_snapshot(run_workflow) -> None:
     mock_linter = create_autospec(WorkflowLinter)
+    mock_history_log = create_autospec(ProgressEncoder)
     run_workflow(MigrationProgress.assess_workflows, workflow_linter=mock_linter)
+    run_workflow(
+        MigrationProgress.update_workflow_problems_history_log, workflow_progress=mock_history_log, parent_run_id=1234
+    )
     mock_linter.snapshot.assert_called_once()
 
 

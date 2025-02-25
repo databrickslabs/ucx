@@ -230,7 +230,7 @@ def test_workflow_task_container_builds_dependency_graph_spark_python_task(
 
 
 def test_workflow_linter_lint_job_logs_problems(dependency_resolver, mock_path_lookup, empty_index, caplog) -> None:
-    expected_message = "Found job problems:\nUNKNOWN:-1 [library-install-failed] 'pip --disable-pip-version-check install unknown-library"
+    expected_message = "Found job problems:\n<MISSING_SOURCE_PATH>:-1 [library-install-failed] 'pip --disable-pip-version-check install unknown-library"
 
     ws = create_autospec(WorkspaceClient)
     sql_backend = MockBackend()
