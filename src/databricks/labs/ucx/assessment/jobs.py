@@ -124,7 +124,7 @@ class JobsCrawler(CrawlerBase[JobInfo], JobsMixin, CheckClusterMixin):
         """List the jobs.
 
         If provided, excludes jobs with id in `exclude_job_ids`.
-        If provided, exclude jobs with id not in `include_job_ids`.
+        If provided, excludes jobs with id not in `include_job_ids`.
         If both provided, `exclude_job_ids` takes precedence.
         """
         try:
