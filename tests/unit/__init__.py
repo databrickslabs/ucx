@@ -193,6 +193,13 @@ def mock_workspace_client(
                 {'workspace_id': 789, 'deployment_name': 'test3'},
             ]
         ),
+        'state.json': json.dumps(
+            {
+                'resources': {
+                    'jobs': {'test': '123', 'assessment': '456'},
+                }
+            }
+        ),
     }
     ws.workspace.download.side_effect = lambda file_name, *, format=None: io.StringIO(
         download_yaml[os.path.basename(file_name)]
