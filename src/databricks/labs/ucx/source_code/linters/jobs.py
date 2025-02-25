@@ -84,24 +84,16 @@ class WorkflowLinter(CrawlerBase):
         - Table and view references (UsedTables)
         - Direct file system access (DirectFsAccess)
         """
-        tasks = []
-        for job in self._jobs_crawler.snapshot():
-            tasks.append(functools.partial(self.lint_job, job.job_id))
+        tasks = [functools.partial(self.lint_job, job.job_id) for job in self._jobs_crawler.snapshot()]
         logger.info(f"Running {len(tasks)} linting tasks in parallel...")
-        job_results, errors = Threads.gather('linting workflows', tasks)
-        job_problems: list[JobProblem] = []
-        job_dfsas: list[DirectFsAccess] = []
-        job_tables: list[UsedTable] = []
-        for problems, dfsas, tables in job_results:
-            job_problems.extend(problems)
-            job_dfsas.extend(dfsas)
-            job_tables.extend(tables)
-        self._directfs_crawler.dump_all(job_dfsas)
-        self._used_tables_crawler.dump_all(job_tables)
-        if len(errors) > 0:
+        results, errors = Threads.gather("linting workflows", tasks)
+        if errors:
             error_messages = "\n".join([str(error) for error in errors])
             logger.warning(f"Errors occurred during linting:\n{error_messages}")
-        yield from job_problems
+        problems, dfsas, tables = zip(*results)
+        self._directfs_crawler.dump_all(dfsas)
+        self._used_tables_crawler.dump_all(tables)
+        yield from problems
 
     def lint_job(self, job_id: int) -> tuple[list[JobProblem], list[DirectFsAccess], list[UsedTable]]:
         try:
