@@ -38,7 +38,7 @@ class JobProblem:
     job_id: int
     job_name: str
     task_key: str
-    path: str
+    path: str  # str for legacy support
     code: str
     message: str
     start_line: int
@@ -63,7 +63,7 @@ class JobProblem:
 
     def has_missing_path(self) -> bool:
         """Flag if the path is missing, or not."""
-        return self.path == Path("<MISSING_SOURCE_PATH>")  # Reusing flag from DependencyProblem
+        return self.path == Path("<MISSING_SOURCE_PATH>").as_posix()  # Reusing flag from DependencyProblem
 
 
 class WorkflowTask(Dependency):
