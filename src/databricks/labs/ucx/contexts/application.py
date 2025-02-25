@@ -589,13 +589,12 @@ class GlobalContext(abc.ABC):
     def workflow_linter(self) -> WorkflowLinter:
         return WorkflowLinter(
             self.workspace_client,
+            self.jobs_crawler,
             self.dependency_resolver,
             self.path_lookup,
             TableMigrationIndex([]),  # TODO: bring back self.tables_migrator.index()
             self.directfs_access_crawler_for_paths,
             self.used_tables_crawler_for_paths,
-            self.config.include_job_ids,
-            self.config.debug_listing_upper_limit,
         )
 
     @cached_property
