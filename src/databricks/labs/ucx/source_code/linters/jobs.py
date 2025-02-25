@@ -38,6 +38,13 @@ logger = logging.getLogger(__name__)
 
 
 class WorkflowLinter:
+    """Lint workflows for UC compatibility and references to data assets.
+
+    Data assets linted:
+    - Table and view references (UsedTables)
+    - Direct file system access (DirectFsAccess)
+    """
+
     def __init__(
         self,
         ws: WorkspaceClient,
