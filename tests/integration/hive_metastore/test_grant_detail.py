@@ -40,8 +40,8 @@ def test_all_grant_types(runtime_ctx: MockRuntimeContext, _deployed_schema: None
     runtime_ctx.sql_backend.execute(f"GRANT SELECT ON ANY FILE TO `{group.display_name}`")
     runtime_ctx.sql_backend.execute(f"GRANT SELECT ON ANONYMOUS FUNCTION TO `{group.display_name}`")
 
-    # Ensure the view is populated (it's based on the crawled grants) and fetch the content.
-    GrantsCrawler(runtime_ctx.tables_crawler, runtime_ctx.udfs_crawler).snapshot()
+
+    runtime_ctx.grants_crawler.snapshot()
 
     grants_detail_query = f"""
         SELECT object_type, object_id
