@@ -166,8 +166,8 @@ class TableMigrationStatusRefresher(CrawlerBase[TableMigrationStatus]):
                 if catalog.securable_kind in self._skip_catalog_securable_kinds:
                     continue
                 yield catalog
-        except DatabricksError as e:
-            logger.error("Cannot list catalogs", exc_info=e)
+        except DatabricksError:
+            logger.warning("Cannot list catalogs; skipping iterating catalogs")
 
     def _iter_schemas(self) -> Iterable[SchemaInfo]:
         for catalog in self._iter_catalogs():
