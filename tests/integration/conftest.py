@@ -632,9 +632,9 @@ class MockRuntimeContext(
         self.make_job(content="spark.read.parquet('dbfs://mnt/file/')", task_type=SparkPythonTask)
         self.make_job(content="spark.table('some.table')", task_type=SparkPythonTask)
         query_1 = self.make_query(sql_query='SELECT * from parquet.`dbfs://mnt/foo2/bar2`')
-        self._make_dashboard(query=query_1)
+        self.make_dashboard(query=query_1)
         query_2 = self.make_query(sql_query='SELECT * from my_schema.my_table')
-        self._make_dashboard(query=query_2)
+        self.make_dashboard(query=query_2)
 
     def add_table(self, table: TableInfo):
         self._tables.append(table)
