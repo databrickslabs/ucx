@@ -165,7 +165,7 @@ def mock_workspace_client(
     ws.pipelines.get = _pipeline
     ws.workspace.get_status = lambda _: ObjectInfo(object_id=123)
     ws.get_workspace_id.return_value = 123
-    ws.jobs.list.return_value = _id_list(BaseJob, job_ids)
+    ws.jobs.list.return_value = iter(_id_list(BaseJob, job_ids))
     ws.jobs.list_runs.return_value = _id_list(BaseRun, jobruns_ids)
     ws.warehouses.get_workspace_warehouse_config().data_access_config = _load_list(EndpointConfPair, warehouse_config)
     ws.workspace.export = _workspace_export
@@ -192,6 +192,13 @@ def mock_workspace_client(
                 {'workspace_id': 456, 'deployment_name': 'test2'},
                 {'workspace_id': 789, 'deployment_name': 'test3'},
             ]
+        ),
+        'state.json': json.dumps(
+            {
+                'resources': {
+                    'jobs': {'test': '123', 'assessment': '456'},
+                }
+            }
         ),
     }
     ws.workspace.download.side_effect = lambda file_name, *, format=None: io.StringIO(
