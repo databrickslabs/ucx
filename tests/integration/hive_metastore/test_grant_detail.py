@@ -1,16 +1,18 @@
 import json
 import logging
 import datetime as dt
+from collections.abc import Callable, Iterable
 
 import pytest
+from databricks.labs.lsql.backends import StatementExecutionBackend
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 
-from databricks.labs.lsql.backends import StatementExecutionBackend
-from databricks.labs.ucx.hive_metastore.grants import GrantsCrawler
+from databricks.labs.ucx.hive_metastore.grants import Grant, GrantsCrawler
 from databricks.labs.ucx.install import deploy_schema
 
 from ..conftest import MockRuntimeContext
+
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +42,23 @@ def test_all_grant_types(runtime_ctx: MockRuntimeContext, _deployed_schema: None
     runtime_ctx.sql_backend.execute(f"GRANT SELECT ON ANY FILE TO `{group.display_name}`")
     runtime_ctx.sql_backend.execute(f"GRANT SELECT ON ANONYMOUS FUNCTION TO `{group.display_name}`")
 
+    @retried(on=[ValueError], timeout=dt.timedelta(minutes=2))
+    def wait_for_grants(condition: Callable[[Iterable[Grant]], bool], **kwargs) -> None:
+        """Wait for grants to meet the condition.
+
+        The method retries the condition check to account for eventual consistency of the permission API.
+        """
+        grants = runtime_ctx.grants_crawler.grants(**kwargs)
+        if not condition(grants):
+            raise ValueError("Grants do not meet condition")
+
+    def contains_select_on_any_file(grants: Iterable[Grant]) -> bool:
+        """Check if the SELECT permission on ANY FILE is present in the grants."""
+        return any(g.principal == group.display_name and g.action_type == "SELECT" for g in grants)
+
+    # Wait for the grants to be available so that we can snapshot them.
+    # Only verifying the SELECT permission on ANY FILE as it takes a while to propagate.
+    wait_for_grants(contains_select_on_any_file, any_file=True)
 
     runtime_ctx.grants_crawler.snapshot()
 
