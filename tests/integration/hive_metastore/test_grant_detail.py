@@ -24,9 +24,11 @@ def _deployed_schema(runtime_ctx) -> None:
 
 @retried(on=[NotFound, TimeoutError], timeout=dt.timedelta(minutes=3))
 def test_all_grant_types(
-    runtime_ctx: MockRuntimeContext, sql_backend: StatementExecutionBackend, _deployed_schema: None
+    runtime_ctx: MockRuntimeContext,
+    sql_backend: StatementExecutionBackend,
+    _deployed_schema: None,
 ):
-    """Test that all types of grants are properly handled by the view when reporting the object type and identifier."""
+    """All types of grants should be reported by the grant_detail view."""
 
     # Fixture: a group and schema to hold all the objects, the objects themselves and a grant on each to the group.
     group = runtime_ctx.make_group()
