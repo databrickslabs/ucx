@@ -43,20 +43,15 @@ def test_all_grant_types(runtime_ctx: MockRuntimeContext, _deployed_schema: None
     # Ensure the view is populated (it's based on the crawled grants) and fetch the content.
     GrantsCrawler(runtime_ctx.tables_crawler, runtime_ctx.udfs_crawler).snapshot()
 
-    rows = list(
-        runtime_ctx.sql_backend.fetch(
-            f"""
+    grants_detail_query = f"""
         SELECT object_type, object_id
         FROM {runtime_ctx.inventory_database}.grant_detail
         WHERE principal_type='group' AND principal='{group.display_name}' and action_type='SELECT'
     """
-        )
-    )
-    grants = {(row.object_type, row.object_id) for row in rows}
+    grants = {(row.object_type, row.object_id) for row in runtime_ctx.sql_backend.fetch(grants_detail_query)}
 
     # TODO: The types of objects targeted by grants is missclassified; this needs to be fixed.
 
-    # Test the results.
     expected_grants = {
         ("TABLE", table.full_name),
         ("VIEW", view.full_name),
