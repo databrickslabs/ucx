@@ -23,11 +23,7 @@ def _deployed_schema(runtime_ctx) -> None:
 
 
 @retried(on=[NotFound, TimeoutError], timeout=dt.timedelta(minutes=3))
-def test_all_grant_types(
-    runtime_ctx: MockRuntimeContext,
-    sql_backend: StatementExecutionBackend,
-    _deployed_schema: None,
-):
+def test_all_grant_types(runtime_ctx: MockRuntimeContext, _deployed_schema: None):
     """All types of grants should be reported by the grant_detail view."""
 
     # Fixture: a group and schema to hold all the objects, the objects themselves and a grant on each to the group.
@@ -36,19 +32,19 @@ def test_all_grant_types(
     table = runtime_ctx.make_table(schema_name=schema.name)
     view = runtime_ctx.make_table(schema_name=schema.name, view=True, ctas="select 1")
     udf = runtime_ctx.make_udf(schema_name=schema.name)
-    sql_backend.execute(f"GRANT SELECT ON CATALOG {schema.catalog_name} TO `{group.display_name}`")
-    sql_backend.execute(f"GRANT SELECT ON SCHEMA {schema.full_name} TO `{group.display_name}`")
-    sql_backend.execute(f"GRANT SELECT ON TABLE {table.full_name} TO `{group.display_name}`")
-    sql_backend.execute(f"GRANT SELECT ON VIEW {view.full_name} TO `{group.display_name}`")
-    sql_backend.execute(f"GRANT SELECT ON FUNCTION {udf.full_name} TO `{group.display_name}`")
-    sql_backend.execute(f"GRANT SELECT ON ANY FILE TO `{group.display_name}`")
-    sql_backend.execute(f"GRANT SELECT ON ANONYMOUS FUNCTION TO `{group.display_name}`")
+    runtime_ctx.sql_backend.execute(f"GRANT SELECT ON CATALOG {schema.catalog_name} TO `{group.display_name}`")
+    runtime_ctx.sql_backend.execute(f"GRANT SELECT ON SCHEMA {schema.full_name} TO `{group.display_name}`")
+    runtime_ctx.sql_backend.execute(f"GRANT SELECT ON TABLE {table.full_name} TO `{group.display_name}`")
+    runtime_ctx.sql_backend.execute(f"GRANT SELECT ON VIEW {view.full_name} TO `{group.display_name}`")
+    runtime_ctx.sql_backend.execute(f"GRANT SELECT ON FUNCTION {udf.full_name} TO `{group.display_name}`")
+    runtime_ctx.sql_backend.execute(f"GRANT SELECT ON ANY FILE TO `{group.display_name}`")
+    runtime_ctx.sql_backend.execute(f"GRANT SELECT ON ANONYMOUS FUNCTION TO `{group.display_name}`")
 
     # Ensure the view is populated (it's based on the crawled grants) and fetch the content.
     GrantsCrawler(runtime_ctx.tables_crawler, runtime_ctx.udfs_crawler).snapshot()
 
     rows = list(
-        sql_backend.fetch(
+        runtime_ctx.sql_backend.fetch(
             f"""
         SELECT object_type, object_id
         FROM {runtime_ctx.inventory_database}.grant_detail
