@@ -207,7 +207,7 @@ class Assessment(Workflow):  # pylint: disable=too-many-public-methods
         """
         ctx.query_linter.refresh_report()
 
-    @job_task(depends_on=[assess_jobs])
+    @job_task(depends_on=[crawl_tables, assess_jobs])
     def assess_workflows(self, ctx: RuntimeContext):
         """Scans all jobs for migration issues in notebooks jobs.
 
