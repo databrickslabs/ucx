@@ -128,9 +128,11 @@ class NotebookRunCall(NodeBase):
             has_unresolved = True
         return has_unresolved, paths
 
+
 class DbutilsCall(NodeBase):
     def __init__(self, node: Call):
         super().__init__(node)
+
 
 class DbutilsPyLinter(PythonLinter):
 

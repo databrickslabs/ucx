@@ -49,6 +49,7 @@ def test_relative_grand_parent_path_is_supported(
     problems = container.build_dependency_graph(root)
     assert not problems
 
+
 def test_dbutils_credentials_assumerole_is_not_supported(simple_ctx):
     source = """# Databricks notebook source
 # COMMAND ----------
