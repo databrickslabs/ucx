@@ -106,6 +106,7 @@ class PythonCodeAnalyzer:
         tree = maybe_tree.tree
         syspath_changes = SysPathChange.extract_from_tree(self._context.session_state, tree)
         run_calls = DbutilsPyLinter.list_dbutils_notebook_run_calls(tree)
+        credential_calls = DbutilsPyLinter.list_dbutils_credentials_assumerole_calls(tree)
         import_sources: list[ImportSource]
         import_problems: list[DependencyProblem]
         import_sources, import_problems = ImportSource.extract_from_tree(tree, DependencyProblem.from_node)
@@ -113,7 +114,7 @@ class PythonCodeAnalyzer:
         magic_lines, command_problems = MagicLine.extract_from_tree(tree, DependencyProblem.from_node)
         problems.extend(command_problems)
         # need to evaluate things in intertwined sequence so concat and sort them
-        nodes: list[NodeBase] = cast(list[NodeBase], syspath_changes + run_calls + import_sources + magic_lines)
+        nodes: list[NodeBase] = cast(list[NodeBase], syspath_changes + run_calls + import_sources + magic_lines + credential_calls)
         nodes = sorted(nodes, key=lambda node: (node.node.lineno, node.node.col_offset))
         return tree, nodes, problems
 
