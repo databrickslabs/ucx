@@ -662,16 +662,7 @@ class WorkspaceInstallation(InstallationMixin):
                 catalog_to_replace="ucx_catalog",
             )
         )
-        metadata.display_name = f"{self._name('UCX ')} {folder.parent.stem.title()} ({folder.stem.title()})"
-        # TODO: Remove temporary fix for the dashboard name:
-        # resource names should only contain alphanumeric characters (a-z, A-Z, 0-9), hyphens (-), or underscores (_)
-        metadata.display_name = (
-            metadata.display_name.replace(" ", "_")
-            .replace("[", "-")
-            .replace("]", "-")
-            .replace("(", "")
-            .replace(")", "")
-        )
+        metadata.display_name = self._name(f"{folder.parent.stem.title()} ({folder.stem.title()})")
         reference = f"{folder.parent.stem}_{folder.stem}".lower()
         dashboard_id = self._install_state.dashboards.get(reference)
         if dashboard_id is not None:
