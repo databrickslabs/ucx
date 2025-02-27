@@ -1,0 +1,4 @@
+title: Filter for owner(s)
+column: owner
+type: MULTI_SELECT
+width: 6
