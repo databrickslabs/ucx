@@ -67,10 +67,12 @@ def test_jobs_assessment_with_spn_cluster_no_job_tasks():
 
 def test_job_crawler_creator():
     ws = mock_workspace_client()
-    ws.jobs.list.return_value = (
-        BaseJob(job_id=1, settings=JobSettings(), creator_user_name=None),
-        BaseJob(job_id=2, settings=JobSettings(), creator_user_name=""),
-        BaseJob(job_id=3, settings=JobSettings(), creator_user_name="bob"),
+    ws.jobs.list.return_value = iter(
+        [
+            BaseJob(job_id=1, settings=JobSettings(), creator_user_name=None),
+            BaseJob(job_id=2, settings=JobSettings(), creator_user_name=""),
+            BaseJob(job_id=3, settings=JobSettings(), creator_user_name="bob"),
+        ]
     )
     result = JobsCrawler(ws, MockBackend(), "ucx").snapshot(force_refresh=True)
 
@@ -78,6 +80,75 @@ def test_job_crawler_creator():
     crawled_creators = [record.creator for record in result]
     assert len(expected_creators) == len(crawled_creators)
     assert set(expected_creators) == set(crawled_creators)
+
+
+def test_job_crawler_skips_all_jobs_with_empty_include_job_ids() -> None:
+    """If `include_job_ids` is empty, all jobs should be skipped."""
+    ws = mock_workspace_client()
+    ws.jobs.list.return_value = iter(
+        [
+            BaseJob(job_id=1, settings=JobSettings(), creator_user_name=None),
+            BaseJob(job_id=2, settings=JobSettings(), creator_user_name=""),
+            BaseJob(job_id=3, settings=JobSettings(), creator_user_name="bob"),
+        ]
+    )
+
+    result = JobsCrawler(ws, MockBackend(), "ucx", include_job_ids=[]).snapshot(force_refresh=True)
+
+    assert not result
+
+
+def test_job_crawler_include_job_ids() -> None:
+    """Only jobs with IDs in `include_job_ids` should be crawled."""
+
+    ws = mock_workspace_client()
+    ws.jobs.list.return_value = iter(
+        [
+            BaseJob(job_id=1, settings=JobSettings(), creator_user_name=None),
+            BaseJob(job_id=2, settings=JobSettings(), creator_user_name=""),
+            BaseJob(job_id=3, settings=JobSettings(), creator_user_name="bob"),
+        ]
+    )
+
+    result = JobsCrawler(ws, MockBackend(), "ucx", include_job_ids=[1]).snapshot(force_refresh=True)
+
+    assert result == [JobInfo(job_id="1", success=1, failures="[]", job_name="Unknown")]
+
+
+def test_job_crawler_exclude_job_ids() -> None:
+    """The jobs with IDs in `exclude_job_ids` should be skipped."""
+
+    ws = mock_workspace_client()
+    ws.jobs.list.return_value = iter(
+        [
+            BaseJob(job_id=1, settings=JobSettings(), creator_user_name=None),
+            BaseJob(job_id=2, settings=JobSettings(), creator_user_name=""),
+            BaseJob(job_id=3, settings=JobSettings(), creator_user_name="bob"),
+        ]
+    )
+
+    result = JobsCrawler(ws, MockBackend(), "ucx", exclude_job_ids=[2, 3]).snapshot(force_refresh=True)
+
+    assert result == [JobInfo(job_id="1", success=1, failures="[]", job_name="Unknown")]
+
+
+def test_job_crawler_exclude_job_ids_takes_preference_over_include_job_ids() -> None:
+    """The jobs with IDs in `exclude_job_ids` should be skipped, also when they are in include_job_ids."""
+
+    ws = mock_workspace_client()
+    ws.jobs.list.return_value = iter(
+        [
+            BaseJob(job_id=1, settings=JobSettings(), creator_user_name=None),
+            BaseJob(job_id=2, settings=JobSettings(), creator_user_name=""),
+            BaseJob(job_id=3, settings=JobSettings(), creator_user_name="bob"),
+        ]
+    )
+
+    result = JobsCrawler(ws, MockBackend(), "ucx", include_job_ids=[1, 2], exclude_job_ids=[2, 3]).snapshot(
+        force_refresh=True
+    )
+
+    assert result == [JobInfo(job_id="1", success=1, failures="[]", job_name="Unknown")]
 
 
 @pytest.mark.parametrize(
