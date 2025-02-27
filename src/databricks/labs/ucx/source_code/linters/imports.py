@@ -163,6 +163,11 @@ class DbutilsPyLinter(PythonLinter):
         calls = tree.locate(Call, [("run", Attribute), ("notebook", Attribute), ("dbutils", Name)])
         return [NotebookRunCall(call) for call in calls]
 
+    @staticmethod
+    def list_dbutils_credentials_assumerole_calls(tree: Tree) -> list[DbutilsCall]:
+        calls = tree.locate(Call, [("assumeRole", Attribute), ("credentials", Attribute), ("dbutils", Name)])
+        return [DbutilsCall(call) for call in calls]
+
 
 class SysPathChange(NodeBase, abc.ABC):
 
