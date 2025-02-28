@@ -7,7 +7,7 @@ from typing import ClassVar
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import DatabricksError, NotFound
-from databricks.sdk.service.catalog import CatalogInfo, CatalogInfoSecurableKind, SchemaInfo
+from databricks.sdk.service.catalog import CatalogInfo, CatalogType, SchemaInfo
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
@@ -79,10 +79,9 @@ class TableMigrationStatusRefresher(CrawlerBase[TableMigrationStatus]):
     properties for the presence of the marker.
     """
 
-    _skip_catalog_securable_kinds = [
-        CatalogInfoSecurableKind.CATALOG_INTERNAL,
-        CatalogInfoSecurableKind.CATALOG_SYSTEM,
-    ]
+    _skip_catalog_types = {
+        CatalogType.SYSTEM_CATALOG,
+    }
 
     def __init__(self, ws: WorkspaceClient, sql_backend: SqlBackend, schema, tables_crawler: TablesCrawler):
         super().__init__(sql_backend, "hive_metastore", schema, "migration_status", TableMigrationStatus)
@@ -163,7 +162,7 @@ class TableMigrationStatusRefresher(CrawlerBase[TableMigrationStatus]):
     def _iter_catalogs(self) -> Iterable[CatalogInfo]:
         try:
             for catalog in self._ws.catalogs.list():
-                if catalog.securable_kind in self._skip_catalog_securable_kinds:
+                if catalog.catalog_type in self._skip_catalog_types:
                     continue
                 yield catalog
         except DatabricksError as e:
