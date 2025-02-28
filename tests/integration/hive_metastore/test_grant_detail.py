@@ -94,9 +94,7 @@ def test_all_grant_types(runtime_ctx: MockRuntimeContext, _deployed_schema: None
 
 
 @retried(on=[NotFound, TimeoutError], timeout=dt.timedelta(minutes=3))
-def test_grant_findings(
-    runtime_ctx: MockRuntimeContext, sql_backend: StatementExecutionBackend, _deployed_schema: None
-) -> None:
+def test_grant_findings(runtime_ctx: MockRuntimeContext, _deployed_schema: None) -> None:
     """Test that findings are reported for a grant."""
 
     # Fixture: two objects, one with a grant that is okay and the other with a grant that is not okay.
@@ -104,13 +102,13 @@ def test_grant_findings(
     schema = runtime_ctx.make_schema()
     table_a = runtime_ctx.make_table(schema_name=schema.name)
     table_b = runtime_ctx.make_table(schema_name=schema.name)
-    sql_backend.execute(f"GRANT SELECT ON TABLE {table_a.full_name} TO `{group.display_name}`")
-    sql_backend.execute(f"DENY SELECT ON TABLE {table_b.full_name} TO `{group.display_name}`")
+    runtime_ctx.sql_backend.execute(f"GRANT SELECT ON TABLE {table_a.full_name} TO `{group.display_name}`")
+    runtime_ctx.sql_backend.execute(f"DENY SELECT ON TABLE {table_b.full_name} TO `{group.display_name}`")
 
     # Ensure the view is populated (it's based on the crawled grants) and fetch the content.
     GrantsCrawler(runtime_ctx.tables_crawler, runtime_ctx.udfs_crawler).snapshot()
 
-    rows = sql_backend.fetch(
+    rows = runtime_ctx.sql_backend.fetch(
         f"""
         SELECT object_type, object_id, success, failures
         FROM {runtime_ctx.inventory_database}.grant_detail
