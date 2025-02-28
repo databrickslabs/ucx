@@ -24,7 +24,7 @@ from databricks.labs.ucx.source_code.linters.imports import (
     DbutilsPyLinter,
     ImportSource,
     NotebookRunCall,
-    UnresolvedPath,
+    UnresolvedPath, DbutilsCall,
 )
 from databricks.labs.ucx.source_code.notebooks.magic import MagicLine
 from databricks.labs.ucx.source_code.python.python_ast import MaybeTree, Tree, NodeBase
@@ -129,6 +129,11 @@ class PythonCodeAnalyzer:
             yield from self._register_import(base_node)
         elif isinstance(base_node, MagicLine):
             yield from base_node.build_dependency_graph(self._context.parent)
+        elif isinstance(base_node, DbutilsCall):
+            problem = DependencyProblem.from_node(
+                'dbutils-credentials-assume-role',
+                "dbutils.credentials.assumeRole is not supported", base_node.node,)
+            yield problem
         else:
             problem = DependencyProblem.from_node(
                 "unsupported-node-type",
