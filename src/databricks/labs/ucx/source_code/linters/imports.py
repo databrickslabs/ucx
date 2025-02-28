@@ -140,9 +140,20 @@ class DbutilsPyLinter(PythonLinter):
         self._session_state = session_state
 
     def lint_tree(self, tree: Tree) -> Iterable[Advice]:
-        nodes = self.list_dbutils_notebook_run_calls(tree)
-        for node in nodes:
+        notebook_call_nodes = self.list_dbutils_notebook_run_calls(tree)
+        for node in notebook_call_nodes:
             yield from self._raise_advice_if_unresolved(node.node, self._session_state)
+
+        credentials_assumerole_call_nodes = self.list_dbutils_credentials_assumerole_calls(tree)
+
+        for node in credentials_assumerole_call_nodes:
+            assert isinstance(node, Call)
+            # call = DbutilsCall(cast(Call, node))
+            yield Advisory.from_node(
+                code='dbutils-credentials-assume-role',
+                message="dbutils.credentials.assumeRole is not supported",
+                node=node)
+
 
     @classmethod
     def _raise_advice_if_unresolved(cls, node: NodeNG, session_state: CurrentSessionState) -> Iterable[Advice]:
