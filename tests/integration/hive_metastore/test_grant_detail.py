@@ -62,13 +62,14 @@ def test_all_grant_types(runtime_ctx: MockRuntimeContext, _deployed_schema: None
         if not condition(grants):
             raise ValueError("Grants do not meet condition")
 
-    def contains_select_on_any_file(grants: Iterable[Grant]) -> bool:
+    def grants_contain_select_action(grants: Iterable[Grant]) -> bool:
         """Check if the SELECT permission on ANY FILE is present in the grants."""
         return any(g.principal == group.display_name and g.action_type == "SELECT" for g in grants)
 
     # Wait for the grants to be available so that we can snapshot them.
-    # Only verifying the SELECT permission on ANY FILE as it takes a while to propagate.
-    wait_for_grants(contains_select_on_any_file, any_file=True)
+    # Only verifying the SELECT permission on ANY FILE and ANONYMOUS FUNCTION as those take a while to propagate.
+    wait_for_grants(grants_contain_select_action, any_file=True)
+    wait_for_grants(grants_contain_select_action, anonymous_function=True)
 
     runtime_ctx.grants_crawler.snapshot()
 
