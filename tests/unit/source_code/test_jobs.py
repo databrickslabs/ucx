@@ -5,20 +5,24 @@ from pathlib import Path
 from unittest.mock import create_autospec
 
 import pytest
-from databricks.labs.lsql.backends import MockBackend
-from databricks.sdk.service.compute import LibraryInstallStatus
-from databricks.sdk.service.jobs import Job, SparkPythonTask
-from databricks.sdk.service.pipelines import NotebookLibrary, GetPipelineResponse, PipelineLibrary, FileLibrary
-
 from databricks.labs.blueprint.paths import DBFSPath, WorkspacePath
-from databricks.labs.ucx.source_code.base import CurrentSessionState
-from databricks.labs.ucx.source_code.directfs_access import DirectFsAccessCrawler
-from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
+from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
-from databricks.sdk.service import compute, jobs, pipelines
-from databricks.sdk.service.workspace import ExportFormat, ObjectInfo, Language
+from databricks.sdk.service import compute, jobs
+from databricks.sdk.service.jobs import Job, SparkPythonTask
+from databricks.sdk.service.pipelines import (
+    GetPipelineResponse,
+    FileLibrary,
+    NotebookLibrary,
+    PipelineLibrary,
+    PipelineSpec,
+)
+from databricks.sdk.service.workspace import ExportFormat, Language, ObjectInfo
 
+from databricks.labs.ucx.assessment.jobs import JobsCrawler
+from databricks.labs.ucx.source_code.base import CurrentSessionState
+from databricks.labs.ucx.source_code.directfs_access import DirectFsAccessCrawler
 from databricks.labs.ucx.source_code.files import FileLoader, ImportFileResolver
 from databricks.labs.ucx.source_code.graph import (
     Dependency,
@@ -27,7 +31,8 @@ from databricks.labs.ucx.source_code.graph import (
 )
 from databricks.labs.ucx.source_code.jobs import JobProblem, WorkflowTaskContainer
 from databricks.labs.ucx.source_code.linters.jobs import WorkflowLinter
-from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
+from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader, NotebookResolver
+from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
 from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
 
 
@@ -228,10 +233,17 @@ def test_workflow_linter_lint_job_logs_problems(dependency_resolver, mock_path_l
     expected_message = "Found job problems:\nUNKNOWN:-1 [library-install-failed] 'pip --disable-pip-version-check install unknown-library"
 
     ws = create_autospec(WorkspaceClient)
+    jobs_crawler = create_autospec(JobsCrawler)
     directfs_crawler = create_autospec(DirectFsAccessCrawler)
     used_tables_crawler = create_autospec(UsedTablesCrawler)
     linter = WorkflowLinter(
-        ws, dependency_resolver, mock_path_lookup, empty_index, directfs_crawler, used_tables_crawler
+        ws,
+        jobs_crawler,
+        dependency_resolver,
+        mock_path_lookup,
+        empty_index,
+        directfs_crawler,
+        used_tables_crawler,
     )
 
     libraries = [compute.Library(pypi=compute.PythonPyPiLibrary(package="unknown-library-name"))]
@@ -243,6 +255,7 @@ def test_workflow_linter_lint_job_logs_problems(dependency_resolver, mock_path_l
     with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.source_code.jobs"):
         linter.lint_job(1234)
 
+    jobs_crawler.assert_not_called()  # Only called through refresh_report
     directfs_crawler.assert_not_called()
     used_tables_crawler.assert_not_called()
     assert any(message.startswith(expected_message) for message in caplog.messages), caplog.messages
@@ -326,7 +339,7 @@ def test_workflow_task_container_with_existing_cluster_builds_dependency_graph_p
                 whl=None,
             ),
             messages=None,
-            status=LibraryInstallStatus.PENDING,
+            status=compute.LibraryInstallStatus.PENDING,
         )
     ]
 
@@ -446,7 +459,7 @@ def test_workflow_linter_dlt_pipeline_task(graph) -> None:
     ws.pipelines.get.return_value = GetPipelineResponse(
         pipeline_id=pipeline.pipeline_id,
         name="test-pipeline",
-        spec=pipelines.PipelineSpec(continuous=False),
+        spec=PipelineSpec(continuous=False),
     )
 
     workflow_task_container = WorkflowTaskContainer(ws, task, Job())
@@ -456,7 +469,7 @@ def test_workflow_linter_dlt_pipeline_task(graph) -> None:
     ws.pipelines.get.return_value = GetPipelineResponse(
         pipeline_id=pipeline.pipeline_id,
         name="test-pipeline",
-        spec=pipelines.PipelineSpec(
+        spec=PipelineSpec(
             libraries=[
                 PipelineLibrary(
                     jar="some.jar",
@@ -549,19 +562,21 @@ def test_workflow_linter_refresh_report(dependency_resolver, mock_path_lookup, m
     ws.jobs.get.return_value = Job(job_id=2, settings=settings)
 
     sql_backend = MockBackend()
+    jobs_crawler = create_autospec(JobsCrawler)
     directfs_crawler = DirectFsAccessCrawler.for_paths(sql_backend, "test")
     used_tables_crawler = UsedTablesCrawler.for_paths(sql_backend, "test")
     linter = WorkflowLinter(
         ws,
+        jobs_crawler,
         dependency_resolver,
         mock_path_lookup,
         migration_index,
         directfs_crawler,
         used_tables_crawler,
-        [1],
     )
     linter.refresh_report(sql_backend, 'test')
 
+    jobs_crawler.snapshot.assert_called_once()
     sql_backend.has_rows_written_for('test.workflow_problems')
     sql_backend.has_rows_written_for('hive_metastore.test.used_tables_in_paths')
     sql_backend.has_rows_written_for('hive_metastore.test.directfs_in_paths')

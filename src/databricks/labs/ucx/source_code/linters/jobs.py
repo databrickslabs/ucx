@@ -12,6 +12,7 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service import jobs
 
+from databricks.labs.ucx.assessment.jobs import JobsCrawler
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.source_code.base import (
     DirectFsAccess,
@@ -25,7 +26,7 @@ from databricks.labs.ucx.source_code.graph import DependencyResolver, Dependency
 from databricks.labs.ucx.source_code.jobs import JobProblem, WorkflowTask, WorkflowTaskContainer
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.linters.graph_walkers import (
-    LintingWalker,
+    LinterWalker,
     DfsaCollectorWalker,
     TablesCollectorWalker,
 )
@@ -40,37 +41,25 @@ class WorkflowLinter:
     def __init__(
         self,
         ws: WorkspaceClient,
+        jobs_crawler: JobsCrawler,
         resolver: DependencyResolver,
         path_lookup: PathLookup,
         migration_index: TableMigrationIndex,
         directfs_crawler: DirectFsAccessCrawler,
         used_tables_crawler: UsedTablesCrawler,
-        include_job_ids: list[int] | None = None,
-        debug_listing_upper_limit: int | None = None,
     ):
         self._ws = ws
+        self._jobs_crawler = jobs_crawler
         self._resolver = resolver
         self._path_lookup = path_lookup
         self._migration_index = migration_index
         self._directfs_crawler = directfs_crawler
         self._used_tables_crawler = used_tables_crawler
-        self._include_job_ids = include_job_ids
-        self._debug_listing_upper_limit = debug_listing_upper_limit
 
     def refresh_report(self, sql_backend: SqlBackend, inventory_database: str) -> None:
         tasks = []
-        items_listed = 0
-        for job in self._ws.jobs.list():
-            if self._include_job_ids is not None and job.job_id not in self._include_job_ids:
-                logger.info(f"Skipping job_id={job.job_id}")
-                continue
-            if self._debug_listing_upper_limit is not None and items_listed >= self._debug_listing_upper_limit:
-                logger.warning(f"Debug listing limit reached: {self._debug_listing_upper_limit}")
-                break
-            if job.settings is not None and job.settings.name is not None:
-                logger.info(f"Found job_id={job.job_id}: {job.settings.name}")
+        for job in self._jobs_crawler.snapshot():
             tasks.append(functools.partial(self.lint_job, job.job_id))
-            items_listed += 1
         logger.info(f"Running {len(tasks)} linting tasks in parallel...")
         job_results, errors = Threads.gather('linting workflows', tasks)
         job_problems: list[JobProblem] = []
@@ -173,7 +162,7 @@ class WorkflowLinter:
         return graph, located_advices, session_state
 
     def _lint_task(self, graph: DependencyGraph, session_state: CurrentSessionState) -> Iterable[LocatedAdvice]:
-        walker = LintingWalker(graph, self._path_lookup, lambda: LinterContext(self._migration_index, session_state))
+        walker = LinterWalker(graph, self._path_lookup, lambda: LinterContext(self._migration_index, session_state))
         yield from walker
 
     def _collect_task_dfsas(

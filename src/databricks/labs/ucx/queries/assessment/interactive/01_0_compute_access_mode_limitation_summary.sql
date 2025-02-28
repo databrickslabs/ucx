@@ -1,4 +1,4 @@
-/* --title 'Compute Access Mode Limitation Summary' --width 6 */ /* Scan notebook command history for potential paper cut issues */ /* https://docs.databricks.com/en/compute/access-mode-limitations.html#compute-access-mode-limitations */
+/* --title 'Compute Access Mode Limitation Summary' --width 6 */ /* Scan notebook command history for potential paper cut issues */ /* https://docs.databricks.com/en/compute/access-mode-limitations.html#compute-access-mode-limitations */ /* DECLARE @docs_url STRING = 'https://databrickslabs.github.io/ucx/docs/reference/workflows/#assessment-workflow' */
 WITH iteractive_cluster_commands AS (
   SELECT
     a.event_id,
@@ -54,7 +54,7 @@ WITH iteractive_cluster_commands AS (
 )
 SELECT
   issue AS `Finding`,
-  COUNT(DISTINCT workspace_id) AS `# workspaces`, /* concat('<a href="https://github.com/databrickslabs/ucx/blob/main/docs/assessment.md#',replace(issue,' ','-'),'">',issue,'</a>') as link, */
+  COUNT(DISTINCT workspace_id) AS `# workspaces`, /* concat(@docs_url, replace(issue,' ','-')) as link, */
   COUNT(DISTINCT notebook_id) AS `# notebooks`,
   COUNT(DISTINCT cluster_id) AS `# clusters`,
   COUNT(DISTINCT email) AS `# users`

@@ -15,7 +15,9 @@ from .test_assessment import _SPARK_CONF
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
 def test_job_crawler(ws, make_job, inventory_schema, sql_backend):
     new_job = make_job(spark_conf=_SPARK_CONF)
-    job_crawler = JobsCrawler(ws=ws, sql_backend=sql_backend, schema=inventory_schema)
+    skip_job = make_job(spark_conf=_SPARK_CONF)
+
+    job_crawler = JobsCrawler(ws=ws, sql_backend=sql_backend, schema=inventory_schema, include_job_ids=[new_job.job_id])
     jobs = job_crawler.snapshot()
     results = []
     for job in jobs:
@@ -23,9 +25,30 @@ def test_job_crawler(ws, make_job, inventory_schema, sql_backend):
             continue
         if int(job.job_id) == new_job.job_id:
             results.append(job)
+        if int(job.job_id) == skip_job.job_id:
+            assert False, "Job should have been skipped"
 
     assert len(results) >= 1
     assert int(results[0].job_id) == new_job.job_id
+
+
+def test_job_crawler_excludes_job(ws, make_job, inventory_schema, sql_backend) -> None:
+    """Test if the job crawler can exclude a job."""
+    new_job = make_job(spark_conf=_SPARK_CONF)
+    skip_job = make_job(spark_conf=_SPARK_CONF)
+    job_crawler = JobsCrawler(
+        ws,
+        sql_backend,
+        inventory_schema,
+        # Adding the skip job to the `include_job_ids` scope the crawler from not crawling all jobs while still testing
+        # the exclude job behaviour
+        include_job_ids=[new_job.job_id, skip_job.job_id],
+        exclude_job_ids=[skip_job.job_id],
+    )
+
+    jobs = job_crawler.snapshot()
+
+    assert not any(job.job_id == str(skip_job.job_id) for job in jobs)
 
 
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))

@@ -16,7 +16,7 @@ from databricks.labs.ucx.assessment.clusters import (
     PolicyInfo,
 )
 from databricks.labs.ucx.assessment.init_scripts import GlobalInitScriptCrawler
-from databricks.labs.ucx.assessment.jobs import JobOwnership, JobInfo, JobsCrawler, SubmitRunsCrawler
+from databricks.labs.ucx.assessment.jobs import JobOwnership, JobInfo, SubmitRunsCrawler
 from databricks.labs.ucx.assessment.pipelines import PipelinesCrawler, PipelineInfo, PipelineOwnership
 from databricks.labs.ucx.assessment.sequencing import MigrationSequencer
 from databricks.labs.ucx.config import WorkspaceConfig
@@ -67,10 +67,6 @@ class RuntimeContext(GlobalContext):
     def installation(self) -> Installation:
         install_folder = self._config_path.parent.as_posix().removeprefix("/Workspace")
         return Installation(self.workspace_client, "ucx", install_folder=install_folder)
-
-    @cached_property
-    def jobs_crawler(self) -> JobsCrawler:
-        return JobsCrawler(self.workspace_client, self.sql_backend, self.inventory_database)
 
     @cached_property
     def job_ownership(self) -> JobOwnership:

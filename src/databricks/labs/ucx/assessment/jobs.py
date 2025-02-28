@@ -8,6 +8,7 @@ from typing import ClassVar
 
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.errors import DatabricksError
 from databricks.sdk.service import compute
 from databricks.sdk.service.compute import ClusterDetails, ClusterSpec
 from databricks.sdk.service.jobs import (
@@ -94,12 +95,49 @@ class JobsMixin:
 
 
 class JobsCrawler(CrawlerBase[JobInfo], JobsMixin, CheckClusterMixin):
-    def __init__(self, ws: WorkspaceClient, sql_backend: SqlBackend, schema):
+    """Crawl jobs (workflows), assess them and store the result in the inventory.
+
+    Args :
+        ws (WorkspaceClient): The workspace client to crawl the jobs with.
+        sql_backend (SqlBackend): The SQL backend to store the results with.
+        schema (str): The schema to store the results in.
+        include_job_ids (list[int] | None): If provided, only include these job ids. Otherwise, include all jobs.
+        exclude_job_ids (list[int] | None): If provided, exclude these job ids. Otherwise, include all jobs. Note: We
+            prefer `include_job_ids` for more strict scoping, but sometimes it's easier to exclude a few jobs.
+    """
+
+    def __init__(
+        self,
+        ws: WorkspaceClient,
+        sql_backend: SqlBackend,
+        schema,
+        *,
+        include_job_ids: list[int] | None = None,
+        exclude_job_ids: list[int] | None = None,
+    ):
         super().__init__(sql_backend, "hive_metastore", schema, "jobs", JobInfo)
         self._ws = ws
+        self._include_job_ids = include_job_ids
+        self._exclude_job_ids = exclude_job_ids
+
+    def _list_jobs(self) -> Iterable[BaseJob]:
+        """List the jobs.
+
+        If provided, excludes jobs with id in `exclude_job_ids`.
+        If provided, excludes jobs with id not in `include_job_ids`.
+        If both provided, `exclude_job_ids` takes precedence.
+        """
+        try:
+            for job in self._ws.jobs.list(expand_tasks=True):
+                if self._exclude_job_ids is not None and job.job_id in self._exclude_job_ids:
+                    continue
+                if self._include_job_ids is None or job.job_id in self._include_job_ids:
+                    yield job
+        except DatabricksError as e:
+            logger.error("Cannot list jobs", exc_info=e)
 
     def _crawl(self) -> Iterable[JobInfo]:
-        all_jobs = list(self._ws.jobs.list(expand_tasks=True))
+        all_jobs = list(self._list_jobs())
         all_clusters = {c.cluster_id: c for c in self._ws.clusters.list() if c.cluster_id}
         return self._assess_jobs(all_jobs, all_clusters)
 

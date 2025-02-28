@@ -1,16 +1,18 @@
 import json
 import logging
 import datetime as dt
+from collections.abc import Callable, Iterable
 
 import pytest
+from databricks.labs.lsql.backends import StatementExecutionBackend
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 
-from databricks.labs.lsql.backends import StatementExecutionBackend
-from databricks.labs.ucx.hive_metastore.grants import GrantsCrawler
+from databricks.labs.ucx.hive_metastore.grants import Grant, GrantsCrawler
 from databricks.labs.ucx.install import deploy_schema
 
 from ..conftest import MockRuntimeContext
+
 
 logger = logging.getLogger(__name__)
 
@@ -23,10 +25,8 @@ def _deployed_schema(runtime_ctx) -> None:
 
 
 @retried(on=[NotFound, TimeoutError], timeout=dt.timedelta(minutes=3))
-def test_all_grant_types(
-    runtime_ctx: MockRuntimeContext, sql_backend: StatementExecutionBackend, _deployed_schema: None
-):
-    """Test that all types of grants are properly handled by the view when reporting the object type and identifier."""
+def test_all_grant_types(runtime_ctx: MockRuntimeContext, _deployed_schema: None):
+    """All types of grants should be reported by the grant_detail view."""
 
     # Fixture: a group and schema to hold all the objects, the objects themselves and a grant on each to the group.
     group = runtime_ctx.make_group()
@@ -34,31 +34,43 @@ def test_all_grant_types(
     table = runtime_ctx.make_table(schema_name=schema.name)
     view = runtime_ctx.make_table(schema_name=schema.name, view=True, ctas="select 1")
     udf = runtime_ctx.make_udf(schema_name=schema.name)
-    sql_backend.execute(f"GRANT SELECT ON CATALOG {schema.catalog_name} TO `{group.display_name}`")
-    sql_backend.execute(f"GRANT SELECT ON SCHEMA {schema.full_name} TO `{group.display_name}`")
-    sql_backend.execute(f"GRANT SELECT ON TABLE {table.full_name} TO `{group.display_name}`")
-    sql_backend.execute(f"GRANT SELECT ON VIEW {view.full_name} TO `{group.display_name}`")
-    sql_backend.execute(f"GRANT SELECT ON FUNCTION {udf.full_name} TO `{group.display_name}`")
-    sql_backend.execute(f"GRANT SELECT ON ANY FILE TO `{group.display_name}`")
-    sql_backend.execute(f"GRANT SELECT ON ANONYMOUS FUNCTION TO `{group.display_name}`")
+    runtime_ctx.sql_backend.execute(f"GRANT SELECT ON CATALOG {schema.catalog_name} TO `{group.display_name}`")
+    runtime_ctx.sql_backend.execute(f"GRANT SELECT ON SCHEMA {schema.full_name} TO `{group.display_name}`")
+    runtime_ctx.sql_backend.execute(f"GRANT SELECT ON TABLE {table.full_name} TO `{group.display_name}`")
+    runtime_ctx.sql_backend.execute(f"GRANT SELECT ON VIEW {view.full_name} TO `{group.display_name}`")
+    runtime_ctx.sql_backend.execute(f"GRANT SELECT ON FUNCTION {udf.full_name} TO `{group.display_name}`")
+    runtime_ctx.sql_backend.execute(f"GRANT SELECT ON ANY FILE TO `{group.display_name}`")
+    runtime_ctx.sql_backend.execute(f"GRANT SELECT ON ANONYMOUS FUNCTION TO `{group.display_name}`")
 
-    # Ensure the view is populated (it's based on the crawled grants) and fetch the content.
-    GrantsCrawler(runtime_ctx.tables_crawler, runtime_ctx.udfs_crawler).snapshot()
+    @retried(on=[ValueError], timeout=dt.timedelta(minutes=2))
+    def wait_for_grants(condition: Callable[[Iterable[Grant]], bool], **kwargs) -> None:
+        """Wait for grants to meet the condition.
 
-    rows = list(
-        sql_backend.fetch(
-            f"""
+        The method retries the condition check to account for eventual consistency of the permission API.
+        """
+        grants = runtime_ctx.grants_crawler.grants(**kwargs)
+        if not condition(grants):
+            raise ValueError("Grants do not meet condition")
+
+    def contains_select_on_any_file(grants: Iterable[Grant]) -> bool:
+        """Check if the SELECT permission on ANY FILE is present in the grants."""
+        return any(g.principal == group.display_name and g.action_type == "SELECT" for g in grants)
+
+    # Wait for the grants to be available so that we can snapshot them.
+    # Only verifying the SELECT permission on ANY FILE as it takes a while to propagate.
+    wait_for_grants(contains_select_on_any_file, any_file=True)
+
+    runtime_ctx.grants_crawler.snapshot()
+
+    grants_detail_query = f"""
         SELECT object_type, object_id
         FROM {runtime_ctx.inventory_database}.grant_detail
         WHERE principal_type='group' AND principal='{group.display_name}' and action_type='SELECT'
     """
-        )
-    )
-    grants = {(row.object_type, row.object_id) for row in rows}
+    grants = {(row.object_type, row.object_id) for row in runtime_ctx.sql_backend.fetch(grants_detail_query)}
 
     # TODO: The types of objects targeted by grants is missclassified; this needs to be fixed.
 
-    # Test the results.
     expected_grants = {
         ("TABLE", table.full_name),
         ("VIEW", view.full_name),

@@ -153,7 +153,7 @@ def test_install_cluster_override_jobs(ws, mock_installation) -> None:
 
     workflows_installation.create_jobs()
 
-    tasks = created_job_tasks(ws, '[MOCK] assessment')
+    tasks = created_job_tasks(ws, 'MOCK_assessment')
     assert tasks['assess_jobs'].existing_cluster_id == 'one'
     assert tasks['crawl_grants'].existing_cluster_id == 'two'
     wheels.upload_to_wsfs.assert_called_once()
@@ -175,7 +175,7 @@ def test_writeable_dbfs(ws, tmp_path, mock_installation) -> None:
 
     workflows_installation.create_jobs()
 
-    job = created_job(ws, '[MOCK] assessment')
+    job = created_job(ws, 'MOCK_assessment')
     job_clusters = {_.job_cluster_key: _ for _ in job['job_clusters']}
     assert 'main' in job_clusters
     assert 'tacl' in job_clusters

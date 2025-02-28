@@ -21,9 +21,8 @@ from databricks.labs.ucx.contexts.application import CliContext
 from databricks.labs.ucx.hive_metastore.federation import HiveMetastoreFederation, HiveMetastoreFederationEnabler
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.progress.install import ProgressTrackingInstallation
-from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.linters.context import LinterContext
-from databricks.labs.ucx.source_code.linters.folders import LocalCodeLinter, LocalFileMigrator
+from databricks.labs.ucx.source_code.linters.folders import LocalCodeLinter
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader
 from databricks.labs.ucx.workspace_access.clusters import ClusterAccess
 
@@ -213,29 +212,22 @@ class LocalCheckoutContext(WorkspaceContext):
     """Local context extends Workspace context to provide extra properties
     for running local operations."""
 
-    def linter_context_factory(self, session_state: CurrentSessionState | None = None):
+    @cached_property
+    def _migration_index(self) -> TableMigrationIndex:
         try:
             index = self.tables_migrator.index()
         except NotFound:
             logger.warning("Metastore does not seem to exist yet. Skipping loading of migration status.")
             index = TableMigrationIndex([])
-        if session_state is None:
-            session_state = CurrentSessionState()
-        return LinterContext(index, session_state)
-
-    @cached_property
-    def local_file_migrator(self) -> LocalFileMigrator:
-        return LocalFileMigrator(lambda: self.linter_context_factory(CurrentSessionState()))
+        return index
 
     @cached_property
     def local_code_linter(self) -> LocalCodeLinter:
-        session_state = CurrentSessionState()
         return LocalCodeLinter(
             self.notebook_loader,
             self.file_loader,
             self.folder_loader,
             self.path_lookup,
-            session_state,
             self.dependency_resolver,
-            lambda: self.linter_context_factory(session_state),
+            lambda: LinterContext(self._migration_index),
         )

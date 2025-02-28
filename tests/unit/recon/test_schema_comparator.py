@@ -1,3 +1,4 @@
+import pytest
 from databricks.labs.lsql.backends import MockBackend
 
 from databricks.labs.ucx.recon.base import TableIdentifier, SchemaComparisonResult, SchemaComparisonEntry
@@ -100,3 +101,36 @@ def test_schema_comparison_failure(metadata_row_factory):
     schema_comparator = StandardSchemaComparator(metadata_retriever)
     actual_comparison_result = schema_comparator.compare_schema(source, target)
     assert actual_comparison_result == expected_comparison_result
+
+
+@pytest.mark.parametrize(
+    "source_column, target_column, case_sensitive, expected_pass",
+    [
+        ("column1", "columnx", True, False),
+        ("column1", "column1", True, True),
+        ("column1", "Column1", True, False),
+        ("column1", "Column1", False, True),
+        ("CoLuMn1", "cOlUmN1", True, False),
+        ("CoLuMn1", "cOlUmN1", False, True),
+    ],
+)
+def test_schema_comparison_case(metadata_row_factory, source_column, target_column, case_sensitive, expected_pass):
+    source = TableIdentifier("hive_metastore", "db1", "table1")
+    target = TableIdentifier("catalog1", "schema1", "table1")
+    sql_backend = MockBackend(
+        rows={
+            "DESCRIBE TABLE": metadata_row_factory[
+                (source_column, "int"),
+                ("column2", "string"),
+            ],
+            f"{target.catalog_escaped}\\.information_schema\\.columns": metadata_row_factory[
+                (target_column, "int"),
+                ("column2", "string"),
+            ],
+        }
+    )
+
+    metadata_retriever = DatabricksTableMetadataRetriever(sql_backend)
+    schema_comparator = StandardSchemaComparator(metadata_retriever, case_sensitive=case_sensitive)
+    actual_comparison_result = schema_comparator.compare_schema(source, target)
+    assert actual_comparison_result.is_matching == expected_pass

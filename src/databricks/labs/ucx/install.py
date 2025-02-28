@@ -48,6 +48,7 @@ from databricks.sdk.service.sql import (
 )
 from databricks.sdk.useragent import with_extra
 
+from databricks.labs.ucx.github import DOCS_URL
 from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalInfo
 from databricks.labs.ucx.assessment.clusters import ClusterInfo, PolicyInfo
@@ -218,7 +219,7 @@ class WorkspaceInstaller(WorkspaceContext):
             if isinstance(err.__cause__, RequestsConnectionError):
                 logger.warning(
                     f"Cannot connect with {self.workspace_client.config.host} see "
-                    f"https://github.com/databrickslabs/ucx#network-connectivity-issues for help: {err}"
+                    f"{DOCS_URL}#reference/common_challenges/#network-connectivity-issues for help: {err}"
                 )
             raise err
         return config
@@ -573,7 +574,7 @@ class WorkspaceInstallation(InstallationMixin):
             if "Unable to load AWS credentials from any provider in the chain" in str(err):
                 msg = (
                     "The UCX installation is configured to use external metastore. There is issue with the external metastore connectivity.\n"
-                    "Please check the UCX installation instruction https://github.com/databrickslabs/ucx?tab=readme-ov-file#prerequisites"
+                    f"Please check the UCX installation instruction {DOCS_URL}/installation "
                     "and re-run installation.\n"
                     "Please Follow the Below Command to uninstall and Install UCX\n"
                     "UCX Uninstall: databricks labs uninstall ucx.\n"
@@ -661,7 +662,7 @@ class WorkspaceInstallation(InstallationMixin):
                 catalog_to_replace="ucx_catalog",
             )
         )
-        metadata.display_name = f"{self._name('UCX ')} {folder.parent.stem.title()} ({folder.stem.title()})"
+        metadata.display_name = self._name(f"{folder.parent.stem.title()}_{folder.stem.title()}")
         reference = f"{folder.parent.stem}_{folder.stem}".lower()
         dashboard_id = self._install_state.dashboards.get(reference)
         if dashboard_id is not None:
