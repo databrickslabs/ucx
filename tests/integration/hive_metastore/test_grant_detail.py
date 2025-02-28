@@ -4,7 +4,7 @@ import datetime as dt
 from collections.abc import Callable, Iterable
 
 import pytest
-from databricks.labs.lsql.backends import StatementExecutionBackend
+from databricks.labs.lsql.backends import CommandExecutionBackend, SqlBackend
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 
@@ -15,6 +15,16 @@ from ..conftest import MockRuntimeContext
 
 
 logger = logging.getLogger(__name__)
+
+
+@pytest.fixture
+def sql_backend(ws, env_or_skip) -> SqlBackend:
+    """Ensure the SQL backend used during fixture setup is using the TACL cluster.
+
+    The TACL cluster is used for grants.
+    """
+    cluster_id = env_or_skip("TEST_LEGACY_TABLE_ACL_CLUSTER_ID")
+    return CommandExecutionBackend(ws, cluster_id)
 
 
 @pytest.fixture()
