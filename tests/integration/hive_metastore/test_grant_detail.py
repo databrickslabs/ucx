@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 @pytest.fixture
-def sql_backend(ws, env_or_skip) -> SqlBackend:
+def sql_backend_tacl(ws, env_or_skip) -> SqlBackend:
     """Ensure the SQL backend used during fixture setup is using the TACL cluster.
 
     The TACL cluster is used for grants.
@@ -35,7 +35,7 @@ def _deployed_schema(runtime_ctx) -> None:
 
 
 @retried(on=[NotFound, TimeoutError], timeout=dt.timedelta(minutes=3))
-def test_all_grant_types(runtime_ctx: MockRuntimeContext, _deployed_schema: None):
+def test_all_grant_types(runtime_ctx: MockRuntimeContext, sql_backend_tacl: SqlBackend, _deployed_schema: None):
     """All types of grants should be reported by the grant_detail view."""
 
     # Fixture: a group and schema to hold all the objects, the objects themselves and a grant on each to the group.
@@ -71,7 +71,12 @@ def test_all_grant_types(runtime_ctx: MockRuntimeContext, _deployed_schema: None
     wait_for_grants(grants_contain_select_action, any_file=True)
     wait_for_grants(grants_contain_select_action, anonymous_function=True)
 
-    runtime_ctx.grants_crawler.snapshot()
+    # Snapshotting tables and udfs to avoid snapshot on TACL cluster during grants crawler
+    runtime_ctx.tables_crawler.snapshot()
+    runtime_ctx.udfs_crawler.snapshot()
+
+    # Fetching the grants requires a table access control list enabled cluster
+    runtime_ctx.replace(sql_backend=sql_backend_tacl).grants_crawler.snapshot()
 
     grants_detail_query = f"""
         SELECT object_type, object_id
