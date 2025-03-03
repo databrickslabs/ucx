@@ -25,6 +25,7 @@ from databricks.labs.ucx.source_code.linters.imports import (
     ImportSource,
     NotebookRunCall,
     UnresolvedPath,
+    DbutilsCall,
 )
 from databricks.labs.ucx.source_code.notebooks.magic import MagicLine
 from databricks.labs.ucx.source_code.python.python_ast import MaybeTree, Tree, NodeBase
@@ -106,6 +107,7 @@ class PythonCodeAnalyzer:
         tree = maybe_tree.tree
         syspath_changes = SysPathChange.extract_from_tree(self._context.session_state, tree)
         run_calls = DbutilsPyLinter.list_dbutils_notebook_run_calls(tree)
+        credential_calls = DbutilsPyLinter.list_dbutils_credentials_assumerole_calls(tree)
         import_sources: list[ImportSource]
         import_problems: list[DependencyProblem]
         import_sources, import_problems = ImportSource.extract_from_tree(tree, DependencyProblem.from_node)
@@ -113,7 +115,9 @@ class PythonCodeAnalyzer:
         magic_lines, command_problems = MagicLine.extract_from_tree(tree, DependencyProblem.from_node)
         problems.extend(command_problems)
         # need to evaluate things in intertwined sequence so concat and sort them
-        nodes: list[NodeBase] = cast(list[NodeBase], syspath_changes + run_calls + import_sources + magic_lines)
+        nodes: list[NodeBase] = cast(
+            list[NodeBase], syspath_changes + run_calls + import_sources + magic_lines + credential_calls
+        )
         nodes = sorted(nodes, key=lambda node: (node.node.lineno, node.node.col_offset))
         return tree, nodes, problems
 
@@ -126,6 +130,13 @@ class PythonCodeAnalyzer:
             yield from self._register_import(base_node)
         elif isinstance(base_node, MagicLine):
             yield from base_node.build_dependency_graph(self._context.parent)
+        elif isinstance(base_node, DbutilsCall):
+            problem = DependencyProblem.from_node(
+                'dbutils-credentials-assume-role',
+                "dbutils.credentials.assumeRole is not supported",
+                base_node.node,
+            )
+            yield problem
         else:
             problem = DependencyProblem.from_node(
                 "unsupported-node-type",
