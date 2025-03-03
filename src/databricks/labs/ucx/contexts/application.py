@@ -254,7 +254,13 @@ class GlobalContext(abc.ABC):
 
     @cached_property
     def grants_crawler(self) -> GrantsCrawler:
-        return GrantsCrawler(self.tables_crawler, self.udfs_crawler, self.config.include_databases)
+        return GrantsCrawler(
+            self.sql_backend,
+            self.inventory_database,
+            self.tables_crawler,
+            self.udfs_crawler,
+            include_databases=self.config.include_databases,
+        )
 
     @cached_property
     def grant_ownership(self) -> GrantOwnership:

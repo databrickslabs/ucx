@@ -137,7 +137,9 @@ def test_grant_ownership(ws, runtime_ctx, inventory_schema, sql_backend, make_ra
     make_acc_group(display_name=admin_group_name, members=[current_user.id], wait_for_provisioning=True)
 
     # Produce the crawled records.
-    crawler = GrantsCrawler(table_crawler, udf_crawler, include_databases=[schema.name])
+    crawler = GrantsCrawler(
+        sql_backend, inventory_database, table_crawler, udf_crawler, include_databases=[schema.name]
+    )
     records = crawler.snapshot(force_refresh=True)
 
     # Find the crawled record for the grant we made.
