@@ -52,13 +52,19 @@ def test_all_grant_types(runtime_ctx: MockRuntimeContext, sql_backend_tacl: SqlB
     runtime_ctx.sql_backend.execute(f"GRANT SELECT ON ANY FILE TO `{group.display_name}`")
     runtime_ctx.sql_backend.execute(f"GRANT SELECT ON ANONYMOUS FUNCTION TO `{group.display_name}`")
 
+    # Snapshotting tables and udfs to avoid snapshot on TACL cluster during grants crawler
+    runtime_ctx.tables_crawler.snapshot()
+    runtime_ctx.udfs_crawler.snapshot()
+    # Fetching the grants requires a table access control list enabled cluster
+    grants_crawler = runtime_ctx.replace(sql_backend=sql_backend_tacl).grants_crawler
+
     @retried(on=[ValueError], timeout=dt.timedelta(minutes=2))
     def wait_for_grants(condition: Callable[[Iterable[Grant]], bool], **kwargs) -> None:
         """Wait for grants to meet the condition.
 
         The method retries the condition check to account for eventual consistency of the permission API.
         """
-        grants = runtime_ctx.grants_crawler.grants(**kwargs)
+        grants = grants_crawler.grants(**kwargs)
         if not condition(grants):
             raise ValueError("Grants do not meet condition")
 
@@ -71,12 +77,7 @@ def test_all_grant_types(runtime_ctx: MockRuntimeContext, sql_backend_tacl: SqlB
     wait_for_grants(grants_contain_select_action, any_file=True)
     wait_for_grants(grants_contain_select_action, anonymous_function=True)
 
-    # Snapshotting tables and udfs to avoid snapshot on TACL cluster during grants crawler
-    runtime_ctx.tables_crawler.snapshot()
-    runtime_ctx.udfs_crawler.snapshot()
-
-    # Fetching the grants requires a table access control list enabled cluster
-    runtime_ctx.replace(sql_backend=sql_backend_tacl).grants_crawler.snapshot()
+    grants_crawler.snapshot()
 
     grants_detail_query = f"""
         SELECT object_type, object_id
@@ -112,7 +113,7 @@ def test_grant_findings(runtime_ctx: MockRuntimeContext, _deployed_schema: None)
     runtime_ctx.sql_backend.execute(f"DENY SELECT ON TABLE {table_b.full_name} TO `{group.display_name}`")
 
     # Ensure the view is populated (it's based on the crawled grants) and fetch the content.
-    GrantsCrawler(runtime_ctx.tables_crawler, runtime_ctx.udfs_crawler).snapshot()
+    GrantsCrawler(sql_backend, inventory_database, runtime_ctx.tables_crawler, runtime_ctx.udfs_crawler).snapshot()
 
     rows = runtime_ctx.sql_backend.fetch(
         f"""
