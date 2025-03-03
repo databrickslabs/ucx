@@ -662,7 +662,7 @@ class WorkspaceInstallation(InstallationMixin):
                 catalog_to_replace="ucx_catalog",
             )
         )
-        metadata.display_name = self._name(f"{folder.parent.stem.title()}_{folder.stem.title()}")
+        metadata.display_name = self._name(f"{folder.parent.stem.title()} ({folder.stem.title()})")
         reference = f"{folder.parent.stem}_{folder.stem}".lower()
         dashboard_id = self._install_state.dashboards.get(reference)
         if dashboard_id is not None:
