@@ -44,19 +44,20 @@ def test_all_grant_types(runtime_ctx: MockRuntimeContext, sql_backend_tacl: SqlB
     table = runtime_ctx.make_table(schema_name=schema.name)
     view = runtime_ctx.make_table(schema_name=schema.name, view=True, ctas="select 1")
     udf = runtime_ctx.make_udf(schema_name=schema.name)
-    runtime_ctx.sql_backend.execute(f"GRANT SELECT ON CATALOG {schema.catalog_name} TO `{group.display_name}`")
-    runtime_ctx.sql_backend.execute(f"GRANT SELECT ON SCHEMA {schema.full_name} TO `{group.display_name}`")
-    runtime_ctx.sql_backend.execute(f"GRANT SELECT ON TABLE {table.full_name} TO `{group.display_name}`")
-    runtime_ctx.sql_backend.execute(f"GRANT SELECT ON VIEW {view.full_name} TO `{group.display_name}`")
-    runtime_ctx.sql_backend.execute(f"GRANT SELECT ON FUNCTION {udf.full_name} TO `{group.display_name}`")
-    runtime_ctx.sql_backend.execute(f"GRANT SELECT ON ANY FILE TO `{group.display_name}`")
-    runtime_ctx.sql_backend.execute(f"GRANT SELECT ON ANONYMOUS FUNCTION TO `{group.display_name}`")
 
     # Snapshotting tables and udfs to avoid snapshot on TACL cluster during grants crawler
     runtime_ctx.tables_crawler.snapshot()
     runtime_ctx.udfs_crawler.snapshot()
-    # Fetching the grants requires a table access control list enabled cluster
-    grants_crawler = runtime_ctx.replace(sql_backend=sql_backend_tacl).grants_crawler
+
+    # Grants require TACL cluster
+    ctx = runtime_ctx.replace(sql_backend=sql_backend_tacl)
+    ctx.sql_backend.execute(f"GRANT SELECT ON CATALOG {schema.catalog_name} TO `{group.display_name}`")
+    ctx.sql_backend.execute(f"GRANT SELECT ON SCHEMA {schema.full_name} TO `{group.display_name}`")
+    ctx.sql_backend.execute(f"GRANT SELECT ON TABLE {table.full_name} TO `{group.display_name}`")
+    ctx.sql_backend.execute(f"GRANT SELECT ON VIEW {view.full_name} TO `{group.display_name}`")
+    ctx.sql_backend.execute(f"GRANT SELECT ON FUNCTION {udf.full_name} TO `{group.display_name}`")
+    ctx.sql_backend.execute(f"GRANT SELECT ON ANY FILE TO `{group.display_name}`")
+    ctx.sql_backend.execute(f"GRANT SELECT ON ANONYMOUS FUNCTION TO `{group.display_name}`")
 
     @retried(on=[ValueError], timeout=dt.timedelta(minutes=2))
     def wait_for_grants(condition: Callable[[Iterable[Grant]], bool], **kwargs) -> None:
@@ -64,7 +65,7 @@ def test_all_grant_types(runtime_ctx: MockRuntimeContext, sql_backend_tacl: SqlB
 
         The method retries the condition check to account for eventual consistency of the permission API.
         """
-        grants = grants_crawler.grants(**kwargs)
+        grants = ctx.grants_crawler.grants(**kwargs)
         if not condition(grants):
             raise ValueError("Grants do not meet condition")
 
@@ -77,14 +78,14 @@ def test_all_grant_types(runtime_ctx: MockRuntimeContext, sql_backend_tacl: SqlB
     wait_for_grants(grants_contain_select_action, any_file=True)
     wait_for_grants(grants_contain_select_action, anonymous_function=True)
 
-    grants_crawler.snapshot()
+    ctx.grants_crawler.snapshot()
 
     grants_detail_query = f"""
         SELECT object_type, object_id
         FROM {runtime_ctx.inventory_database}.grant_detail
         WHERE principal_type='group' AND principal='{group.display_name}' and action_type='SELECT'
     """
-    grants = {(row.object_type, row.object_id) for row in runtime_ctx.sql_backend.fetch(grants_detail_query)}
+    grants = {(row.object_type, row.object_id) for row in ctx.sql_backend.fetch(grants_detail_query)}
 
     # TODO: The types of objects targeted by grants is missclassified; this needs to be fixed.
 
