@@ -19,7 +19,7 @@ class InstallationMixin:
 
     def _name(self, name: str) -> str:
         prefix = os.path.basename(self._installation.install_folder()).removeprefix('.')
-        return f"{prefix.upper()}_{name}"
+        return f"[{prefix.upper()}] {name}"
 
     @property
     def _my_username(self):
