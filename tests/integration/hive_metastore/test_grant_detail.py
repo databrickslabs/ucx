@@ -8,7 +8,7 @@ from databricks.labs.lsql.backends import CommandExecutionBackend, SqlBackend
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 
-from databricks.labs.ucx.hive_metastore.grants import Grant, GrantsCrawler
+from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.install import deploy_schema
 
 from ..conftest import MockRuntimeContext
@@ -102,7 +102,7 @@ def test_all_grant_types(runtime_ctx: MockRuntimeContext, sql_backend_tacl: SqlB
 
 
 @retried(on=[NotFound, TimeoutError], timeout=dt.timedelta(minutes=3))
-def test_grant_findings(runtime_ctx: MockRuntimeContext, _deployed_schema: None) -> None:
+def test_grant_findings(runtime_ctx: MockRuntimeContext, sql_backend_tacl: SqlBackend, _deployed_schema: None) -> None:
     """Test that findings are reported for a grant."""
 
     # Fixture: two objects, one with a grant that is okay and the other with a grant that is not okay.
