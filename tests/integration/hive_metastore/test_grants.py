@@ -9,9 +9,7 @@ from databricks.sdk.retries import retried
 from databricks.labs.lsql.backends import StatementExecutionBackend
 
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
-from databricks.labs.ucx.hive_metastore import TablesCrawler
-from databricks.labs.ucx.hive_metastore.grants import GrantsCrawler, GrantOwnership
-from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
+from databricks.labs.ucx.hive_metastore.grants import GrantOwnership
 from ..conftest import MockRuntimeContext
 
 logger = logging.getLogger(__name__)
@@ -129,7 +127,9 @@ def test_grant_ownership(ws, runtime_ctx, make_random, make_acc_group) -> None:
 
     schema = runtime_ctx.make_schema()
     this_user = ws.current_user.me()
-    runtime_ctx.sql_backend.execute(f"GRANT SELECT ON SCHEMA {escape_sql_identifier(schema.full_name)} TO `{this_user.user_name}`")
+    runtime_ctx.sql_backend.execute(
+        f"GRANT SELECT ON SCHEMA {escape_sql_identifier(schema.full_name)} TO `{this_user.user_name}`"
+    )
     current_user = ws.current_user.me()
     admin_group_name = f"admin_group_{make_random()}"
     make_acc_group(display_name=admin_group_name, members=[current_user.id], wait_for_provisioning=True)
