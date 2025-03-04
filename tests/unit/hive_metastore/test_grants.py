@@ -190,7 +190,7 @@ def test_crawler_no_data() -> None:
     sql_backend = MockBackend()
     table = TablesCrawler(sql_backend, "schema")
     udf = UdfsCrawler(sql_backend, "schema")
-    crawler = GrantsCrawler(sql_backend, inventory_database, table, udf)
+    crawler = GrantsCrawler(sql_backend, "test", table, udf)
     grants = list(crawler.snapshot())
     assert len(grants) == 0
 
@@ -252,7 +252,7 @@ def test_crawler_crawl() -> None:
     }
     table = TablesCrawler(sql_backend, "schema")
     udf = UdfsCrawler(sql_backend, "schema")
-    crawler = GrantsCrawler(sql_backend, inventory_database, table, udf)
+    crawler = GrantsCrawler(sql_backend, "test", table, udf)
     grants = list(crawler.snapshot())
     assert len(grants) == len(expected_grants) and set(grants) == expected_grants
 
@@ -301,7 +301,7 @@ def test_crawler_udf_crawl() -> None:
 
     table = TablesCrawler(sql_backend, "schema")
     udf = UdfsCrawler(sql_backend, "schema")
-    crawler = GrantsCrawler(sql_backend, inventory_database, table, udf)
+    crawler = GrantsCrawler(sql_backend, "test", table, udf)
     grants = list(crawler.snapshot())
 
     assert len(grants) == len(expected_grants) and set(grants) == expected_grants
@@ -311,7 +311,7 @@ def test_crawler_snapshot_when_no_data() -> None:
     sql_backend = MockBackend()
     table = TablesCrawler(sql_backend, "schema")
     udf = UdfsCrawler(sql_backend, "schema")
-    crawler = GrantsCrawler(sql_backend, inventory_database, table, udf)
+    crawler = GrantsCrawler(sql_backend, "test", table, udf)
     snapshot = list(crawler.snapshot())
     assert len(snapshot) == 0
 
@@ -320,7 +320,7 @@ def test_crawler_snapshot_with_data() -> None:
     sql_backend = MockBackend(rows=ROWS)
     table = TablesCrawler(sql_backend, "schema")
     udf = UdfsCrawler(sql_backend, "schema")
-    crawler = GrantsCrawler(sql_backend, inventory_database, table, udf)
+    crawler = GrantsCrawler(sql_backend, "test", table, udf)
     snapshot = list(crawler.snapshot())
     assert len(snapshot) == 3
 
@@ -345,10 +345,10 @@ def test_grants_returning_error_when_showing_grants() -> None:
         ],
     }
 
-    backend = MockBackend(fails_on_first=errors, rows=rows)
-    table_crawler = TablesCrawler(backend, "default")
-    udf = UdfsCrawler(backend, "default")
-    crawler = GrantsCrawler(sql_backend, inventory_database, table_crawler, udf)
+    sql_backend = MockBackend(fails_on_first=errors, rows=rows)
+    table_crawler = TablesCrawler(sql_backend, "default")
+    udf = UdfsCrawler(sql_backend, "default")
+    crawler = GrantsCrawler(sql_backend, "test", table_crawler, udf)
 
     results = list(crawler.snapshot())
     assert results == [
@@ -381,10 +381,10 @@ def test_grants_returning_error_when_describing() -> None:
         ],
     }
 
-    backend = MockBackend(fails_on_first=errors, rows=rows)
-    table_crawler = TablesCrawler(backend, "default")
-    udf = UdfsCrawler(backend, "default")
-    crawler = GrantsCrawler(sql_backend, inventory_database, table_crawler, udf)
+    sql_backend = MockBackend(fails_on_first=errors, rows=rows)
+    table_crawler = TablesCrawler(sql_backend, "default")
+    udf = UdfsCrawler(sql_backend, "default")
+    crawler = GrantsCrawler(sql_backend, "test", table_crawler, udf)
 
     results = list(crawler.snapshot())
     assert results == [
@@ -420,10 +420,10 @@ def test_udf_grants_returning_error_when_showing_grants() -> None:
         ],
     }
 
-    backend = MockBackend(fails_on_first=errors, rows=rows)
-    table_crawler = TablesCrawler(backend, "default")
-    udf = UdfsCrawler(backend, "default")
-    crawler = GrantsCrawler(sql_backend, inventory_database, table_crawler, udf)
+    sql_backend = MockBackend(fails_on_first=errors, rows=rows)
+    table_crawler = TablesCrawler(sql_backend, "default")
+    udf = UdfsCrawler(sql_backend, "default")
+    crawler = GrantsCrawler(sql_backend, "test", table_crawler, udf)
 
     results = list(crawler.snapshot())
     assert results == [
@@ -456,10 +456,10 @@ def test_udf_grants_returning_error_when_describing() -> None:
         ],
     }
 
-    backend = MockBackend(fails_on_first=errors, rows=rows)
-    table_crawler = TablesCrawler(backend, "default")
-    udf = UdfsCrawler(backend, "default")
-    crawler = GrantsCrawler(sql_backend, inventory_database, table_crawler, udf)
+    sql_backend = MockBackend(fails_on_first=errors, rows=rows)
+    table_crawler = TablesCrawler(sql_backend, "default")
+    udf = UdfsCrawler(sql_backend, "default")
+    crawler = GrantsCrawler(sql_backend, "test", table_crawler, udf)
 
     results = list(crawler.snapshot())
     assert results == [
@@ -504,7 +504,7 @@ def test_crawler_should_filter_databases() -> None:
 
     table = TablesCrawler(sql_backend, "schema", include_databases=["database_one"])
     udf = UdfsCrawler(sql_backend, "schema", include_databases=["database_one"])
-    crawler = GrantsCrawler(sql_backend, inventory_database, table, udf, include_databases=["database_one"])
+    crawler = GrantsCrawler(sql_backend, "test", table, udf, include_databases=["database_one"])
     grants = list(crawler.snapshot())
 
     assert "SHOW DATABASES" not in sql_backend.queries
