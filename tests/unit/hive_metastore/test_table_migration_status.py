@@ -4,7 +4,7 @@ from unittest.mock import create_autospec
 import pytest
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import BadRequest, DatabricksError, NotFound
-from databricks.sdk.service.catalog import CatalogInfoSecurableKind, CatalogInfo, SchemaInfo, TableInfo
+from databricks.sdk.service.catalog import CatalogInfo, CatalogType, SchemaInfo, TableInfo
 
 from databricks.labs.ucx.hive_metastore.tables import TablesCrawler
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationStatusRefresher
@@ -67,20 +67,12 @@ def test_table_migration_status_refresher_get_seen_tables_handles_errors_on_tabl
     tables_crawler.snapshot.assert_not_called()
 
 
-@pytest.mark.parametrize(
-    "securable_kind",
-    [
-        CatalogInfoSecurableKind.CATALOG_INTERNAL,
-        CatalogInfoSecurableKind.CATALOG_SYSTEM,
-    ],
-)
-def test_table_migration_status_refresher_get_seen_tables_skips_builtin_catalog(
-    mock_backend, securable_kind: CatalogInfoSecurableKind
-) -> None:
+def test_table_migration_status_refresher_get_seen_tables_skips_system_catalog(mock_backend) -> None:
+    """We can skip the system catalog when refreshing the table migration status."""
     ws = create_autospec(WorkspaceClient)
     ws.catalogs.list.return_value = [
         CatalogInfo(name="test"),
-        CatalogInfo(name="system", securable_kind=securable_kind),
+        CatalogInfo(name="system", catalog_type=CatalogType.SYSTEM_CATALOG),
     ]
 
     def schemas_list(catalog_name: str) -> Iterable[SchemaInfo]:
