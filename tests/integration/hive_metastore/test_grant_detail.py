@@ -108,22 +108,29 @@ def test_grant_findings(runtime_ctx: MockRuntimeContext, _deployed_schema: None)
     # Fixture: two objects, one with a grant that is okay and the other with a grant that is not okay.
     group = runtime_ctx.make_group()
     schema = runtime_ctx.make_schema()
+    # The UDF is not used by the test, but avoids re-crawling UDFs during grants crawling
+    runtime_ctx.make_udf(schema_name=schema.name)
     table_a = runtime_ctx.make_table(schema_name=schema.name)
     table_b = runtime_ctx.make_table(schema_name=schema.name)
-    runtime_ctx.sql_backend.execute(f"GRANT SELECT ON TABLE {table_a.full_name} TO `{group.display_name}`")
-    runtime_ctx.sql_backend.execute(f"DENY SELECT ON TABLE {table_b.full_name} TO `{group.display_name}`")
+
+    # Snapshotting tables and udfs to avoid snapshot on TACL cluster during grants crawler
+    runtime_ctx.tables_crawler.snapshot()
+    runtime_ctx.udfs_crawler.snapshot()
+
+    ctx = runtime_ctx.replace(sql_backend=sql_backend_tacl)
+    ctx.sql_backend.execute(f"GRANT SELECT ON TABLE {table_a.full_name} TO `{group.display_name}`")
+    ctx.sql_backend.execute(f"DENY SELECT ON TABLE {table_b.full_name} TO `{group.display_name}`")
 
     # Ensure the view is populated (it's based on the crawled grants) and fetch the content.
-    GrantsCrawler(sql_backend, inventory_database, runtime_ctx.tables_crawler, runtime_ctx.udfs_crawler).snapshot()
+    ctx.grants.snapshot()
 
-    rows = runtime_ctx.sql_backend.fetch(
-        f"""
-        SELECT object_type, object_id, success, failures
-        FROM {runtime_ctx.inventory_database}.grant_detail
-        WHERE catalog='{schema.catalog_name}' AND database='{schema.name}'
-          AND principal_type='group' AND principal='{group.display_name}'
-        """
-    )
+    grants_detail_query = f"""
+    SELECT object_type, object_id, success, failures
+    FROM {runtime_ctx.inventory_database}.grant_detail
+    WHERE catalog='{schema.catalog_name}' AND database='{schema.name}'
+      AND principal_type='group' AND principal='{group.display_name}'
+    """
+    rows = ctx.sql_backend.fetch(grants_detail_query)
     grants = {
         (row.object_type, row.object_id): (row.success, json.loads(row.failures) if row.failures is not None else None)
         for row in rows
