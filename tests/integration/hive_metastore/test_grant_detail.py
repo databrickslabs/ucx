@@ -122,7 +122,7 @@ def test_grant_findings(runtime_ctx: MockRuntimeContext, sql_backend_tacl: SqlBa
     ctx.sql_backend.execute(f"DENY SELECT ON TABLE {table_b.full_name} TO `{group.display_name}`")
 
     # Ensure the view is populated (it's based on the crawled grants) and fetch the content.
-    ctx.grants.snapshot()
+    ctx.grants_crawler.snapshot()
 
     grants_detail_query = f"""
     SELECT object_type, object_id, success, failures
