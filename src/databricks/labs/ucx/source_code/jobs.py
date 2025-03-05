@@ -286,7 +286,12 @@ class WorkflowTaskContainer(SourceContainer):
         if not self._task.pipeline_task:
             return
 
-        pipeline = self._ws.pipelines.get(self._task.pipeline_task.pipeline_id)
+        try:
+            pipeline = self._ws.pipelines.get(self._task.pipeline_task.pipeline_id)
+        except ResourceDoesNotExist:
+            yield DependencyProblem('pipeline-not-found', f'Could not find pipeline: {self._task.pipeline_task.pipeline_id}')
+            return
+
         if not pipeline.spec:
             return
         if not pipeline.spec.libraries:
