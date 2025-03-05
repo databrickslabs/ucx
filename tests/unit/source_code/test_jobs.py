@@ -443,7 +443,6 @@ def test_workflow_task_container_builds_dependency_graph_for_python_wheel_task(g
 
 def test_workflow_linter_dlt_pipeline_task(graph) -> None:
     ws = create_autospec(WorkspaceClient)
-
     pipeline = ws.pipelines.create(continous=False, name="test-pipeline")
     task = jobs.Task(task_key="test", pipeline_task=jobs.PipelineTask(pipeline_id=pipeline.pipeline_id))
 
