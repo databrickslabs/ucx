@@ -521,8 +521,8 @@ def test_job_dlt_task_linter_unhappy_path(
 
     # Pipeline id does not exist
     task = jobs.Task(
-            task_key=make_random(4),
-            pipeline_task=jobs.PipelineTask(pipeline_id="1234"),
+        task_key=make_random(4),
+        pipeline_task=jobs.PipelineTask(pipeline_id="1234"),
     )
     j = make_job(tasks=[task])
 

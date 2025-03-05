@@ -11,7 +11,7 @@ from urllib import parse
 from databricks.labs.blueprint.paths import DBFSPath
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import ResourceDoesNotExist, BadRequest, InvalidParameterValue, DatabricksError
-from databricks.sdk.service import compute, jobs
+from databricks.sdk.service import compute, jobs, pipelines
 from databricks.sdk.service.compute import DataSecurityMode
 from databricks.sdk.service.jobs import Source
 
@@ -289,26 +289,31 @@ class WorkflowTaskContainer(SourceContainer):
         try:
             pipeline = self._ws.pipelines.get(self._task.pipeline_task.pipeline_id)
         except ResourceDoesNotExist:
-            yield DependencyProblem('pipeline-not-found', f'Could not find pipeline: {self._task.pipeline_task.pipeline_id}')
+            yield DependencyProblem(
+                'pipeline-not-found', f'Could not find pipeline: {self._task.pipeline_task.pipeline_id}'
+            )
             return
 
-        if not pipeline.spec:
-            return
-        if not pipeline.spec.libraries:
+        if not pipeline:
             return
 
-        pipeline_libraries = pipeline.spec.libraries
-        for library in pipeline_libraries:
-            if not library.notebook:
-                return
-            if library.notebook.path:
-                yield from self._register_notebook_path(graph, library.notebook.path)
-            if library.jar:
-                yield from self._register_library(graph, compute.Library(jar=library.jar))
-            if library.maven:
-                yield DependencyProblem('not-yet-implemented', 'Maven library is not yet implemented')
-            if library.file:
-                yield DependencyProblem('not-yet-implemented', 'File library is not yet implemented')
+        if not pipeline.spec or not pipeline.spec.libraries:
+            return
+
+        for library in pipeline.spec.libraries:
+            yield from self._register_pipeline_library(graph, library)
+
+    def _register_pipeline_library(
+        self, graph: DependencyGraph, library: pipelines.PipelineLibrary
+    ) -> Iterable[DependencyProblem]:
+        if library.notebook and library.notebook.path:
+            yield from self._register_notebook_path(graph, library.notebook.path)
+        if library.jar:
+            yield from self._register_library(graph, compute.Library(jar=library.jar))
+        if library.maven:
+            yield DependencyProblem('not-yet-implemented', 'Maven library is not yet implemented')
+        if library.file:
+            yield DependencyProblem('not-yet-implemented', 'File library is not yet implemented')
 
     def _register_notebook_path(self, graph: DependencyGraph, notebook_path: str) -> Iterable[DependencyProblem]:
         try:
