@@ -65,6 +65,7 @@ def test_create_account_level_groups(
     group = get_group(group_display_name)
     assert group
 
+
 def test_create_account_level_groups_nested_groups(
     make_ucx_group,
     make_group,
