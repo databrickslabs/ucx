@@ -231,17 +231,20 @@ class WorkspaceInstaller(WorkspaceContext):
         logger.info("Please answer a couple of questions to configure Unity Catalog migration")
 
         default_database = "ucx"
-        default_config = WorkspaceConfig(default_database)
+
         # if a workspace is configured to use external hive metastore, the majority of the time that metastore will be
         # shared with other workspaces. we need to add the suffix to ensure uniqueness of the inventory database
         if self.policy_installer.has_ext_hms():
             default_database = f"ucx_{self.workspace_client.get_workspace_id()}"
+        default_config = WorkspaceConfig(default_database)
         inventory_database = self.prompts.question(
             "Inventory Database stored in hive_metastore",
             default=default_config.inventory_database,
             valid_regex=r"^\w+$",
         )
-        ucx_catalog = self.prompts.question("Catalog to store UCX artifacts in", default="ucx", valid_regex=r"^\w+$")
+        ucx_catalog = self.prompts.question(
+            "Catalog to store UCX artifacts in", default=default_config.ucx_catalog, valid_regex=r"^\w+$"
+        )
         log_level = self.prompts.question("Log level", default=default_config.log_level).upper()
         num_threads = int(
             self.prompts.question("Number of threads", default=str(default_config.num_threads), valid_number=True)
