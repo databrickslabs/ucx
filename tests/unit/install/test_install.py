@@ -96,11 +96,6 @@ def mock_installation_extra_jobs():
     )
 
 
-def not_found(_):
-    msg = "save_config"
-    raise NotFound(msg)
-
-
 def test_create_database(ws, caplog, mock_installation, any_prompt) -> None:
     sql_backend = MockBackend(
         fails_on_first={'CREATE TABLE': '[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable is incorrect'}
@@ -484,7 +479,6 @@ def test_create_cluster_policy(ws, mock_installation) -> None:
             r".*": "",
         }
     )
-    ws.workspace.get_status = not_found
     install = WorkspaceInstaller(ws).replace(
         prompts=prompts,
         installation=mock_installation,
@@ -1101,7 +1095,6 @@ def test_open_config(ws, mocker, mock_installation):
             r".*": "",
         }
     )
-    ws.workspace.get_status = not_found
 
     install = WorkspaceInstaller(ws).replace(
         prompts=prompts,
@@ -1729,7 +1722,6 @@ def test_save_config_ext_hms(ws, mock_installation) -> None:
             r".*": "",
         }
     )
-    ws.workspace.get_status = not_found
     install = WorkspaceInstaller(ws).replace(
         prompts=prompts,
         installation=mock_installation,
