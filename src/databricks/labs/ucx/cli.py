@@ -255,7 +255,8 @@ def update_migration_progress(
 def repair_run(w: WorkspaceClient, step):
     """Repair Run the Failed Job"""
     if not step:
-        raise KeyError("You did not specify --step")
+        logger.error("--step is a required parameter")
+        return
     ctx = WorkspaceContext(w)
     logger.info(f"Repair Running {step} Job")
     ctx.deployed_workflows.repair_run(step)
@@ -313,10 +314,12 @@ def move(
     """move a uc table/tables from one schema to another schema in same or different catalog"""
     logger.info("Running move command")
     if from_catalog == "" or to_catalog == "":
-        logger.error("Please enter from_catalog and to_catalog details")
+        logger.error("--from_catalog and --to_catalog are required parameter")
         return
     if from_schema == "" or to_schema == "" or from_table == "":
-        logger.error("Please enter from_schema, to_schema and from_table (enter * for migrating all tables) details.")
+        logger.error(
+            "--from_schema, --to_schema and --from_table (enter * for migrating all tables) are required parameter."
+        )
         return
     if from_catalog == to_catalog and from_schema == to_schema:
         logger.error("please select a different schema or catalog to migrate to")
@@ -342,10 +345,12 @@ def alias(
 ):
     """move a uc table/tables from one schema to another schema in same or different catalog"""
     if from_catalog == "" or to_catalog == "":
-        logger.error("Please enter from_catalog and to_catalog details")
+        logger.error("--from_catalog and --to_catalog are required parameter")
         return
     if from_schema == "" or to_schema == "" or from_table == "":
-        logger.error("Please enter from_schema, to_schema and from_table (enter * for migrating all tables) details.")
+        logger.error(
+            "--from_schema, --to_schema and --from_table (enter * for migrating all tables) are required parameter."
+        )
         return
     if from_catalog == to_catalog and from_schema == to_schema:
         logger.error("please select a different schema or catalog to migrate to")

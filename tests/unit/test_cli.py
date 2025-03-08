@@ -414,9 +414,9 @@ def test_repair_run(ws):
     ws.jobs.list_runs.assert_called_once()
 
 
-def test_no_step_in_repair_run(ws):
-    with pytest.raises(KeyError):
-        repair_run(ws, "")
+def test_no_step_in_repair_run(ws, caplog):
+    repair_run(ws, "")
+    assert '--step is a required parameter' in caplog.messages
 
 
 def test_revert_migrated_tables(ws, caplog):
@@ -440,7 +440,7 @@ def test_move_no_catalog(ws, caplog):
     prompts = MockPrompts({})
     move(ws, prompts, "", "", "", "", "")
 
-    assert 'Please enter from_catalog and to_catalog details' in caplog.messages
+    assert '--from_catalog and --to_catalog are required parameter' in caplog.messages
 
 
 def test_move_same_schema(ws, caplog):
@@ -455,7 +455,7 @@ def test_move_no_schema(ws, caplog):
     move(ws, prompts, "SrcCat", "", "*", "TgtCat", "")
 
     assert (
-        'Please enter from_schema, to_schema and from_table (enter * for migrating all tables) details.'
+        '--from_schema, --to_schema and --from_table (enter * for migrating all tables) are required parameter.'
         in caplog.messages
     )
 
@@ -477,7 +477,7 @@ def test_move_aborted_via_prompt(ws):
 def test_alias_no_catalog(ws, caplog):
     alias(ws, "", "", "", "", "")
 
-    assert "Please enter from_catalog and to_catalog details" in caplog.messages
+    assert "--from_catalog and --to_catalog are required parameter" in caplog.messages
 
 
 def test_alias_same_schema(ws, caplog):
@@ -490,7 +490,7 @@ def test_alias_no_schema(ws, caplog):
     alias(ws, "SrcCat", "", "*", "TgtCat", "")
 
     assert (
-        'Please enter from_schema, to_schema and from_table (enter * for migrating all tables) details.'
+        '--from_schema, --to_schema and --from_table (enter * for migrating all tables) are required parameter.'
         in caplog.messages
     )
 
