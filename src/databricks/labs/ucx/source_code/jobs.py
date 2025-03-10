@@ -294,9 +294,6 @@ class WorkflowTaskContainer(SourceContainer):
             )
             return
 
-        if not pipeline:
-            return
-
         if not pipeline.spec or not pipeline.spec.libraries:
             return
 
