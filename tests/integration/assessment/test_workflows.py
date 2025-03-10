@@ -4,6 +4,8 @@ from databricks.sdk.errors import NotFound, InvalidParameterValue
 from databricks.sdk.retries import retried
 from databricks.sdk.service.iam import PermissionLevel
 
+from databricks.labs.ucx.source_code.jobs import JobProblem
+
 
 @retried(on=[NotFound, InvalidParameterValue])
 def test_running_real_assessment_job(
@@ -47,5 +49,9 @@ def test_running_real_assessment_job(
     assert actual_tables == expected_tables
 
     query = f"SELECT * FROM {installation_ctx.inventory_database}.workflow_problems"
-    workflow_problems_without_path = [problem for problem in sql_backend.fetch(query) if problem["path"] == "UNKNOWN"]
+    workflow_problems_without_path = []
+    for record in sql_backend.fetch(query):
+        job_problem = JobProblem(**record.asDict())
+        if job_problem.has_missing_path():
+            workflow_problems_without_path.append(job_problem)
     assert not workflow_problems_without_path
