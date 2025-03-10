@@ -173,22 +173,22 @@ lock = Lock()
 
 # DBTITLE 1,Assessment Export
 FILE_NAME = "ucx_assessment_main.xlsx"
-TMP_PATH = f"/Workspace{{ctx.installation.install_folder()}}/tmp/"
+UCX_PATH = f"/Workspace{{ctx.installation.install_folder()}}"
 DOWNLOAD_PATH = "/dbfs/FileStore/excel-export"
 
 
 def _cleanup() -> None:
     '''Move the temporary results file to the download path and clean up the temp directory.'''
     shutil.move(
-        os.path.join(TMP_PATH, FILE_NAME),
+        os.path.join(UCX_PATH + "/tmp/", FILE_NAME),
         os.path.join(DOWNLOAD_PATH, FILE_NAME),
     )
-    shutil.rmtree(TMP_PATH)
+    shutil.rmtree(UCX_PATH + "/tmp/")
 
 
 def _prepare_directories() -> None:
     '''Ensure that the necessary directories exist.'''
-    os.makedirs(TMP_PATH, exist_ok=True)
+    os.makedirs(UCX_PATH + "/tmp/", exist_ok=True)
     os.makedirs(DOWNLOAD_PATH, exist_ok=True)
 
 
@@ -214,14 +214,13 @@ def export_results() -> None:
     '''Main method to export results to an Excel file.'''
     _prepare_directories()
 
-    dashboard_path = (
-        Path(ctx.installation.install_folder())
-        / "dashboards/[UCX] UCX  Assessment (Main).lvdash.json"
-    )
+    assessment_dashboard = next(d for d in os.listdir(UCX_PATH + "/dashboards") if "Assessment (Main)" in d)
+    dashboard_path = Path(ctx.installation.install_folder()) / "dashboards" / assessment_dashboard
+
     dashboard = Dashboards(ctx.workspace_client)
     dashboard_datasets = dashboard.get_dashboard(dashboard_path).datasets
     try:
-        target = TMP_PATH + "/ucx_assessment_main.xlsx"
+        target = UCX_PATH + "/tmp/ucx_assessment_main.xlsx"
         with pd.ExcelWriter(target, engine="xlsxwriter") as writer:
             tasks = []
             for dataset in dashboard_datasets:
