@@ -219,6 +219,7 @@ def export_results() -> None:
 
     dashboard = Dashboards(ctx.workspace_client)
     dashboard_datasets = dashboard.get_dashboard(dashboard_path).datasets
+
     try:
         target = UCX_PATH + "/tmp/ucx_assessment_main.xlsx"
         with pd.ExcelWriter(target, engine="xlsxwriter") as writer:
