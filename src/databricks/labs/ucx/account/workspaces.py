@@ -89,15 +89,6 @@ class AccountWorkspaces:
         for group_name, valid_group in self.all_valid_workspace_groups.items():
             self._create_account_level_groups(valid_group)
 
-        # for group_name, valid_group in all_valid_workspace_groups.items():
-        #     acc_group = self._try_create_account_groups(group_name, acc_groups)
-        #
-        #     if not acc_group or not valid_group.members or not acc_group.id:
-        #         continue
-        #     if len(valid_group.members) > 0:
-        #         self._add_members_to_acc_group(self._ac, acc_group.id, group_name, valid_group)
-        #     logger.info(f"Group {group_name} created in the account")
-
     def _create_account_level_groups(self, valid_group):
         """
         Function recursively crawls through all group and nested groups to create account level groups
