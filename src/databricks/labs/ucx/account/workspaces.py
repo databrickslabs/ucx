@@ -1,5 +1,5 @@
 import logging
-from typing import ClassVar
+from typing import ClassVar, Optional, List
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.tui import Prompts
@@ -16,6 +16,9 @@ class AccountWorkspaces:
     def __init__(self, account_client: AccountClient, include_workspace_ids: list[int] | None = None):
         self._ac = account_client
         self._include_workspace_ids = include_workspace_ids if include_workspace_ids else []
+        self.acc_groups:dict[str | None, list[ComplexValue] | None] = {}
+        self.created_groups:dict[str | None, list[ComplexValue] | None] = {}
+        self.all_valid_workspace_groups:dict[str, Group] = {}
 
     def _workspaces(self):
         for workspace in self._ac.workspaces.list():
@@ -77,20 +80,51 @@ class AccountWorkspaces:
                 logger.warning(f"Failed to save workspace info for {ws.config.host}")
 
     def create_account_level_groups(self, prompts: Prompts):
-        acc_groups = self._get_account_groups()
+        self.acc_groups = self._get_account_groups()
         workspace_ids = [workspace.workspace_id for workspace in self._workspaces()]
         if not workspace_ids:
             raise ValueError("The workspace ids provided are not found in the account, Please check and try again.")
-        all_valid_workspace_groups = self._get_valid_workspaces_groups(prompts, workspace_ids)
+        self.all_valid_workspace_groups = self._get_valid_workspaces_groups(prompts, workspace_ids)
 
-        for group_name, valid_group in all_valid_workspace_groups.items():
-            acc_group = self._try_create_account_groups(group_name, acc_groups)
+        for group_name, valid_group in self.all_valid_workspace_groups.items():
+            self._create_account_level_groups(valid_group)
 
-            if not acc_group or not valid_group.members or not acc_group.id:
-                continue
-            if len(valid_group.members) > 0:
-                self._add_members_to_acc_group(self._ac, acc_group.id, group_name, valid_group)
-            logger.info(f"Group {group_name} created in the account")
+        # for group_name, valid_group in all_valid_workspace_groups.items():
+        #     acc_group = self._try_create_account_groups(group_name, acc_groups)
+        #
+        #     if not acc_group or not valid_group.members or not acc_group.id:
+        #         continue
+        #     if len(valid_group.members) > 0:
+        #         self._add_members_to_acc_group(self._ac, acc_group.id, group_name, valid_group)
+        #     logger.info(f"Group {group_name} created in the account")
+
+    def _create_account_level_groups(self, valid_group):
+        """
+        Function recursively crawls through all group and nested groups to create account level groups
+        """
+
+        members_to_add = []
+        for member in valid_group.members:
+            if member.ref.startswith("Users"):
+                members_to_add.append(member)
+            elif member.ref.startswith("Groups"):
+                if self.created_groups.get(member.display):
+                    members_to_add.append(self.created_groups[member.display])
+                else:
+                    self._create_account_level_groups(self.all_valid_workspace_groups[member.display])
+                    created_acc_group = self.created_groups.get(member.display)
+                    members_to_add.append(ComplexValue(
+                        display=created_acc_group.display_name,
+                        ref=f"Groups/{created_acc_group.id}",
+                        value=created_acc_group.id
+                    ))
+
+        acc_group = self._try_create_account_groups(valid_group.display_name, self.acc_groups)
+        if acc_group:
+            if len(members_to_add) > 0:
+                self._add_members_to_acc_group(self._ac, acc_group.id, valid_group.display_name, members_to_add)
+            self.created_groups[valid_group.display_name] = acc_group
+
 
     def get_accessible_workspaces(self) -> list[Workspace]:
         """
@@ -139,9 +173,9 @@ class AccountWorkspaces:
             return None
 
     def _add_members_to_acc_group(
-        self, acc_client: AccountClient, acc_group_id: str, group_name: str, valid_group: Group
+        self, acc_client: AccountClient, acc_group_id: str, group_name: str, group_members: Optional[List[ComplexValue]]
     ):
-        for chunk in self._chunks(valid_group.members, 20):
+        for chunk in self._chunks(group_members, 20):
             logger.debug(f"Adding {len(chunk)} members to acc group {group_name}")
             acc_client.groups.patch(
                 acc_group_id,
