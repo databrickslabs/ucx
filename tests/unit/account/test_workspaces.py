@@ -68,12 +68,12 @@ def test_create_acc_groups_should_create_acc_group_if_no_group_found_in_account(
     group = Group(
         id="12",
         display_name="de",
-        members=[ComplexValue(display="test-user-1", value="20"), ComplexValue(display="test-user-2", value="21")],
+        members=[ComplexValue(display="test-user-1", value="20", ref="Users/20"), ComplexValue(display="test-user-2", value="21", ref="Users/21")],
         meta=ResourceMeta("WorkspaceGroup"),
     )
     group_2 = Group(
         display_name="no_id",
-        members=[ComplexValue(display="test-user-1", value="20"), ComplexValue(display="test-user-2", value="21")],
+        members=[ComplexValue(display="test-user-1", value="20", ref="Users/20"), ComplexValue(display="test-user-2", value="21", ref="Users/21")],
     )
 
     ws.groups.list.return_value = [group, group_2]
@@ -93,7 +93,7 @@ def test_create_acc_groups_should_create_acc_group_if_no_group_found_in_account(
             iam.Patch(
                 op=iam.PatchOp.ADD,
                 path='members',
-                value=[{'display': 'test-user-1', 'value': '20'}, {'display': 'test-user-2', 'value': '21'}],
+                value=[{'display': 'test-user-1', 'value': '20', '$ref': 'Users/20',}, {'display': 'test-user-2', 'value': '21', '$ref': 'Users/21',}],
             )
         ],
         schemas=[iam.PatchSchema.URN_IETF_PARAMS_SCIM_API_MESSAGES_2_0_PATCH_OP],
@@ -170,31 +170,31 @@ def test_create_acc_groups_should_create_acc_group_with_appropriate_members(acc_
         id="12",
         display_name="de",
         members=[
-            ComplexValue(display="test-user-1", value="1"),
-            ComplexValue(display="test-user-2", value="2"),
-            ComplexValue(display="test-user-3", value="3"),
-            ComplexValue(display="test-user-4", value="4"),
-            ComplexValue(display="test-user-5", value="5"),
-            ComplexValue(display="test-user-6", value="6"),
-            ComplexValue(display="test-user-7", value="7"),
-            ComplexValue(display="test-user-8", value="8"),
-            ComplexValue(display="test-user-9", value="9"),
-            ComplexValue(display="test-user-10", value="10"),
-            ComplexValue(display="test-user-11", value="11"),
-            ComplexValue(display="test-user-12", value="12"),
-            ComplexValue(display="test-user-13", value="13"),
-            ComplexValue(display="test-user-14", value="14"),
-            ComplexValue(display="test-user-15", value="15"),
-            ComplexValue(display="test-user-16", value="16"),
-            ComplexValue(display="test-user-17", value="17"),
-            ComplexValue(display="test-user-18", value="18"),
-            ComplexValue(display="test-user-19", value="19"),
-            ComplexValue(display="test-user-20", value="20"),
-            ComplexValue(display="test-user-21", value="21"),
-            ComplexValue(display="test-user-22", value="22"),
-            ComplexValue(display="test-user-23", value="23"),
-            ComplexValue(display="test-user-24", value="24"),
-            ComplexValue(display="test-user-25", value="25"),
+            ComplexValue(display="test-user-1", value="1", ref='Users/1'),
+            ComplexValue(display="test-user-2", value="2", ref='Users/2'),
+            ComplexValue(display="test-user-3", value="3", ref='Users/3'),
+            ComplexValue(display="test-user-4", value="4", ref='Users/4'),
+            ComplexValue(display="test-user-5", value="5", ref='Users/5'),
+            ComplexValue(display="test-user-6", value="6", ref='Users/6'),
+            ComplexValue(display="test-user-7", value="7", ref='Users/7'),
+            ComplexValue(display="test-user-8", value="8", ref='Users/8'),
+            ComplexValue(display="test-user-9", value="9", ref='Users/9'),
+            ComplexValue(display="test-user-10", value="10", ref='Users/10'),
+            ComplexValue(display="test-user-11", value="11", ref='Users/11'),
+            ComplexValue(display="test-user-12", value="12", ref='Users/12'),
+            ComplexValue(display="test-user-13", value="13", ref='Users/13'),
+            ComplexValue(display="test-user-14", value="14", ref='Users/14'),
+            ComplexValue(display="test-user-15", value="15", ref='Users/15'),
+            ComplexValue(display="test-user-16", value="16", ref='Users/16'),
+            ComplexValue(display="test-user-17", value="17", ref='Users/17'),
+            ComplexValue(display="test-user-18", value="18", ref='Users/18'),
+            ComplexValue(display="test-user-19", value="19", ref='Users/19'),
+            ComplexValue(display="test-user-20", value="20", ref='Users/20'),
+            ComplexValue(display="test-user-21", value="21", ref='Users/21'),
+            ComplexValue(display="test-user-22", value="22", ref='Users/22'),
+            ComplexValue(display="test-user-23", value="23", ref='Users/23'),
+            ComplexValue(display="test-user-24", value="24", ref='Users/24'),
+            ComplexValue(display="test-user-25", value="25", ref='Users/25'),
         ],
     )
 
@@ -215,26 +215,26 @@ def test_create_acc_groups_should_create_acc_group_with_appropriate_members(acc_
                 op=iam.PatchOp.ADD,
                 path='members',
                 value=[
-                    {'display': 'test-user-1', 'value': '1'},
-                    {'display': 'test-user-2', 'value': '2'},
-                    {'display': 'test-user-3', 'value': '3'},
-                    {'display': 'test-user-4', 'value': '4'},
-                    {'display': 'test-user-5', 'value': '5'},
-                    {'display': 'test-user-6', 'value': '6'},
-                    {'display': 'test-user-7', 'value': '7'},
-                    {'display': 'test-user-8', 'value': '8'},
-                    {'display': 'test-user-9', 'value': '9'},
-                    {'display': 'test-user-10', 'value': '10'},
-                    {'display': 'test-user-11', 'value': '11'},
-                    {'display': 'test-user-12', 'value': '12'},
-                    {'display': 'test-user-13', 'value': '13'},
-                    {'display': 'test-user-14', 'value': '14'},
-                    {'display': 'test-user-15', 'value': '15'},
-                    {'display': 'test-user-16', 'value': '16'},
-                    {'display': 'test-user-17', 'value': '17'},
-                    {'display': 'test-user-18', 'value': '18'},
-                    {'display': 'test-user-19', 'value': '19'},
-                    {'display': 'test-user-20', 'value': '20'},
+                    {'display': 'test-user-1', 'value': '1', '$ref': 'Users/1'},
+                    {'display': 'test-user-2', 'value': '2', '$ref': 'Users/2'},
+                    {'display': 'test-user-3', 'value': '3', '$ref': 'Users/3'},
+                    {'display': 'test-user-4', 'value': '4', '$ref': 'Users/4'},
+                    {'display': 'test-user-5', 'value': '5', '$ref': 'Users/5'},
+                    {'display': 'test-user-6', 'value': '6', '$ref': 'Users/6'},
+                    {'display': 'test-user-7', 'value': '7', '$ref': 'Users/7'},
+                    {'display': 'test-user-8', 'value': '8', '$ref': 'Users/8'},
+                    {'display': 'test-user-9', 'value': '9', '$ref': 'Users/9'},
+                    {'display': 'test-user-10', 'value': '10', '$ref': 'Users/10'},
+                    {'display': 'test-user-11', 'value': '11', '$ref': 'Users/11'},
+                    {'display': 'test-user-12', 'value': '12', '$ref': 'Users/12'},
+                    {'display': 'test-user-13', 'value': '13', '$ref': 'Users/13'},
+                    {'display': 'test-user-14', 'value': '14', '$ref': 'Users/14'},
+                    {'display': 'test-user-15', 'value': '15', '$ref': 'Users/15'},
+                    {'display': 'test-user-16', 'value': '16', '$ref': 'Users/16'},
+                    {'display': 'test-user-17', 'value': '17', '$ref': 'Users/17'},
+                    {'display': 'test-user-18', 'value': '18', '$ref': 'Users/18'},
+                    {'display': 'test-user-19', 'value': '19', '$ref': 'Users/19'},
+                    {'display': 'test-user-20', 'value': '20', '$ref': 'Users/20'},
                 ],
             )
         ],
@@ -247,11 +247,11 @@ def test_create_acc_groups_should_create_acc_group_with_appropriate_members(acc_
                 op=iam.PatchOp.ADD,
                 path='members',
                 value=[
-                    {'display': 'test-user-21', 'value': '21'},
-                    {'display': 'test-user-22', 'value': '22'},
-                    {'display': 'test-user-23', 'value': '23'},
-                    {'display': 'test-user-24', 'value': '24'},
-                    {'display': 'test-user-25', 'value': '25'},
+                    {'display': 'test-user-21', 'value': '21', '$ref': 'Users/21'},
+                    {'display': 'test-user-22', 'value': '22', '$ref': 'Users/22'},
+                    {'display': 'test-user-23', 'value': '23', '$ref': 'Users/23'},
+                    {'display': 'test-user-24', 'value': '24', '$ref': 'Users/24'},
+                    {'display': 'test-user-25', 'value': '25', '$ref': 'Users/25'},
                 ],
             )
         ],
@@ -263,7 +263,7 @@ def test_create_acc_groups_should_not_create_group_if_exists_in_account(acc_clie
     group = Group(
         id="12",
         display_name="de",
-        members=[ComplexValue(display="test-user-1", value="20"), ComplexValue(display="test-user-2", value="21")],
+        members=[ComplexValue(display="test-user-1", value="20", ref="Users/20" ), ComplexValue(display="test-user-2", value="21", ref="Users/21")],
     )
     group_2 = Group(display_name="de_invalid")
     acc_client.groups.list.return_value = [group, group_2]
@@ -331,7 +331,7 @@ def test_create_acc_groups_should_filter_groups_accross_workspaces(acc_client):
     group = Group(
         id="12",
         display_name="de",
-        members=[ComplexValue(display="test-user-1", value="20"), ComplexValue(display="test-user-2", value="21")],
+        members=[ComplexValue(display="test-user-1", value="20", ref="Users/20"), ComplexValue(display="test-user-2", value="21", ref="Users/21")],
     )
 
     ws1.groups.list.return_value = [group]
@@ -352,7 +352,7 @@ def test_create_acc_groups_should_filter_groups_accross_workspaces(acc_client):
             iam.Patch(
                 op=iam.PatchOp.ADD,
                 path='members',
-                value=[{'display': 'test-user-1', 'value': '20'}, {'display': 'test-user-2', 'value': '21'}],
+                value=[{'display': 'test-user-1', 'value': '20', '$ref': 'Users/20'}, {'display': 'test-user-2', 'value': '21', '$ref': 'Users/21'}],
             )
         ],
         schemas=[iam.PatchSchema.URN_IETF_PARAMS_SCIM_API_MESSAGES_2_0_PATCH_OP],
@@ -376,12 +376,12 @@ def test_create_acc_groups_should_create_acc_group_if_exist_in_other_workspaces_
     group = Group(
         id="12",
         display_name="de",
-        members=[ComplexValue(display="test-user-1", value="20"), ComplexValue(display="test-user-2", value="21")],
+        members=[ComplexValue(display="test-user-1", value="20", ref="Users/20"), ComplexValue(display="test-user-2", value="21", ref="Users/21")],
     )
     group_2 = Group(
         id="12",
         display_name="de",
-        members=[ComplexValue(display="test-user-1", value="20")],
+        members=[ComplexValue(display="test-user-1", value="20", ref="Users/20")],
     )
 
     ws1.groups.list.return_value = [group]
@@ -436,7 +436,7 @@ def test_create_acc_groups_should_not_throw_if_acc_grp_exists(acc_client):
     ws = create_autospec(WorkspaceClient)
     account_workspaces = AccountWorkspaces(acc_client, [123])
 
-    group = Group(id="12", display_name="de", members=[ComplexValue(display="test-user-1", value="1")])
+    group = Group(id="12", display_name="de", members=[ComplexValue(display="test-user-1", value="1", ref="Users/1")])
 
     ws.groups.list.return_value = [group]
     ws.groups.get.return_value = group

@@ -114,6 +114,7 @@ class AccountWorkspaces:
 
         acc_group = self._try_create_account_groups(valid_group.display_name, self.acc_groups)
         if acc_group:
+            logger.info(f"Successfully created account group {acc_group.display_name}")
             if len(members_to_add) > 0:
                 self._add_members_to_acc_group(self._ac, acc_group.id, valid_group.display_name, members_to_add)
             self.created_groups[valid_group.display_name] = acc_group
