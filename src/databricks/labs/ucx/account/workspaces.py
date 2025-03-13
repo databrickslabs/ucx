@@ -1,5 +1,5 @@
 import logging
-from typing import ClassVar, Optional, List
+from typing import ClassVar
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.tui import Prompts
@@ -16,9 +16,9 @@ class AccountWorkspaces:
     def __init__(self, account_client: AccountClient, include_workspace_ids: list[int] | None = None):
         self._ac = account_client
         self._include_workspace_ids = include_workspace_ids if include_workspace_ids else []
-        self.acc_groups:dict[str | None, list[ComplexValue] | None] = {}
-        self.created_groups:dict[str | None, list[ComplexValue] | None] = {}
-        self.all_valid_workspace_groups:dict[str, Group] = {}
+        self.acc_groups: dict[str | None, list[ComplexValue] | None] = {}
+        self.created_groups: dict[str | None, list[ComplexValue] | None] = {}
+        self.all_valid_workspace_groups: dict[str, Group] = {}
 
     def _workspaces(self):
         for workspace in self._ac.workspaces.list():
@@ -86,7 +86,7 @@ class AccountWorkspaces:
             raise ValueError("The workspace ids provided are not found in the account, Please check and try again.")
         self.all_valid_workspace_groups = self._get_valid_workspaces_groups(prompts, workspace_ids)
 
-        for group_name, valid_group in self.all_valid_workspace_groups.items():
+        for _, valid_group in self.all_valid_workspace_groups.items():
             self._create_account_level_groups(valid_group)
 
     def _create_account_level_groups(self, valid_group):
@@ -104,18 +104,19 @@ class AccountWorkspaces:
                 else:
                     self._create_account_level_groups(self.all_valid_workspace_groups[member.display])
                     created_acc_group = self.created_groups.get(member.display)
-                    members_to_add.append(ComplexValue(
-                        display=created_acc_group.display_name,
-                        ref=f"Groups/{created_acc_group.id}",
-                        value=created_acc_group.id
-                    ))
+                    members_to_add.append(
+                        ComplexValue(
+                            display=created_acc_group.display_name,
+                            ref=f"Groups/{created_acc_group.id}",
+                            value=created_acc_group.id,
+                        )
+                    )
 
         acc_group = self._try_create_account_groups(valid_group.display_name, self.acc_groups)
         if acc_group:
             if len(members_to_add) > 0:
                 self._add_members_to_acc_group(self._ac, acc_group.id, valid_group.display_name, members_to_add)
             self.created_groups[valid_group.display_name] = acc_group
-
 
     def get_accessible_workspaces(self) -> list[Workspace]:
         """
@@ -164,7 +165,7 @@ class AccountWorkspaces:
             return None
 
     def _add_members_to_acc_group(
-        self, acc_client: AccountClient, acc_group_id: str, group_name: str, group_members: Optional[List[ComplexValue]]
+        self, acc_client: AccountClient, acc_group_id: str, group_name: str, group_members: list[ComplexValue] | None
     ):
         for chunk in self._chunks(group_members, 20):
             logger.debug(f"Adding {len(chunk)} members to acc group {group_name}")
