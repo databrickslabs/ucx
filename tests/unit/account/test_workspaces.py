@@ -68,12 +68,18 @@ def test_create_acc_groups_should_create_acc_group_if_no_group_found_in_account(
     group = Group(
         id="12",
         display_name="de",
-        members=[ComplexValue(display="test-user-1", value="20", ref="Users/20"), ComplexValue(display="test-user-2", value="21", ref="Users/21")],
+        members=[
+            ComplexValue(display="test-user-1", value="20", ref="Users/20"),
+            ComplexValue(display="test-user-2", value="21", ref="Users/21"),
+        ],
         meta=ResourceMeta("WorkspaceGroup"),
     )
     group_2 = Group(
         display_name="no_id",
-        members=[ComplexValue(display="test-user-1", value="20", ref="Users/20"), ComplexValue(display="test-user-2", value="21", ref="Users/21")],
+        members=[
+            ComplexValue(display="test-user-1", value="20", ref="Users/20"),
+            ComplexValue(display="test-user-2", value="21", ref="Users/21"),
+        ],
     )
 
     ws.groups.list.return_value = [group, group_2]
@@ -93,7 +99,18 @@ def test_create_acc_groups_should_create_acc_group_if_no_group_found_in_account(
             iam.Patch(
                 op=iam.PatchOp.ADD,
                 path='members',
-                value=[{'display': 'test-user-1', 'value': '20', '$ref': 'Users/20',}, {'display': 'test-user-2', 'value': '21', '$ref': 'Users/21',}],
+                value=[
+                    {
+                        'display': 'test-user-1',
+                        'value': '20',
+                        '$ref': 'Users/20',
+                    },
+                    {
+                        'display': 'test-user-2',
+                        'value': '21',
+                        '$ref': 'Users/21',
+                    },
+                ],
             )
         ],
         schemas=[iam.PatchSchema.URN_IETF_PARAMS_SCIM_API_MESSAGES_2_0_PATCH_OP],
@@ -263,7 +280,10 @@ def test_create_acc_groups_should_not_create_group_if_exists_in_account(acc_clie
     group = Group(
         id="12",
         display_name="de",
-        members=[ComplexValue(display="test-user-1", value="20", ref="Users/20" ), ComplexValue(display="test-user-2", value="21", ref="Users/21")],
+        members=[
+            ComplexValue(display="test-user-1", value="20", ref="Users/20"),
+            ComplexValue(display="test-user-2", value="21", ref="Users/21"),
+        ],
     )
     group_2 = Group(display_name="de_invalid")
     acc_client.groups.list.return_value = [group, group_2]
@@ -331,7 +351,10 @@ def test_create_acc_groups_should_filter_groups_accross_workspaces(acc_client):
     group = Group(
         id="12",
         display_name="de",
-        members=[ComplexValue(display="test-user-1", value="20", ref="Users/20"), ComplexValue(display="test-user-2", value="21", ref="Users/21")],
+        members=[
+            ComplexValue(display="test-user-1", value="20", ref="Users/20"),
+            ComplexValue(display="test-user-2", value="21", ref="Users/21"),
+        ],
     )
 
     ws1.groups.list.return_value = [group]
@@ -352,7 +375,10 @@ def test_create_acc_groups_should_filter_groups_accross_workspaces(acc_client):
             iam.Patch(
                 op=iam.PatchOp.ADD,
                 path='members',
-                value=[{'display': 'test-user-1', 'value': '20', '$ref': 'Users/20'}, {'display': 'test-user-2', 'value': '21', '$ref': 'Users/21'}],
+                value=[
+                    {'display': 'test-user-1', 'value': '20', '$ref': 'Users/20'},
+                    {'display': 'test-user-2', 'value': '21', '$ref': 'Users/21'},
+                ],
             )
         ],
         schemas=[iam.PatchSchema.URN_IETF_PARAMS_SCIM_API_MESSAGES_2_0_PATCH_OP],
@@ -376,7 +402,10 @@ def test_create_acc_groups_should_create_acc_group_if_exist_in_other_workspaces_
     group = Group(
         id="12",
         display_name="de",
-        members=[ComplexValue(display="test-user-1", value="20", ref="Users/20"), ComplexValue(display="test-user-2", value="21", ref="Users/21")],
+        members=[
+            ComplexValue(display="test-user-1", value="20", ref="Users/20"),
+            ComplexValue(display="test-user-2", value="21", ref="Users/21"),
+        ],
     )
     group_2 = Group(
         id="12",

@@ -86,10 +86,10 @@ class AccountWorkspaces:
             raise ValueError("The workspace ids provided are not found in the account, Please check and try again.")
         self.all_valid_workspace_groups = self._get_valid_workspaces_groups(prompts, workspace_ids)
 
-        for _, valid_group in self.all_valid_workspace_groups.items():
-            self._create_account_level_groups(valid_group)
+        for group_name, valid_group in self.all_valid_workspace_groups.items():
+            self._create_account_level_groups(group_name, valid_group)
 
-    def _create_account_level_groups(self, valid_group):
+    def _create_account_level_groups(self, group_name, valid_group):
         """
         Function recursively crawls through all group and nested groups to create account level groups
         """
@@ -102,7 +102,7 @@ class AccountWorkspaces:
                 if self.created_groups.get(member.display):
                     members_to_add.append(self.created_groups[member.display])
                 else:
-                    self._create_account_level_groups(self.all_valid_workspace_groups[member.display])
+                    self._create_account_level_groups(member.display, self.all_valid_workspace_groups[member.display])
                     created_acc_group = self.created_groups.get(member.display)
                     members_to_add.append(
                         ComplexValue(
@@ -112,7 +112,7 @@ class AccountWorkspaces:
                         )
                     )
 
-        acc_group = self._try_create_account_groups(valid_group.display_name, self.acc_groups)
+        acc_group = self._try_create_account_groups(group_name, self.acc_groups)
         if acc_group:
             logger.info(f"Successfully created account group {acc_group.display_name}")
             if len(members_to_add) > 0:
