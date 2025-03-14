@@ -77,9 +77,10 @@ def test_create_account_level_groups_nested_groups(
     watchdog_purge_suffix,
 ):
     suffix = f"{make_random(4).lower()}-{watchdog_purge_suffix}"
-    regular_group = make_group(display_name=f"created_by_ucx_regular_group1-{suffix}", members=[make_user().id, make_user().id])
+    regular_group = make_group(
+        display_name=f"created_by_ucx_regular_group1-{suffix}", members=[make_user().id, make_user().id]
+    )
     make_group(display_name=f"created_by_ucx_regular_group2-{suffix}", members=[make_user().id, make_user().id])
-
 
     group_display_name = f"created_by_ucx_nested_group-{suffix}"
     nested_group = make_group(display_name=group_display_name, members=[make_user().id, regular_group.id])
