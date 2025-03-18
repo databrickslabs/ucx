@@ -99,9 +99,16 @@ class AccountWorkspaces:
             if member.ref.startswith("Users"):
                 members_to_add.append(member)
             elif member.ref.startswith("Groups"):
-                if not self.created_groups.get(member.display):
-                    self._create_account_level_groups(member.display, self.all_valid_workspace_groups[member.display])
+
+                # check if workspace group is already created at account level
                 created_acc_group = self.created_groups.get(member.display)
+
+                if not created_acc_group:
+                    # if there is no account group created for the workspace group, create one
+                    self._create_account_level_groups(member.display, self.all_valid_workspace_groups[member.display])
+                    created_acc_group = self.created_groups.get(member.display)
+
+                # the AccountGroupsAPI expects the members to be in the form of ComplexValue
                 members_to_add.append(
                     ComplexValue(
                         display=created_acc_group.display_name,
