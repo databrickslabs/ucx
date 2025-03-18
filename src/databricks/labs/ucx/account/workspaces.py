@@ -99,18 +99,16 @@ class AccountWorkspaces:
             if member.ref.startswith("Users"):
                 members_to_add.append(member)
             elif member.ref.startswith("Groups"):
-                if self.created_groups.get(member.display):
-                    members_to_add.append(self.created_groups[member.display])
-                else:
+                if not self.created_groups.get(member.display):
                     self._create_account_level_groups(member.display, self.all_valid_workspace_groups[member.display])
-                    created_acc_group = self.created_groups.get(member.display)
-                    members_to_add.append(
-                        ComplexValue(
-                            display=created_acc_group.display_name,
-                            ref=f"Groups/{created_acc_group.id}",
-                            value=created_acc_group.id,
-                        )
+                created_acc_group = self.created_groups.get(member.display)
+                members_to_add.append(
+                    ComplexValue(
+                        display=created_acc_group.display_name,
+                        ref=f"Groups/{created_acc_group.id}",
+                        value=created_acc_group.id,
                     )
+                )
 
         acc_group = self._try_create_account_groups(group_name, self.acc_groups)
         if acc_group:
