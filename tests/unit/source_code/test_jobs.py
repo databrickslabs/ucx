@@ -34,6 +34,7 @@ from databricks.labs.ucx.source_code.linters.jobs import WorkflowLinter
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader, NotebookResolver
 from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
 from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
+from databricks.sdk.errors.platform import ResourceDoesNotExist
 
 
 def test_job_problem_as_message() -> None:
@@ -485,6 +486,14 @@ def test_workflow_linter_dlt_pipeline_task(graph) -> None:
     problems = workflow_task_container.build_dependency_graph(graph)
     assert len(problems) == 4
     ws.assert_not_called()
+
+    task = jobs.Task(task_key="test", pipeline_task=jobs.PipelineTask(pipeline_id='1234'))
+
+    ws.pipelines.get.side_effect = ResourceDoesNotExist("Could not find pipeline: 1234")
+
+    workflow_task_container = WorkflowTaskContainer(ws, task, Job())
+    problems = workflow_task_container.build_dependency_graph(graph)
+    assert len(problems) == 1
 
 
 def test_xxx(graph) -> None:
