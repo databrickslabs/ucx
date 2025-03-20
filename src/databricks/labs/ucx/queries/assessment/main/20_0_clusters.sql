@@ -5,11 +5,11 @@
 --overrides '{"spec":{
     "encodings":{
       "columns": [
-        {"fieldName": "cluster_id", "booleanValues": ["false", "true"], "linkUrlTemplate": "/compute/{{ @ }}", "linkTextTemplate": "{{ @ }}", "linkTitleTemplate": "{{ @ }}", "linkOpenInNewTab": true, "type": "string", "displayAs": "link", "title": "cluster_id"},
-        {"fieldName": "cluster_name", "booleanValues": ["false", "true"], "linkUrlTemplate": "/compute/{{ cluster_id }}", "linkTextTemplate": "{{ @ }}", "linkTitleTemplate": "{{ @ }}", "linkOpenInNewTab": true, "type": "string", "displayAs": "link",  "title": "cluster_name"},
+        {"fieldName": "cluster_id", "booleanValues": ["false", "true"], "linkUrlTemplate": "/compute/clusters/{{ @ }}", "linkTextTemplate": "{{ @ }}", "linkTitleTemplate": "{{ @ }}", "linkOpenInNewTab": true, "type": "string", "displayAs": "link", "title": "cluster_id"},
+        {"fieldName": "cluster_name", "booleanValues": ["false", "true"], "linkUrlTemplate": "/compute/clusters/{{ cluster_id }}", "linkTextTemplate": "{{ @ }}", "linkTitleTemplate": "{{ @ }}", "linkOpenInNewTab": true, "type": "string", "displayAs": "link",  "title": "cluster_name"},
         {"fieldName": "finding", "booleanValues": ["false", "true"], "type": "string", "displayAs": "string", "title": "finding"},
-        {"fieldName": "creator", "booleanValues": ["false", "true"], "type": "string", "displayAs": "string", "title": "creator"}"},
-      ]},
+        {"fieldName": "creator", "booleanValues": ["false", "true"], "type": "string", "displayAs": "string", "title": "creator"}
+      ]}
   }}'
 */
 SELECT
