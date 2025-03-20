@@ -75,6 +75,7 @@ def test_create_account_level_groups_nested_groups(
     make_random,
     clean_account_level_groups,
     watchdog_purge_suffix,
+    runtime_ctx
 ):
     suffix = f"{make_random(4).lower()}-{watchdog_purge_suffix}"
     regular_group = make_group(
@@ -96,3 +97,6 @@ def test_create_account_level_groups_nested_groups(
     group = get_group(group_display_name)
     assert group
     assert len(group.members) == len(nested_group.members)
+
+    assert runtime_ctx.group_manager.validate_group_membership()
+
