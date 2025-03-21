@@ -65,17 +65,9 @@ def test_create_account_level_groups(
     group = get_group(group_display_name)
     assert group
 
-
+@pytest.mark.repeat(10)
 def test_create_account_level_groups_nested_groups(
-    make_ucx_group,
-    make_group,
-    make_user,
-    acc,
-    ws,
-    make_random,
-    clean_account_level_groups,
-    watchdog_purge_suffix,
-    runtime_ctx,
+    make_group, make_user, acc, ws, make_random, clean_account_level_groups, watchdog_purge_suffix, runtime_ctx, caplog
 ):
     suffix = f"{make_random(4).lower()}-{watchdog_purge_suffix}"
     regular_group = make_group(
@@ -98,4 +90,6 @@ def test_create_account_level_groups_nested_groups(
     assert group
     assert len(group.members) == len(nested_group.members)
 
-    assert runtime_ctx.group_manager.validate_group_membership()
+    runtime_ctx.group_manager.validate_group_membership()
+
+    assert 'There are no groups with different membership between account and workspace.' in caplog.text
