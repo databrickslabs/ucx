@@ -1,4 +1,20 @@
-/* --title 'Table Types' --filter name --width 6 */
+/*
+--title 'Table Types'
+--filter name
+--width 6
+--overrides '{"spec":{
+    "encodings":{
+      "columns": [
+        {"fieldName": "name", "booleanValues": ["false", "true"], "linkUrlTemplate": "/explore/data/hive_metastore/{{ @ }}", "linkTextTemplate": "{{ @ }}", "linkTitleTemplate": "{{ @ }}", "linkOpenInNewTab": true, "type": "string", "displayAs": "link", "title": "name"},
+        {"fieldName": "type", "booleanValues": ["false", "true"], "type": "string", "displayAs": "string", "title": "type"},
+        {"fieldName": "format", "booleanValues": ["false", "true"], "type": "string", "displayAs": "string", "title": "format"},
+        {"fieldName": "storage", "booleanValues": ["false", "true"], "type": "string", "displayAs": "string", "title": "storage"},
+        {"fieldName": "is_delta", "booleanValues": ["false", "true"], "type": "string", "displayAs": "string", "title": "is_delta"},
+        {"fieldName": "location", "booleanValues": ["false", "true"], "type": "string", "displayAs": "string", "title": "location"},
+        {"fieldName": "table_size", "booleanValues": ["false", "true"], "type": "string", "displayAs": "string", "title": "table_size"}
+      ]}
+  }}'
+*/
 SELECT
   CONCAT(tables.`database`, '.', tables.name) AS name,
   object_type AS type,
@@ -42,3 +58,4 @@ SELECT
 FROM inventory.tables AS tables
 LEFT OUTER JOIN inventory.table_size AS table_size
   ON tables.catalog = table_size.catalog AND tables.database = table_size.database AND tables.name = table_size.name
+ORDER by type, name
