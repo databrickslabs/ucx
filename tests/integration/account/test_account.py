@@ -65,7 +65,7 @@ def test_create_account_level_groups(
     group = get_group(group_display_name)
     assert group
 
-@pytest.mark.repeat(10)
+
 def test_create_account_level_groups_nested_groups(
     make_group, make_user, acc, ws, make_random, clean_account_level_groups, watchdog_purge_suffix, runtime_ctx, caplog
 ):
