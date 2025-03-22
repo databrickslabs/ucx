@@ -216,7 +216,7 @@ def export_results() -> None:
 
     dashboard_path = (
         Path(ctx.installation.install_folder())
-        / "dashboards/[UCX] UCX  Assessment (Main).lvdash.json"
+        / "dashboards/[UCX] Assessment (Main).lvdash.json"
     )
     dashboard = Dashboards(ctx.workspace_client)
     dashboard_datasets = dashboard.get_dashboard(dashboard_path).datasets
