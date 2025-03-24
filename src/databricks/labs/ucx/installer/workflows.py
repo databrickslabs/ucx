@@ -191,11 +191,19 @@ def _prepare_directories() -> None:
     os.makedirs(UCX_PATH / "tmp/", exist_ok=True)
     os.makedirs(DOWNLOAD_PATH, exist_ok=True)
 
+def _process_id_columns(df):
+    id_columns = [col for col in df.columns if 'id' in col.lower()]
+
+    if id_columns:
+        for col in id_columns:
+            df[col] = "'" + df[col].astype(str)
+    return df
 
 def _to_excel(dataset: Dataset, writer: ...) -> None:
     '''Execute a SQL query and write the result to an Excel sheet.'''
     worksheet_name = dataset.display_name[:31]
     df = spark.sql(dataset.query).toPandas()
+    df = _process_id_columns(df)
     with lock:
         df.to_excel(writer, sheet_name=worksheet_name, index=False)
 
