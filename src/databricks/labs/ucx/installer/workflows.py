@@ -173,7 +173,7 @@ lock = Lock()
 
 # DBTITLE 1,Assessment Export
 FILE_NAME = "ucx_assessment_main.xlsx"
-UCX_PATH = Path(f"/Workspace{ctx.installation.install_folder()}")
+UCX_PATH = Path(f"/Workspace{{ctx.installation.install_folder()}}")
 DOWNLOAD_PATH = Path("/dbfs/FileStore/excel-export/")
 
 
