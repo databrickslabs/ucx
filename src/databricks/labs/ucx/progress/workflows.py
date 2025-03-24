@@ -181,7 +181,7 @@ class MigrationProgress(Workflow):
         """Scans all jobs for migration issues in notebooks.
         Also stores direct filesystem accesses for display in the migration dashboard."""
         # TODO: Ensure these are captured in the history log.
-        ctx.workflow_linter.refresh_report(ctx.sql_backend, ctx.inventory_database)
+        ctx.workflow_linter.refresh_report(ctx.sql_backend, ctx.inventory_database, last_run_days=30)
 
     @job_task(
         depends_on=[
