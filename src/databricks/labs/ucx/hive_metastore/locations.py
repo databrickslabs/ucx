@@ -424,38 +424,6 @@ class MountsCrawler(CrawlerBase[Mount]):
                 deduplicated_mounts.append(obj)
         return deduplicated_mounts
 
-    @cached_property
-    def _jvm(self):
-        # pylint: disable=import-error,import-outside-toplevel,broad-exception-caught
-        try:
-            from pyspark.sql.session import SparkSession  # type: ignore[import-not-found]
-
-            spark = SparkSession.builder.getOrCreate()
-            return spark._jvm  # pylint: disable=protected-access
-        except Exception as err:
-            logger.warning(f"Cannot create Py4j proxy: {err}")
-            return None
-
-    def _resolve_dbfs_root(self) -> Mount | None:
-        # TODO: Consider deprecating this method and rely on the new API call
-        # pylint: disable=broad-exception-caught,too-many-try-statements
-        try:
-            jvm = self._jvm
-            if not jvm:
-                return None
-            uri = jvm.java.net.URI
-            some = jvm.scala.Some
-            hms_fed_dbfs_utils = jvm.com.databricks.sql.managedcatalog.connections.HmsFedDbfsUtils
-            root_location_opt = hms_fed_dbfs_utils.resolveDbfsPath(some(uri("dbfs:/user/hive/warehouse")))
-            if root_location_opt.isDefined():
-                source: str = root_location_opt.get().toString()
-                source = source.removesuffix('user/hive/warehouse')
-                return Mount("/", source)
-            return None
-        except Exception as err:
-            logger.warning(f"Failed to resolve DBFS root location: {err}")
-            return None
-
     def _crawl(self) -> Iterable[Mount]:
         mounts = []
         try:

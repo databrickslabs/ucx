@@ -200,6 +200,15 @@ PIP_INDEX_URL="https://url-to-company-hosted-pypi.internal" databricks labs inst
 
 During installation reply *yes* to the question "Does the given workspace block Internet access"?
 
+In case if host has no access to github, then ucx installation will not be able to download the files locally and fail.
+In order to address that, follow the steps below
+ - install ucx on a host which has access to github using the instruction above
+ - zip the installation from ~/.databricks/labs/ucx
+ - copy the zip file to the target host and unzip
+Now the installation can be done in offline mode (ensure databricks cli is upgrade to version v0.244.0 or higher)
+```commandline
+PIP_INDEX_URL="https://url-to-company-hosted-pypi.internal" databricks labs install ucx --offline=true
+```
 
 
 ## Upgrading UCX for newer versions
