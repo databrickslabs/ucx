@@ -117,6 +117,12 @@ class AccountWorkspaces:
                     )
                 )
 
+        if group_name in self.acc_groups:
+            logger.info(f"Group {group_name} already exist in the account, ignoring")
+            acc_group = self.acc_groups[group_name]
+            self.created_groups[valid_group.display_name] = acc_group
+            return
+
         acc_group = self._try_create_account_groups(group_name, self.acc_groups)
         if acc_group:
             logger.info(f"Successfully created account group {acc_group.display_name}")
