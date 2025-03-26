@@ -173,29 +173,37 @@ lock = Lock()
 
 # DBTITLE 1,Assessment Export
 FILE_NAME = "ucx_assessment_main.xlsx"
-TMP_PATH = f"/Workspace{{ctx.installation.install_folder()}}/tmp/"
-DOWNLOAD_PATH = "/dbfs/FileStore/excel-export"
+UCX_PATH = Path(f"/Workspace{{ctx.installation.install_folder()}}")
+DOWNLOAD_PATH = Path("/dbfs/FileStore/excel-export/")
 
 
 def _cleanup() -> None:
     '''Move the temporary results file to the download path and clean up the temp directory.'''
     shutil.move(
-        os.path.join(TMP_PATH, FILE_NAME),
-        os.path.join(DOWNLOAD_PATH, FILE_NAME),
+        UCX_PATH / "tmp" / FILE_NAME,
+        DOWNLOAD_PATH / FILE_NAME,
     )
-    shutil.rmtree(TMP_PATH)
+    shutil.rmtree(UCX_PATH / "tmp/")
 
 
 def _prepare_directories() -> None:
     '''Ensure that the necessary directories exist.'''
-    os.makedirs(TMP_PATH, exist_ok=True)
+    os.makedirs(UCX_PATH / "tmp/", exist_ok=True)
     os.makedirs(DOWNLOAD_PATH, exist_ok=True)
 
+def _process_id_columns(df):
+    id_columns = [col for col in df.columns if 'id' in col.lower()]
+
+    if id_columns:
+        for col in id_columns:
+            df[col] = "'" + df[col].astype(str)
+    return df
 
 def _to_excel(dataset: Dataset, writer: ...) -> None:
     '''Execute a SQL query and write the result to an Excel sheet.'''
     worksheet_name = dataset.display_name[:31]
     df = spark.sql(dataset.query).toPandas()
+    df = _process_id_columns(df)
     with lock:
         df.to_excel(writer, sheet_name=worksheet_name, index=False)
 
@@ -214,14 +222,11 @@ def export_results() -> None:
     '''Main method to export results to an Excel file.'''
     _prepare_directories()
 
-    dashboard_path = (
-        Path(ctx.installation.install_folder())
-        / "dashboards/[UCX] UCX  Assessment (Main).lvdash.json"
-    )
-    dashboard = Dashboards(ctx.workspace_client)
-    dashboard_datasets = dashboard.get_dashboard(dashboard_path).datasets
+    assessment_dashboard = next(UCX_PATH.glob("dashboards/*Assessment (Main)*"))
+    dashboard_datasets = Dashboards(ctx.workspace_client).get_dashboard(assessment_dashboard).datasets
+
     try:
-        target = TMP_PATH + "/ucx_assessment_main.xlsx"
+        target = UCX_PATH / "tmp/ucx_assessment_main.xlsx"
         with pd.ExcelWriter(target, engine="xlsxwriter") as writer:
             tasks = []
             for dataset in dashboard_datasets:
