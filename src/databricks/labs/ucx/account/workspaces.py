@@ -102,7 +102,8 @@ class AccountWorkspaces:
                 if member.display in self.acc_groups:
                     logger.info(f"Group {member.display} already exist in the account, ignoring")
                     acc_group_id, _ = self.acc_groups[member.display]
-                    self.created_groups[member.display] = self._safe_groups_get(self._ac, acc_group_id)
+                    full_account_group = self._safe_groups_get(self._ac, acc_group_id)
+                    self.created_groups[member.display] = full_account_group
 
                 # check if workspace group is already created at account level
                 created_acc_group = self.created_groups.get(member.display)
