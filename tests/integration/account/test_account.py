@@ -64,3 +64,43 @@ def test_create_account_level_groups(
 
     group = get_group(group_display_name)
     assert group
+
+
+def test_create_account_level_groups_nested_groups(
+    make_group, make_user, acc, ws, make_random, clean_account_level_groups, watchdog_purge_suffix, runtime_ctx, caplog
+):
+    suffix = f"{make_random(4).lower()}-{watchdog_purge_suffix}"
+    regular_group = make_group(
+        display_name=f"created_by_ucx_regular_group1-{suffix}", members=[make_user().id, make_user().id]
+    )
+    make_group(
+        display_name=f"created_by_ucx_regular_group_standalone-{suffix}", members=[make_user().id, make_user().id]
+    )
+
+    group_display_name = f"created_by_ucx_nested_group1-{suffix}"
+    nested_group = make_group(display_name=group_display_name, members=[make_user().id, regular_group.id])
+    AccountWorkspaces(acc, [ws.get_workspace_id()]).create_account_level_groups(MockPrompts({}))
+    regular_group2 = make_group(
+        display_name=f"created_by_ucx_regular_group2-{suffix}", members=[make_user().id, make_user().id]
+    )
+    make_group(
+        display_name=f"created_by_ucx_nested_group2-{suffix}",
+        members=[make_user().id, regular_group.id, regular_group2.id],
+    )
+
+    AccountWorkspaces(acc, [ws.get_workspace_id()]).create_account_level_groups(MockPrompts({}))
+
+    @retried(on=[KeyError], timeout=timedelta(minutes=2))
+    def get_group(display_name: str) -> Group:
+        for grp in acc.groups.list():
+            if grp.display_name == display_name:
+                return grp
+        raise KeyError(f"Group not found {display_name}")
+
+    group = get_group(group_display_name)
+    assert group
+    assert len(group.members) == len(nested_group.members)
+
+    runtime_ctx.group_manager.validate_group_membership()
+
+    assert 'There are no groups with different membership between account and workspace.' in caplog.text
