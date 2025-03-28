@@ -1,5 +1,5 @@
 import logging
-from typing import ClassVar, Tuple
+from typing import ClassVar
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.tui import Prompts
@@ -16,8 +16,8 @@ class AccountWorkspaces:
     def __init__(self, account_client: AccountClient, include_workspace_ids: list[int] | None = None):
         self._ac = account_client
         self._include_workspace_ids = include_workspace_ids if include_workspace_ids else []
-        self.acc_groups: dict[str, Tuple[str, list[ComplexValue]]] = {}
-        self.created_groups: dict[str , Group] = {}
+        self.acc_groups: dict[str | None, tuple[str, list[ComplexValue] | None]] = {}
+        self.created_groups: dict[str, Group] = {}
         self.all_valid_workspace_groups: dict[str, Group] = {}
 
     def _workspaces(self):
@@ -98,7 +98,6 @@ class AccountWorkspaces:
             if member.ref.startswith("Users"):
                 members_to_add.append(member)
             elif member.ref.startswith("Groups"):
-
                 # check if account group was created before this run
                 if member.display in self.acc_groups:
                     logger.info(f"Group {member.display} already exist in the account, ignoring")
@@ -114,18 +113,13 @@ class AccountWorkspaces:
                     created_acc_group = self.created_groups.get(member.display)
 
                 # the AccountGroupsAPI expects the members to be in the form of ComplexValue
-                if created_acc_group:
-                    try:
-                        members_to_add.append(
-                            ComplexValue(
-                                display=created_acc_group.display_name,
-                                ref=f"Groups/{created_acc_group.id}",
-                                value=created_acc_group.id,
-                            )
-                        )
-                    except AttributeError:
-                        logger.error(f"Errors because of {group_name}: {member.display}", exc_info=True)
-
+                members_to_add.append(
+                    ComplexValue(
+                        display=created_acc_group.display_name,
+                        ref=f"Groups/{created_acc_group.id}",
+                        value=created_acc_group.id,
+                    )
+                )
 
         acc_group = self._try_create_account_groups(group_name, self.acc_groups)
         if acc_group:
@@ -254,7 +248,7 @@ class AccountWorkspaces:
         ws_members_set_2 = set([m.display for m in group_2.members] if group_2.members else [])
         return not bool((ws_members_set_1 - ws_members_set_2).union(ws_members_set_2 - ws_members_set_1))
 
-    def _get_account_groups(self) -> dict[str | None, Tuple[str, list[ComplexValue]] | None]:
+    def _get_account_groups(self) -> dict[str | None, tuple[str, list[ComplexValue] | None]]:
         logger.debug("Listing groups in account")
         acc_groups = {}
         for acc_grp_id in self._ac.groups.list(attributes="id"):
