@@ -66,6 +66,7 @@ def test_create_account_level_groups(
     assert group
 
 
+@pytest.mark.repeat(5)
 def test_create_account_level_groups_nested_groups(
     make_group, make_user, acc, ws, make_random, clean_account_level_groups, watchdog_purge_suffix, runtime_ctx, caplog
 ):
@@ -73,10 +74,16 @@ def test_create_account_level_groups_nested_groups(
     regular_group = make_group(
         display_name=f"created_by_ucx_regular_group1-{suffix}", members=[make_user().id, make_user().id]
     )
-    make_group(display_name=f"created_by_ucx_regular_group2-{suffix}", members=[make_user().id, make_user().id])
+    make_group(display_name=f"created_by_ucx_regular_group_standalone-{suffix}", members=[make_user().id, make_user().id])
 
-    group_display_name = f"created_by_ucx_nested_group-{suffix}"
+    group_display_name = f"created_by_ucx_nested_group1-{suffix}"
     nested_group = make_group(display_name=group_display_name, members=[make_user().id, regular_group.id])
+    AccountWorkspaces(acc, [ws.get_workspace_id()]).create_account_level_groups(MockPrompts({}))
+    regular_group2 = make_group(
+        display_name=f"created_by_ucx_regular_group2-{suffix}", members=[make_user().id, make_user().id]
+    )
+    make_group(display_name=f"created_by_ucx_nested_group2-{suffix}", members=[make_user().id, regular_group.id, regular_group2.id])
+
     AccountWorkspaces(acc, [ws.get_workspace_id()]).create_account_level_groups(MockPrompts({}))
 
     @retried(on=[KeyError], timeout=timedelta(minutes=2))
