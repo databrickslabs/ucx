@@ -103,8 +103,6 @@ class AccountWorkspaces:
                     logger.info(f"Group {member.display} already exist in the account, ignoring")
                     acc_group_id, _ = self.acc_groups[member.display]
                     full_account_group = self._safe_groups_get(self._ac, acc_group_id)
-                    if not full_account_group:
-                        continue
                     self.created_groups[member.display] = full_account_group
 
                 # check if workspace group is already created at account level
@@ -114,6 +112,10 @@ class AccountWorkspaces:
                     # if there is no account group created for the workspace group, create one
                     self._create_account_level_groups(member.display, self.all_valid_workspace_groups[member.display])
                     created_acc_group = self.created_groups.get(member.display)
+
+                if not created_acc_group:
+                    logger.warning(f"Group {member.display} could not be fetched, skipping")
+                    continue
 
                 # the AccountGroupsAPI expects the members to be in the form of ComplexValue
                 members_to_add.append(
