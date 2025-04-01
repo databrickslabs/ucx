@@ -23,7 +23,7 @@ class AccountWorkspaces:
     def __init__(self, account_client: AccountClient, include_workspace_ids: list[int] | None = None):
         self._ac = account_client
         self._include_workspace_ids = include_workspace_ids if include_workspace_ids else []
-        self.acc_groups: dict[str | None, AccountGroupDetails] = {}
+        self.acc_groups: dict[str, AccountGroupDetails] = {}
         self.created_groups: dict[str, Group] = {}
         self.all_valid_workspace_groups: dict[str, Group] = {}
 
@@ -108,7 +108,7 @@ class AccountWorkspaces:
                 # check if account group was created before this run
                 if member.display in self.acc_groups:
                     logger.info(f"Group {member.display} already exist in the account, ignoring")
-                    acc_group_id, _ = self.acc_groups[member.display]
+                    acc_group_id = self.acc_groups[member.display].id
                     full_account_group = self._safe_groups_get(self._ac, acc_group_id)
                     self.created_groups[member.display] = full_account_group
 
