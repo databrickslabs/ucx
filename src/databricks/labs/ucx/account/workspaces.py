@@ -1,4 +1,5 @@
 import logging
+from dataclasses import dataclass
 from typing import ClassVar
 
 from databricks.labs.blueprint.installation import Installation
@@ -10,13 +11,19 @@ from databricks.sdk.service.iam import ComplexValue, Group, Patch, PatchOp, Patc
 logger = logging.getLogger(__name__)
 
 
+@dataclass
+class AccountGroupDetails:
+    id: str
+    members: list[ComplexValue] | None = None
+
+
 class AccountWorkspaces:
     SYNC_FILE_NAME: ClassVar[str] = "workspaces.json"
 
     def __init__(self, account_client: AccountClient, include_workspace_ids: list[int] | None = None):
         self._ac = account_client
         self._include_workspace_ids = include_workspace_ids if include_workspace_ids else []
-        self.acc_groups: dict[str | None, tuple[str, list[ComplexValue] | None]] = {}
+        self.acc_groups: dict[str | None, AccountGroupDetails] = {}
         self.created_groups: dict[str, Group] = {}
         self.all_valid_workspace_groups: dict[str, Group] = {}
 
@@ -253,7 +260,7 @@ class AccountWorkspaces:
         ws_members_set_2 = set([m.display for m in group_2.members] if group_2.members else [])
         return not bool((ws_members_set_1 - ws_members_set_2).union(ws_members_set_2 - ws_members_set_1))
 
-    def _get_account_groups(self) -> dict[str | None, tuple[str, list[ComplexValue] | None]]:
+    def _get_account_groups(self) -> dict[str | None, AccountGroupDetails]:
         logger.debug("Listing groups in account")
         acc_groups = {}
         for acc_grp_id in self._ac.groups.list(attributes="id"):
@@ -263,7 +270,9 @@ class AccountWorkspaces:
             if not full_account_group:
                 continue
             logger.debug(f"Found account group {full_account_group.display_name}")
-            acc_groups[full_account_group.display_name] = (acc_grp_id.id, full_account_group.members)
+            acc_groups[full_account_group.display_name] = AccountGroupDetails(
+                id=acc_grp_id.id, members=full_account_group.members
+            )
 
         logger.info(f"{len(acc_groups)} account groups found")
         return acc_groups
