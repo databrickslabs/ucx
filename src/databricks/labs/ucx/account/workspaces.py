@@ -23,7 +23,7 @@ class AccountWorkspaces:
     def __init__(self, account_client: AccountClient, include_workspace_ids: list[int] | None = None):
         self._ac = account_client
         self._include_workspace_ids = include_workspace_ids if include_workspace_ids else []
-        self.acc_groups: dict[str, AccountGroupDetails] = {}
+        self.acc_groups: dict[str | None, AccountGroupDetails] = {}
         self.created_groups: dict[str, Group] = {}
         self.all_valid_workspace_groups: dict[str, Group] = {}
 
@@ -94,9 +94,9 @@ class AccountWorkspaces:
         self.all_valid_workspace_groups = self._get_valid_workspaces_groups(prompts, workspace_ids)
 
         for group_name, valid_group in self.all_valid_workspace_groups.items():
-            self._create_account_level_groups(group_name, valid_group)
+            self._create_account_groups_recursively(group_name, valid_group)
 
-    def _create_account_level_groups(self, group_name, valid_group):
+    def _create_account_groups_recursively(self, group_name, valid_group):
         """
         Function recursively crawls through all group and nested groups to create account level groups
         """
@@ -117,7 +117,9 @@ class AccountWorkspaces:
 
                 if not created_acc_group:
                     # if there is no account group created for the workspace group, create one
-                    self._create_account_level_groups(member.display, self.all_valid_workspace_groups[member.display])
+                    self._create_account_groups_recursively(
+                        member.display, self.all_valid_workspace_groups[member.display]
+                    )
                     created_acc_group = self.created_groups.get(member.display)
 
                 if not created_acc_group:
