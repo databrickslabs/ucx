@@ -25,6 +25,7 @@ class AccountWorkspaces:
         self._ac = account_client
         self._include_workspace_ids = include_workspace_ids if include_workspace_ids else []
         self.created_groups: dict[str, Group] = {}
+        self.renamed_groups: dict[str, str] = {}
         self.all_valid_workspace_groups: dict[str, Group] = {}
         self.recursion_depth: int = 5
 
@@ -134,6 +135,10 @@ class AccountWorkspaces:
         """
         Function to handle nested groups
         """
+        # check if group name is in the renamed groups
+        if group_name in self.renamed_groups:
+            group_name = self.renamed_groups[group_name]
+
         # check if account group was created before this run
         if group_name in self.account_groups:
             logger.info(f"Group {group_name} already exist in the account, ignoring")
@@ -263,6 +268,7 @@ class AccountWorkspaces:
                     f"it will be created at the account with name : {workspace.workspace_name}_{group_name}"
                 ):
                     all_workspaces_groups[f"{workspace.workspace_name}_{group_name}"] = full_workspace_group
+                    self.renamed_groups[group_name] = f"{workspace.workspace_name}_{group_name}"
                     continue
             logger.info(f"Found new group {group_name}")
             all_workspaces_groups[group_name] = full_workspace_group
