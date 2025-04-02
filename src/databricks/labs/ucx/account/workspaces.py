@@ -1,5 +1,6 @@
 import logging
 from dataclasses import dataclass
+from functools import cached_property
 from typing import ClassVar
 
 from databricks.labs.blueprint.installation import Installation
@@ -23,9 +24,13 @@ class AccountWorkspaces:
     def __init__(self, account_client: AccountClient, include_workspace_ids: list[int] | None = None):
         self._ac = account_client
         self._include_workspace_ids = include_workspace_ids if include_workspace_ids else []
-        self.acc_groups: dict[str | None, AccountGroupDetails] = {}
         self.created_groups: dict[str, Group] = {}
         self.all_valid_workspace_groups: dict[str, Group] = {}
+
+    @cached_property
+    def account_groups(self) -> dict[str | None, AccountGroupDetails]:
+        """Return all account groups in the account."""
+        return self._get_account_groups()
 
     def _workspaces(self):
         for workspace in self._ac.workspaces.list():
@@ -87,7 +92,7 @@ class AccountWorkspaces:
                 logger.warning(f"Failed to save workspace info for {ws.config.host}")
 
     def create_account_level_groups(self, prompts: Prompts):
-        self.acc_groups = self._get_account_groups()
+
         workspace_ids = [workspace.workspace_id for workspace in self._workspaces()]
         if not workspace_ids:
             raise ValueError("The workspace ids provided are not found in the account, Please check and try again.")
@@ -106,9 +111,9 @@ class AccountWorkspaces:
                 members_to_add.append(member)
             elif member.ref.startswith("Groups"):
                 # check if account group was created before this run
-                if member.display in self.acc_groups:
+                if member.display in self.account_groups:
                     logger.info(f"Group {member.display} already exist in the account, ignoring")
-                    acc_group_id = self.acc_groups[member.display].id
+                    acc_group_id = self.account_groups[member.display].id
                     full_account_group = self._safe_groups_get(self._ac, acc_group_id)
                     self.created_groups[member.display] = full_account_group
 
@@ -135,7 +140,7 @@ class AccountWorkspaces:
                     )
                 )
 
-        acc_group = self._try_create_account_groups(group_name, self.acc_groups)
+        acc_group = self._try_create_account_groups(group_name, self.account_groups)
         if acc_group:
             logger.info(f"Successfully created account group {acc_group.display_name}")
             if len(members_to_add) > 0:
@@ -177,7 +182,7 @@ class AccountWorkspaces:
         return True
 
     def _try_create_account_groups(
-        self, group_name: str, acc_groups: dict[str | None, list[ComplexValue] | None]
+        self, group_name: str, acc_groups: dict[str | None, AccountGroupDetails]
     ) -> Group | None:
         try:
             if group_name in acc_groups:
