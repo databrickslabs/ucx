@@ -92,60 +92,78 @@ class AccountWorkspaces:
                 logger.warning(f"Failed to save workspace info for {ws.config.host}")
 
     def create_account_level_groups(self, prompts: Prompts):
-
         workspace_ids = [workspace.workspace_id for workspace in self._workspaces()]
         if not workspace_ids:
             raise ValueError("The workspace ids provided are not found in the account, Please check and try again.")
         self.all_valid_workspace_groups = self._get_valid_workspaces_groups(prompts, workspace_ids)
 
         for group_name, valid_group in self.all_valid_workspace_groups.items():
-            self._create_account_groups_recursively(group_name, valid_group)
+            self._create_account_groups_recursively(group_name, valid_group, recursion_depth=0)
 
-    def _create_account_groups_recursively(self, group_name, valid_group):
+    def _create_account_groups_recursively(self, group_name, valid_group, recursion_depth: int):
         """
         Function recursively crawls through all group and nested groups to create account level groups
         """
+        logger.info(f"Creating account group {group_name} at recursion depth {recursion_depth}")
+        if recursion_depth > 5:
+            logger.error(f"Recursion depth exceeded for group {group_name}, skipping")
+
         members_to_add = []
         for member in valid_group.members:
             if member.ref.startswith("Users"):
                 members_to_add.append(member)
             elif member.ref.startswith("Groups"):
-                # check if account group was created before this run
-                if member.display in self.account_groups:
-                    logger.info(f"Group {member.display} already exist in the account, ignoring")
-                    acc_group_id = self.account_groups[member.display].id
-                    full_account_group = self._safe_groups_get(self._ac, acc_group_id)
-                    self.created_groups[member.display] = full_account_group
-
-                # check if workspace group is already created at account level
-                created_acc_group = self.created_groups.get(member.display)
-
-                if not created_acc_group:
-                    # if there is no account group created for the workspace group, create one
-                    self._create_account_groups_recursively(
-                        member.display, self.all_valid_workspace_groups[member.display]
-                    )
-                    created_acc_group = self.created_groups.get(member.display)
-
-                if not created_acc_group:
-                    logger.warning(f"Group {member.display} could not be fetched, skipping")
-                    continue
-
-                # the AccountGroupsAPI expects the members to be in the form of ComplexValue
-                members_to_add.append(
-                    ComplexValue(
-                        display=created_acc_group.display_name,
-                        ref=f"Groups/{created_acc_group.id}",
-                        value=created_acc_group.id,
-                    )
-                )
+                members_to_append = self._handle_nested_group(member.display, recursion_depth)
+                if members_to_append:
+                    members_to_add.append(members_to_append)
 
         acc_group = self._try_create_account_groups(group_name, self.account_groups)
         if acc_group:
             logger.info(f"Successfully created account group {acc_group.display_name}")
-            if len(members_to_add) > 0:
+            if len(members_to_add) > 0 and acc_group.id:
                 self._add_members_to_acc_group(self._ac, acc_group.id, valid_group.display_name, members_to_add)
-            self.created_groups[valid_group.display_name] = self._safe_groups_get(self._ac, acc_group.id)
+            created_acc_group = self._safe_groups_get(self._ac, acc_group.id)
+            if not created_acc_group:
+                logger.warning(f"Newly created group {valid_group.display_name} could not be fetched, skipping")
+                return
+            self.created_groups[valid_group.display_name] = created_acc_group
+
+    def _handle_nested_group(self, group_name: str, recursion_depth: int) -> ComplexValue | None:
+        """
+        Function to handle nested groups
+        """
+        # check if account group was created before this run
+        if group_name in self.account_groups:
+            logger.info(f"Group {group_name} already exist in the account, ignoring")
+            acc_group_id = self.account_groups[group_name].id
+            full_account_group = self._safe_groups_get(self._ac, acc_group_id)
+            if not full_account_group:
+                logger.warning(f"Group {group_name} could not be fetched, skipping")
+                return None
+            self.created_groups[group_name] = full_account_group
+
+        # check if workspace group is already created at account level in current run
+        created_acc_group = self.created_groups.get(group_name)
+
+        if not created_acc_group:
+            # if there is no account group created for the workspace group, create one
+            self._create_account_groups_recursively(
+                group_name,
+                self.all_valid_workspace_groups[group_name],
+                recursion_depth=recursion_depth + 1,
+            )
+            created_acc_group = self.created_groups.get(group_name)
+
+        if not created_acc_group:
+            logger.warning(f"Group {group_name} could not be fetched, skipping")
+            return None
+
+        # the AccountGroupsAPI expects the members to be in the form of ComplexValue
+        return ComplexValue(
+            display=created_acc_group.display_name,
+            ref=f"Groups/{created_acc_group.id}",
+            value=created_acc_group.id,
+        )
 
     def get_accessible_workspaces(self) -> list[Workspace]:
         """
