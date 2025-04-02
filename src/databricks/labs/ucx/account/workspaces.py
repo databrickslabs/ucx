@@ -26,6 +26,7 @@ class AccountWorkspaces:
         self._include_workspace_ids = include_workspace_ids if include_workspace_ids else []
         self.created_groups: dict[str, Group] = {}
         self.all_valid_workspace_groups: dict[str, Group] = {}
+        self.recursion_depth: int = 5
 
     @cached_property
     def account_groups(self) -> dict[str | None, AccountGroupDetails]:
@@ -91,7 +92,8 @@ class AccountWorkspaces:
             except (PermissionDenied, NotFound, ValueError):
                 logger.warning(f"Failed to save workspace info for {ws.config.host}")
 
-    def create_account_level_groups(self, prompts: Prompts):
+    def create_account_level_groups(self, prompts: Prompts, recursion_depth: int = 5):
+        self.recursion_depth = recursion_depth
         workspace_ids = [workspace.workspace_id for workspace in self._workspaces()]
         if not workspace_ids:
             raise ValueError("The workspace ids provided are not found in the account, Please check and try again.")
@@ -105,7 +107,7 @@ class AccountWorkspaces:
         Function recursively crawls through all group and nested groups to create account level groups
         """
         logger.info(f"Creating account group {group_name} at recursion depth {recursion_depth}")
-        if recursion_depth > 5:
+        if recursion_depth > self.recursion_depth:
             logger.error(f"Recursion depth exceeded for group {group_name}, skipping")
 
         members_to_add = []

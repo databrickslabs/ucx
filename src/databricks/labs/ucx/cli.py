@@ -169,7 +169,8 @@ def create_account_groups(
     """
     if not ctx:
         ctx = AccountContext(a, named_parameters)
-    ctx.account_workspaces.create_account_level_groups(prompts)
+    override_recursion_depth = named_parameters.get("override_recursion_depth", 5)
+    ctx.account_workspaces.create_account_level_groups(prompts, recursion_depth=override_recursion_depth)
 
 
 @ucx.command
