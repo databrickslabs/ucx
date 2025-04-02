@@ -134,6 +134,10 @@ class AccountWorkspaces:
     def _handle_nested_group(self, group_name: str, recursion_depth: int) -> ComplexValue | None:
         """
         Function to handle nested groups
+        Checks if the group has already been created at account level
+        If not, it creates the group by calling _create_account_groups_recursively
+        :param group_name: name of the group to handle
+        :param recursion_depth: current recursion depth
         """
         # check if group name is in the renamed groups
         if group_name in self.renamed_groups:
