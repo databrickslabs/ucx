@@ -24,6 +24,7 @@ class AccountGroupCreationContext:
     created_groups: set[str] = field(default_factory=set)
     created_groups_details: dict[str, Group] = field(default_factory=dict)
     renamed_groups: dict[str, str] = field(default_factory=dict)
+    account_groups: dict[str | None, AccountGroupDetails] = field(default_factory=dict)
 
 
 class AccountWorkspaces:
@@ -32,11 +33,6 @@ class AccountWorkspaces:
     def __init__(self, account_client: AccountClient, include_workspace_ids: list[int] | None = None):
         self._ac = account_client
         self._include_workspace_ids = include_workspace_ids if include_workspace_ids else []
-
-    @cached_property
-    def account_groups(self) -> dict[str | None, AccountGroupDetails]:
-        """Return all account groups in the account."""
-        return self._get_account_groups()
 
     def _workspaces(self):
         for workspace in self._ac.workspaces.list():
@@ -110,12 +106,13 @@ class AccountWorkspaces:
             - If its a nested group follow the same approach recursively
             - If it is a regular group, create the group in the account and add all members to the group
         """
-
+        account_groups = self._get_account_groups()
         workspace_ids = [workspace.workspace_id for workspace in self._workspaces()]
         if not workspace_ids:
             raise ValueError("The workspace ids provided are not found in the account, Please check and try again.")
         context = AccountGroupCreationContext(
-            valid_workspace_groups={}, created_groups=set(), created_groups_details={}, renamed_groups={}
+            valid_workspace_groups={}, created_groups=set(), created_groups_details={}, renamed_groups={},
+            account_groups=account_groups
         )
         context.valid_workspace_groups = self._get_valid_workspaces_groups(prompts, workspace_ids, context)
 
@@ -141,7 +138,7 @@ class AccountWorkspaces:
             else:
                 logger.warning(f"Member {member.ref} is not a user or group, skipping")
 
-        acc_group = self._try_create_account_groups(group_name, self.account_groups)
+        acc_group = self._try_create_account_groups(group_name, context.account_groups)
         if acc_group:
             logger.info(f"Successfully created account group {acc_group.display_name}")
             if len(members_to_add) > 0 and acc_group.id:
@@ -164,9 +161,9 @@ class AccountWorkspaces:
             group_name = context.renamed_groups[group_name]
 
         # check if account group was created before this run
-        if group_name in self.account_groups:
+        if group_name in context.account_groups:
             logger.info(f"Group {group_name} already exist in the account, ignoring")
-            acc_group_id = self.account_groups[group_name].id
+            acc_group_id = context.account_groups[group_name].id
             full_account_group = self._safe_groups_get(self._ac, acc_group_id)
             if not full_account_group:
                 logger.warning(f"Group {group_name} could not be fetched, skipping")
