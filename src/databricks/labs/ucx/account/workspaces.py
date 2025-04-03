@@ -260,7 +260,13 @@ class AccountWorkspaces:
 
         return all_workspaces_groups
 
-    def _load_workspace_groups(self, prompts, workspace, all_workspaces_groups, context):
+    def _load_workspace_groups(
+        self,
+        prompts: Prompts,
+        workspace: Workspace,
+        all_workspaces_groups: dict[str, Group],
+        context: AccountGroupCreationContext,
+    ) -> None:
         client = self.client_for(workspace)
         logger.info(f"Crawling groups in workspace {client.config.host}")
         ws_group_ids = client.groups.list(attributes="id")
