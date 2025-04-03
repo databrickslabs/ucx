@@ -19,11 +19,10 @@ class AccountGroupDetails:
 
 @dataclass
 class AccountGroupCreationContext:
-    valid_workspace_groups: dict[str, Group]
-    created_groups: set[str] = field(default_factory=set)
-    created_groups_details: dict[str, Group] = field(default_factory=dict)
+    valid_workspace_groups: dict[str, Group] = field(default_factory=dict)
+    created_groups: dict[str, Group] = field(default_factory=dict)
     renamed_groups: dict[str, str] = field(default_factory=dict)
-    account_groups: dict[str | None, AccountGroupDetails] = field(default_factory=dict)
+    preexisting_account_groups: dict[str | None, AccountGroupDetails] = field(default_factory=dict)
 
 
 class AccountWorkspaces:
@@ -105,17 +104,11 @@ class AccountWorkspaces:
             - If its a nested group follow the same approach recursively
             - If it is a regular group, create the group in the account and add all members to the group
         """
-        account_groups = self._get_account_groups()
+        context = AccountGroupCreationContext()
+        context.preexisting_account_groups = self._get_account_groups()
         workspace_ids = [workspace.workspace_id for workspace in self._workspaces()]
         if not workspace_ids:
             raise ValueError("The workspace ids provided are not found in the account, Please check and try again.")
-        context = AccountGroupCreationContext(
-            valid_workspace_groups={},
-            created_groups=set(),
-            created_groups_details={},
-            renamed_groups={},
-            account_groups=account_groups,
-        )
         context.valid_workspace_groups = self._get_valid_workspaces_groups(prompts, workspace_ids, context)
 
         for group_name, valid_group in context.valid_workspace_groups.items():
@@ -140,7 +133,7 @@ class AccountWorkspaces:
             else:
                 logger.warning(f"Member {member.ref} is not a user or group, skipping")
 
-        acc_group = self._try_create_account_groups(group_name, context.account_groups)
+        acc_group = self._try_create_account_groups(group_name, context.preexisting_account_groups)
         if acc_group:
             logger.info(f"Successfully created account group {acc_group.display_name}")
             if len(members_to_add) > 0 and acc_group.id:
@@ -149,8 +142,7 @@ class AccountWorkspaces:
             if not created_acc_group:
                 logger.warning(f"Newly created group {valid_group.display_name} could not be fetched, skipping")
                 return
-            context.created_groups.add(group_name)
-            context.created_groups_details[valid_group.display_name] = created_acc_group
+            context.created_groups[valid_group.display_name] = created_acc_group
 
     def _handle_nested_group(self, group_name: str, context: AccountGroupCreationContext) -> ComplexValue | None:
         """
@@ -163,15 +155,14 @@ class AccountWorkspaces:
             group_name = context.renamed_groups[group_name]
 
         # check if account group was created before this run
-        if group_name in context.account_groups:
+        if group_name in context.preexisting_account_groups:
             logger.info(f"Group {group_name} already exist in the account, ignoring")
-            acc_group_id = context.account_groups[group_name].id
+            acc_group_id = context.preexisting_account_groups[group_name].id
             full_account_group = self._safe_groups_get(self._ac, acc_group_id)
             if not full_account_group:
                 logger.warning(f"Group {group_name} could not be fetched, skipping")
                 return None
-            context.created_groups.add(group_name)
-            context.created_groups_details[group_name] = full_account_group
+            context.created_groups[group_name] = full_account_group
 
         # check if workspace group is already created at account level in current run
         if group_name not in context.created_groups:
@@ -182,7 +173,7 @@ class AccountWorkspaces:
             logger.warning(f"Group {group_name} could not be fetched, skipping")
             return None
 
-        created_acc_group = context.created_groups_details[group_name]
+        created_acc_group = context.created_groups[group_name]
 
         # the AccountGroupsAPI expects the members to be in the form of ComplexValue
         return ComplexValue(
