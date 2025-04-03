@@ -1,5 +1,5 @@
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import cached_property
 from typing import ClassVar
 
@@ -18,16 +18,20 @@ class AccountGroupDetails:
     members: list[ComplexValue] | None = None
 
 
+@dataclass
+class AccountGroupCreationContext:
+    valid_workspace_groups: dict[str, Group]
+    created_groups: set[str] = field(default_factory=set)
+    created_groups_details: dict[str, Group] = field(default_factory=dict)
+    renamed_groups: dict[str, str] = field(default_factory=dict)
+
+
 class AccountWorkspaces:
     SYNC_FILE_NAME: ClassVar[str] = "workspaces.json"
 
     def __init__(self, account_client: AccountClient, include_workspace_ids: list[int] | None = None):
         self._ac = account_client
         self._include_workspace_ids = include_workspace_ids if include_workspace_ids else []
-        self.created_groups: dict[str, Group] = {}
-        self.renamed_groups: dict[str, str] = {}
-        self.all_valid_workspace_groups: dict[str, Group] = {}
-        self.recursion_depth: int = 5
 
     @cached_property
     def account_groups(self) -> dict[str | None, AccountGroupDetails]:
@@ -93,30 +97,45 @@ class AccountWorkspaces:
             except (PermissionDenied, NotFound, ValueError):
                 logger.warning(f"Failed to save workspace info for {ws.config.host}")
 
-    def create_account_level_groups(self, prompts: Prompts, recursion_depth: int = 5) -> None:
-        self.recursion_depth = recursion_depth
+    def create_account_level_groups(self, prompts: Prompts) -> None:
+        """
+        Create account level groups from workspace groups
+
+        The following approach is used:
+        Get all valid worskpace groups from all workspaces
+
+        For each group:
+            - Check if the group already exists in the account
+            - If it does not exist, check if it is a nested group (users are added directly)
+            - If its a nested group follow the same approach recursively
+            - If it is a regular group, create the group in the account and add all members to the group
+        """
+
         workspace_ids = [workspace.workspace_id for workspace in self._workspaces()]
         if not workspace_ids:
             raise ValueError("The workspace ids provided are not found in the account, Please check and try again.")
-        self.all_valid_workspace_groups = self._get_valid_workspaces_groups(prompts, workspace_ids)
+        context = AccountGroupCreationContext(
+            valid_workspace_groups={}, created_groups=set(), created_groups_details={}, renamed_groups={}
+        )
+        context.valid_workspace_groups = self._get_valid_workspaces_groups(prompts, workspace_ids, context)
 
-        for group_name, valid_group in self.all_valid_workspace_groups.items():
-            self._create_account_groups_recursively(group_name, valid_group, recursion_depth=0)
+        for group_name, valid_group in context.valid_workspace_groups.items():
+            self._create_account_groups_recursively(group_name, valid_group, context)
 
-    def _create_account_groups_recursively(self, group_name, valid_group, recursion_depth: int):
+    def _create_account_groups_recursively(self, group_name, valid_group, context) -> None:
         """
         Function recursively crawls through all group and nested groups to create account level groups
         """
-        logger.info(f"Creating account group {group_name} at recursion depth {recursion_depth}")
-        if recursion_depth > self.recursion_depth:
-            logger.error(f"Recursion depth exceeded for group {group_name}, skipping")
+        if group_name in context.created_groups:
+            logger.info(f"Group {group_name} already exist in the account, ignoring")
+            return
 
         members_to_add = []
         for member in valid_group.members:
-            if member.ref.startswith("Users"):
+            if member.ref and member.ref.startswith("Users"):
                 members_to_add.append(member)
-            elif member.ref.startswith("Groups"):
-                members_to_append = self._handle_nested_group(member.display, recursion_depth)
+            elif member.ref and member.ref.startswith("Groups"):
+                members_to_append = self._handle_nested_group(member.display, context)
                 if members_to_append:
                     members_to_add.append(members_to_append)
             else:
@@ -131,19 +150,18 @@ class AccountWorkspaces:
             if not created_acc_group:
                 logger.warning(f"Newly created group {valid_group.display_name} could not be fetched, skipping")
                 return
-            self.created_groups[valid_group.display_name] = created_acc_group
+            context.created_groups.add(group_name)
+            context.created_groups_details[valid_group.display_name] = created_acc_group
 
-    def _handle_nested_group(self, group_name: str, recursion_depth: int) -> ComplexValue | None:
+    def _handle_nested_group(self, group_name: str, context: AccountGroupCreationContext) -> ComplexValue | None:
         """
         Function to handle nested groups
         Checks if the group has already been created at account level
         If not, it creates the group by calling _create_account_groups_recursively
-        :param group_name: name of the group to handle
-        :param recursion_depth: current recursion depth
         """
         # check if group name is in the renamed groups
-        if group_name in self.renamed_groups:
-            group_name = self.renamed_groups[group_name]
+        if group_name in context.renamed_groups:
+            group_name = context.renamed_groups[group_name]
 
         # check if account group was created before this run
         if group_name in self.account_groups:
@@ -153,22 +171,19 @@ class AccountWorkspaces:
             if not full_account_group:
                 logger.warning(f"Group {group_name} could not be fetched, skipping")
                 return None
-            self.created_groups[group_name] = full_account_group
+            context.created_groups.add(group_name)
+            context.created_groups_details[group_name] = full_account_group
 
         # check if workspace group is already created at account level in current run
-        if group_name not in self.created_groups:
+        if group_name not in context.created_groups:
             # if there is no account group created for the group, create one
-            self._create_account_groups_recursively(
-                group_name,
-                self.all_valid_workspace_groups[group_name],
-                recursion_depth=recursion_depth + 1,
-            )
+            self._create_account_groups_recursively(group_name, context.valid_workspace_groups[group_name], context)
 
-        if group_name not in self.created_groups:
+        if group_name not in context.created_groups:
             logger.warning(f"Group {group_name} could not be fetched, skipping")
             return None
 
-        created_acc_group = self.created_groups[group_name]
+        created_acc_group = context.created_groups_details[group_name]
 
         # the AccountGroupsAPI expects the members to be in the form of ComplexValue
         return ComplexValue(
@@ -240,17 +255,19 @@ class AccountWorkspaces:
         for i in range(0, len(lst), chunk_size):
             yield lst[i : i + chunk_size]
 
-    def _get_valid_workspaces_groups(self, prompts: Prompts, workspace_ids: list[int]) -> dict[str, Group]:
+    def _get_valid_workspaces_groups(
+        self, prompts: Prompts, workspace_ids: list[int], context: AccountGroupCreationContext
+    ) -> dict[str, Group]:
         all_workspaces_groups: dict[str, Group] = {}
 
         for workspace in self._workspaces():
             if workspace.workspace_id not in workspace_ids:
                 continue
-            self._load_workspace_groups(prompts, workspace, all_workspaces_groups)
+            self._load_workspace_groups(prompts, workspace, all_workspaces_groups, context)
 
         return all_workspaces_groups
 
-    def _load_workspace_groups(self, prompts, workspace, all_workspaces_groups):
+    def _load_workspace_groups(self, prompts, workspace, all_workspaces_groups, context):
         client = self.client_for(workspace)
         logger.info(f"Crawling groups in workspace {client.config.host}")
         ws_group_ids = client.groups.list(attributes="id")
@@ -273,7 +290,7 @@ class AccountWorkspaces:
                     f"it will be created at the account with name : {workspace.workspace_name}_{group_name}"
                 ):
                     all_workspaces_groups[f"{workspace.workspace_name}_{group_name}"] = full_workspace_group
-                    self.renamed_groups[group_name] = f"{workspace.workspace_name}_{group_name}"
+                    context.renamed_groups[group_name] = f"{workspace.workspace_name}_{group_name}"
                     continue
             logger.info(f"Found new group {group_name}")
             all_workspaces_groups[group_name] = full_workspace_group
