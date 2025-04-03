@@ -22,7 +22,7 @@ class AccountGroupCreationContext:
     valid_workspace_groups: dict[str, Group] = field(default_factory=dict)
     created_groups: dict[str, Group] = field(default_factory=dict)
     renamed_groups: dict[str, str] = field(default_factory=dict)
-    preexisting_account_groups: dict[str | None, AccountGroupDetails] = field(default_factory=dict)
+    preexisting_account_groups: dict[str, AccountGroupDetails] = field(default_factory=dict)
 
 
 class AccountWorkspaces:
@@ -114,7 +114,9 @@ class AccountWorkspaces:
         for group_name, valid_group in context.valid_workspace_groups.items():
             self._create_account_groups_recursively(group_name, valid_group, context)
 
-    def _create_account_groups_recursively(self, group_name, valid_group, context) -> None:
+    def _create_account_groups_recursively(
+        self, group_name: str, valid_group: Group, context: AccountGroupCreationContext
+    ) -> None:
         """
         Function recursively crawls through all group and nested groups to create account level groups
         """
@@ -123,10 +125,12 @@ class AccountWorkspaces:
             return
 
         members_to_add = []
+        assert valid_group.members is not None, "group members undefined"
         for member in valid_group.members:
             if member.ref and member.ref.startswith("Users"):
                 members_to_add.append(member)
             elif member.ref and member.ref.startswith("Groups"):
+                assert member.display is not None, "group name undefined"
                 members_to_append = self._handle_nested_group(member.display, context)
                 if members_to_append:
                     members_to_add.append(members_to_append)
@@ -135,6 +139,7 @@ class AccountWorkspaces:
 
         acc_group = self._try_create_account_groups(group_name, context.preexisting_account_groups)
         if acc_group:
+            assert valid_group.display_name is not None, "group name undefined"
             logger.info(f"Successfully created account group {acc_group.display_name}")
             if members_to_add and acc_group.id:
                 self._add_members_to_acc_group(self._ac, acc_group.id, valid_group.display_name, members_to_add)
@@ -216,9 +221,7 @@ class AccountWorkspaces:
             return False
         return True
 
-    def _try_create_account_groups(
-        self, group_name: str, acc_groups: dict[str | None, AccountGroupDetails]
-    ) -> Group | None:
+    def _try_create_account_groups(self, group_name: str, acc_groups: dict[str, AccountGroupDetails]) -> Group | None:
         try:
             if group_name in acc_groups:
                 logger.info(f"Group {group_name} already exist in the account, ignoring")
@@ -305,7 +308,7 @@ class AccountWorkspaces:
         ws_members_set_2 = set([m.display for m in group_2.members] if group_2.members else [])
         return not bool((ws_members_set_1 - ws_members_set_2).union(ws_members_set_2 - ws_members_set_1))
 
-    def _get_account_groups(self) -> dict[str | None, AccountGroupDetails]:
+    def _get_account_groups(self) -> dict[str, AccountGroupDetails]:
         logger.debug("Listing groups in account")
         acc_groups = {}
         for acc_grp_id in self._ac.groups.list(attributes="id"):
@@ -315,6 +318,7 @@ class AccountWorkspaces:
             if not full_account_group:
                 continue
             logger.debug(f"Found account group {full_account_group.display_name}")
+            assert full_account_group.display_name is not None, "group name undefined"
             acc_groups[full_account_group.display_name] = AccountGroupDetails(
                 id=acc_grp_id.id, members=full_account_group.members
             )
