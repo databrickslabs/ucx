@@ -119,6 +119,8 @@ class AccountWorkspaces:
                 members_to_append = self._handle_nested_group(member.display, recursion_depth)
                 if members_to_append:
                     members_to_add.append(members_to_append)
+            else:
+                logger.warning(f"Member {member.ref} is not a user or group, skipping")
 
         acc_group = self._try_create_account_groups(group_name, self.account_groups)
         if acc_group:
@@ -154,20 +156,19 @@ class AccountWorkspaces:
             self.created_groups[group_name] = full_account_group
 
         # check if workspace group is already created at account level in current run
-        created_acc_group = self.created_groups.get(group_name)
-
-        if not created_acc_group:
-            # if there is no account group created for the workspace group, create one
+        if group_name not in self.created_groups:
+            # if there is no account group created for the group, create one
             self._create_account_groups_recursively(
                 group_name,
                 self.all_valid_workspace_groups[group_name],
                 recursion_depth=recursion_depth + 1,
             )
-            created_acc_group = self.created_groups.get(group_name)
 
-        if not created_acc_group:
+        if group_name not in self.created_groups:
             logger.warning(f"Group {group_name} could not be fetched, skipping")
             return None
+
+        created_acc_group = self.created_groups[group_name]
 
         # the AccountGroupsAPI expects the members to be in the form of ComplexValue
         return ComplexValue(
