@@ -1,6 +1,5 @@
 import logging
 from dataclasses import dataclass, field
-from functools import cached_property
 from typing import ClassVar
 
 from databricks.labs.blueprint.installation import Installation
@@ -111,8 +110,11 @@ class AccountWorkspaces:
         if not workspace_ids:
             raise ValueError("The workspace ids provided are not found in the account, Please check and try again.")
         context = AccountGroupCreationContext(
-            valid_workspace_groups={}, created_groups=set(), created_groups_details={}, renamed_groups={},
-            account_groups=account_groups
+            valid_workspace_groups={},
+            created_groups=set(),
+            created_groups_details={},
+            renamed_groups={},
+            account_groups=account_groups,
         )
         context.valid_workspace_groups = self._get_valid_workspaces_groups(prompts, workspace_ids, context)
 

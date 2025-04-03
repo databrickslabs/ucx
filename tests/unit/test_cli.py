@@ -348,7 +348,7 @@ def test_create_account_groups():
     prompts = MockPrompts({})
     ctx = AccountContext(a, {"workspace_ids": "123,456"})
     create_account_groups(a, prompts, ctx=ctx)
-    a.workspaces.list.assert_called_with()
+    a.groups.list.assert_called_with(attributes="id")
 
 
 def test_create_account_groups_with_id():
