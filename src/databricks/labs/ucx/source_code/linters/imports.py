@@ -129,15 +129,31 @@ class NotebookRunCall(NodeBase):
         return has_unresolved, paths
 
 
+class DbutilsCall(NodeBase):
+    def __init__(self, node: Call):
+        super().__init__(node)
+
+
 class DbutilsPyLinter(PythonLinter):
 
     def __init__(self, session_state: CurrentSessionState):
         self._session_state = session_state
 
     def lint_tree(self, tree: Tree) -> Iterable[Advice]:
-        nodes = self.list_dbutils_notebook_run_calls(tree)
-        for node in nodes:
+        notebook_call_nodes = self.list_dbutils_notebook_run_calls(tree)
+        for node in notebook_call_nodes:
             yield from self._raise_advice_if_unresolved(node.node, self._session_state)
+
+        credentials_assumerole_call_nodes = self.list_dbutils_credentials_assumerole_calls(tree)
+
+        for node in credentials_assumerole_call_nodes:
+            assert isinstance(node, Call)
+            # call = DbutilsCall(cast(Call, node))
+            yield Advisory.from_node(
+                code='dbutils-credentials-assume-role',
+                message="dbutils.credentials.assumeRole is not supported",
+                node=node)
+
 
     @classmethod
     def _raise_advice_if_unresolved(cls, node: NodeNG, session_state: CurrentSessionState) -> Iterable[Advice]:
@@ -162,6 +178,11 @@ class DbutilsPyLinter(PythonLinter):
     def list_dbutils_notebook_run_calls(tree: Tree) -> list[NotebookRunCall]:
         calls = tree.locate(Call, [("run", Attribute), ("notebook", Attribute), ("dbutils", Name)])
         return [NotebookRunCall(call) for call in calls]
+
+    @staticmethod
+    def list_dbutils_credentials_assumerole_calls(tree: Tree) -> list[DbutilsCall]:
+        calls = tree.locate(Call, [("assumeRole", Attribute), ("credentials", Attribute), ("dbutils", Name)])
+        return [DbutilsCall(call) for call in calls]
 
 
 class SysPathChange(NodeBase, abc.ABC):
