@@ -4,7 +4,7 @@ import pytest
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.sdk import AccountClient
 from databricks.sdk.retries import retried
-from databricks.sdk.service.iam import Group
+from databricks.sdk.service.iam import Group, User
 
 from databricks.labs.ucx.account.workspaces import AccountWorkspaces
 
@@ -70,23 +70,30 @@ def test_create_account_level_groups_nested_groups(
     make_group, make_user, acc, ws, make_random, clean_account_level_groups, watchdog_purge_suffix, runtime_ctx, caplog
 ):
     suffix = f"{make_random(4).lower()}-{watchdog_purge_suffix}"
-    regular_group = make_group(
-        display_name=f"created_by_ucx_regular_group1-{suffix}", members=[make_user().id, make_user().id]
+    # Test groups:
+    # group_a (group_b, group_c)
+    # group_b (user1, user2, group_d)
+    # group_c (group_d)
+    # group_d (user3, user4)
+
+    users = list[User]()
+    for i in range(4):
+        users.append(make_user())
+
+    group_d = make_group(
+        display_name=f"created_by_ucx_regular_group_d-{suffix}", members=[users[2].id, users[3].id]
     )
-    make_group(
-        display_name=f"created_by_ucx_regular_group_standalone-{suffix}", members=[make_user().id, make_user().id]
+    group_c = make_group(
+        display_name=f"created_by_ucx_regular_group_c-{suffix}", members=[group_d.id]
+    )
+    group_b = make_group(
+        display_name=f"created_by_ucx_regular_group_b-{suffix}", members=[users[0].id, users[1].id, group_d.id]
+    )
+    group_a = make_group(
+        display_name=f"created_by_ucx_regular_group_a-{suffix}", members=[group_b.id, group_c.id]
     )
 
-    group_display_name = f"created_by_ucx_nested_group1-{suffix}"
-    nested_group = make_group(display_name=group_display_name, members=[make_user().id, regular_group.id])
-    AccountWorkspaces(acc, [ws.get_workspace_id()]).create_account_level_groups(MockPrompts({}))
-    regular_group2 = make_group(
-        display_name=f"created_by_ucx_regular_group2-{suffix}", members=[make_user().id, make_user().id]
-    )
-    make_group(
-        display_name=f"created_by_ucx_nested_group2-{suffix}",
-        members=[make_user().id, regular_group.id, regular_group2.id],
-    )
+    ws_groups = [group_a, group_b, group_c, group_d]
 
     AccountWorkspaces(acc, [ws.get_workspace_id()]).create_account_level_groups(MockPrompts({}))
 
@@ -97,9 +104,12 @@ def test_create_account_level_groups_nested_groups(
                 return grp
         raise KeyError(f"Group not found {display_name}")
 
-    group = get_group(group_display_name)
-    assert group
-    assert len(group.members) == len(nested_group.members)
+
+    for ws_group in ws_groups:
+        group_display_name = ws_group.display_name
+        group = get_group(group_display_name)
+        assert group
+        assert len(group.members) == len(ws_group.members)
 
     runtime_ctx.group_manager.validate_group_membership()
 
