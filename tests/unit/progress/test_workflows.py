@@ -3,6 +3,7 @@ from typing import get_type_hints
 from unittest.mock import create_autospec
 
 import pytest
+
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationStatusRefresher
 from databricks.labs.ucx.progress.history import ProgressEncoder
@@ -12,6 +13,8 @@ from databricks.sdk.service.jobs import BaseRun, RunResultState, RunState, Pause
 
 from databricks.labs.ucx.progress.workflows import MigrationProgress
 from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
+from databricks.labs.ucx.source_code.linters.jobs import WorkflowLinter
+from databricks.labs.ucx.source_code.linters.queries import QueryLinter
 
 
 @pytest.mark.parametrize(
@@ -98,19 +101,20 @@ def test_migration_progress_runtime_tables_refresh_update_history_log(run_workfl
     mock_history_log.append_inventory_snapshot.assert_called_once()
 
 
-@pytest.mark.parametrize(
-    "task, linter",
-    (
-        (MigrationProgress.assess_dashboards, RuntimeContext.query_linter),
-        (MigrationProgress.assess_workflows, RuntimeContext.workflow_linter),
-    ),
-)
-def test_linter_runtime_refresh(run_workflow, task, linter) -> None:
-    linter_class = get_type_hints(linter.func)["return"]
-    mock_linter = create_autospec(linter_class)
-    linter_name = linter.attrname
-    run_workflow(task, **{linter_name: mock_linter})
+def test_migration_progress_assess_dashboards_calls_query_linter_refresh_report(run_workflow) -> None:
+    mock_linter = create_autospec(QueryLinter)
+    run_workflow(MigrationProgress.assess_dashboards, query_linter=mock_linter)
     mock_linter.refresh_report.assert_called_once()
+
+
+def test_migration_progress_assess_workflows_calls_workflow_linter_snapshot(run_workflow) -> None:
+    mock_linter = create_autospec(WorkflowLinter)
+    mock_history_log = create_autospec(ProgressEncoder)
+    run_workflow(MigrationProgress.assess_workflows, workflow_linter=mock_linter)
+    run_workflow(
+        MigrationProgress.update_workflow_problems_history_log, workflow_progress=mock_history_log, parent_run_id=1234
+    )
+    mock_linter.snapshot.assert_called_once()
 
 
 def test_migration_progress_with_valid_prerequisites(run_workflow) -> None:

@@ -180,8 +180,13 @@ class MigrationProgress(Workflow):
     def assess_workflows(self, ctx: RuntimeContext):
         """Scans all jobs for migration issues in notebooks.
         Also stores direct filesystem accesses for display in the migration dashboard."""
-        # TODO: Ensure these are captured in the history log.
-        ctx.workflow_linter.refresh_report(ctx.sql_backend, ctx.inventory_database)
+        ctx.workflow_linter.snapshot(force_refresh=True)
+
+    @job_task(depends_on=[assess_workflows], job_cluster="user_isolation")
+    def update_workflow_problems_history_log(self, ctx: RuntimeContext) -> None:
+        """Update the history log with the latest workflow problems snapshot."""
+        workflow_problems_snapshot = ctx.workflow_linter.snapshot(force_refresh=False)
+        ctx.workflow_problem_progress.append_inventory_snapshot(workflow_problems_snapshot)
 
     @job_task(
         depends_on=[
