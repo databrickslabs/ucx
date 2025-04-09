@@ -71,29 +71,28 @@ def test_create_account_level_groups_nested_groups(
 ):
     suffix = f"{make_random(4).lower()}-{watchdog_purge_suffix}"
     # Test groups:
-    # group_a (group_b, group_c)
-    # group_b (user1, user2, group_d)
-    # group_c (group_d)
-    # group_d (user3, user4)
+    # 1. group a contains group_b and group_c.
+    # 2. group b contains user1, user2 and group_d.
+    # 3. group c contains group_d.
+    # 4. group d contains user3 and user4.
 
     users = list[User]()
-    for i in range(4):
+    for _ in range(4):
         users.append(make_user())
 
-    group_d = make_group(
-        display_name=f"created_by_ucx_regular_group_d-{suffix}", members=[users[2].id, users[3].id]
+    ws_groups = list[Group]()
+    ws_groups.append(
+        make_group(display_name=f"created_by_ucx_regular_group_d-{suffix}", members=[users[2].id, users[3].id])
     )
-    group_c = make_group(
-        display_name=f"created_by_ucx_regular_group_c-{suffix}", members=[group_d.id]
+    ws_groups.append(make_group(display_name=f"created_by_ucx_regular_group_c-{suffix}", members=ws_groups[0].id))
+    ws_groups.append(
+        make_group(
+            display_name=f"created_by_ucx_regular_group_b-{suffix}", members=[users[0].id, users[1].id, ws_groups[0].id]
+        )
     )
-    group_b = make_group(
-        display_name=f"created_by_ucx_regular_group_b-{suffix}", members=[users[0].id, users[1].id, group_d.id]
+    ws_groups.append(
+        make_group(display_name=f"created_by_ucx_regular_group_a-{suffix}", members=[ws_groups[1].id, ws_groups[2].id])
     )
-    group_a = make_group(
-        display_name=f"created_by_ucx_regular_group_a-{suffix}", members=[group_b.id, group_c.id]
-    )
-
-    ws_groups = [group_a, group_b, group_c, group_d]
 
     AccountWorkspaces(acc, [ws.get_workspace_id()]).create_account_level_groups(MockPrompts({}))
 
@@ -103,7 +102,6 @@ def test_create_account_level_groups_nested_groups(
             if grp.display_name == display_name:
                 return grp
         raise KeyError(f"Group not found {display_name}")
-
 
     for ws_group in ws_groups:
         group_display_name = ws_group.display_name
