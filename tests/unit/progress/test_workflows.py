@@ -174,4 +174,4 @@ def test_migration_progress_record_workflow_run(run_workflow, mock_backend) -> N
 def test_migration_progress_has_schedule() -> None:
     workflow = MigrationProgress()
     schedule = workflow.schedule
-    assert schedule is not None and schedule.pause_status == PauseStatus.UNPAUSED
+    assert schedule is not None and schedule.pause_status == PauseStatus.PAUSED
