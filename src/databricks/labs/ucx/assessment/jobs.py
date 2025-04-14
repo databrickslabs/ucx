@@ -42,6 +42,8 @@ class JobInfo:
     job_name: str | None = None
     creator: str | None = None
     """User-name of the creator of the pipeline, if known."""
+    last_run: int | None = None
+    """Timestamp of the last run of the pipeline, if known."""
 
     __id_attributes__: ClassVar[tuple[str, ...]] = ("job_id",)
 
@@ -54,6 +56,7 @@ class JobInfo:
             failures="[]",
             job_name=job_name,
             creator=job.creator_user_name or None,
+            last_run=None,
         )
 
 
