@@ -3,7 +3,7 @@ from collections import defaultdict
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, replace
 from functools import partial, cached_property
-from typing import ClassVar, Protocol
+from typing import ClassVar, Protocol, Any
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.parallel import ManyError, Threads
@@ -406,6 +406,9 @@ class GrantOwnership(Ownership[Grant]):
 
     At the present we can't determine a specific owner for grants.
     """
+
+    def is_applicable_to(self, record: Any) -> bool:
+        return isinstance(record, Grant)
 
     def _maybe_direct_owner(self, record: Grant) -> None:
         return None

@@ -1,6 +1,7 @@
 import logging
 import re
 from collections.abc import Callable, Sequence
+from typing import Any
 from unittest.mock import create_autospec, Mock
 
 import pytest
@@ -31,6 +32,9 @@ class _OwnershipFixture(Ownership[Record]):
         super().__init__(mock_admin_locator)
         self._owner_fn = owner_fn
         self.mock_admin_locator = mock_admin_locator
+
+    def is_applicable_to(self, record: Any) -> bool:
+        return True
 
     def _maybe_direct_owner(self, record: Record) -> str | None:
         return self._owner_fn(record)
