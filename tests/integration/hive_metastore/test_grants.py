@@ -9,9 +9,7 @@ from databricks.sdk.retries import retried
 from databricks.labs.lsql.backends import StatementExecutionBackend
 
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
-from databricks.labs.ucx.hive_metastore import TablesCrawler
-from databricks.labs.ucx.hive_metastore.grants import GrantsCrawler, GrantOwnership
-from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
+from databricks.labs.ucx.hive_metastore.grants import GrantOwnership
 from ..conftest import MockRuntimeContext
 
 logger = logging.getLogger(__name__)
@@ -123,22 +121,20 @@ def test_all_grants_for_other_objects(
     assert {"DENIED_SELECT"} == found_anonymous_function_grants[group_d.display_name]
 
 
-def test_grant_ownership(ws, runtime_ctx, inventory_schema, sql_backend, make_random, make_acc_group) -> None:
+def test_grant_ownership(ws, runtime_ctx, make_random, make_acc_group) -> None:
     """Verify the ownership can be determined for crawled grants.
     This currently isn't very useful: we can't locate specific owners for grants"""
 
     schema = runtime_ctx.make_schema()
     this_user = ws.current_user.me()
-    sql_backend.execute(f"GRANT SELECT ON SCHEMA {escape_sql_identifier(schema.full_name)} TO `{this_user.user_name}`")
-    table_crawler = TablesCrawler(sql_backend, schema=inventory_schema, include_databases=[schema.name])
-    udf_crawler = UdfsCrawler(sql_backend, schema=inventory_schema, include_databases=[schema.name])
+    runtime_ctx.sql_backend.execute(
+        f"GRANT SELECT ON SCHEMA {escape_sql_identifier(schema.full_name)} TO `{this_user.user_name}`"
+    )
     current_user = ws.current_user.me()
     admin_group_name = f"admin_group_{make_random()}"
     make_acc_group(display_name=admin_group_name, members=[current_user.id], wait_for_provisioning=True)
 
-    # Produce the crawled records.
-    crawler = GrantsCrawler(table_crawler, udf_crawler, include_databases=[schema.name])
-    records = crawler.snapshot(force_refresh=True)
+    records = runtime_ctx.grants_crawler.snapshot(force_refresh=True)
 
     # Find the crawled record for the grant we made.
     grant_record = next(record for record in records if record.this_type_and_key() == ("DATABASE", schema.full_name))
