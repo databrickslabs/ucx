@@ -1,8 +1,9 @@
+import pytest
 from databricks.labs.lsql.backends import Row
 
 from databricks.labs.ucx.source_code.base import DirectFsAccess, LineageAtom, UsedTable
 
-
+@pytest.mark.skip(reason="Legacy dashboard creation is no longer supported by Databricks.")
 def test_query_linter_lints_queries_and_stores_dfsas_and_tables(simple_ctx) -> None:
     query_with_dfsa = simple_ctx.make_query(sql_query="SELECT * from csv.`dbfs://some_folder/some_file.csv`")
     dashboard_with_dfsa = simple_ctx.make_dashboard(query=query_with_dfsa)
