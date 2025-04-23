@@ -593,7 +593,7 @@ def dashboard_metadata(catalog_populated: str) -> DashboardMetadata:
     metadata.validate()
     return metadata
 
-
+@pytest.mark.skip(reason="Legacy dashboard creation is no longer supported by Databricks.")
 def test_migration_progress_dashboard(
     ws: WorkspaceClient,
     is_in_debug,  # Skip test when not in debug
@@ -615,7 +615,7 @@ def test_migration_progress_dashboard(
     webbrowser.open(dashboard_url)
     assert True, "Dashboard deployment successful"
 
-
+@pytest.mark.skip(reason="Legacy dashboard creation is no longer supported by Databricks.")
 @pytest.mark.parametrize(
     "query_name, rows",
     [
@@ -719,7 +719,7 @@ def exclude_fields_from_rows(rows: list[Row], *fields: str) -> list[Row]:
         rows_without_fields.append(row)
     return rows_without_fields
 
-
+@pytest.mark.skip(reason="Legacy dashboard creation is no longer supported by Databricks.")
 def test_migration_progress_query_dashboard_pending_migration_by_owner_bar_graph(
     dashboard_metadata: DashboardMetadata,
     sql_backend: SqlBackend,
@@ -733,7 +733,7 @@ def test_migration_progress_query_dashboard_pending_migration_by_owner_bar_graph
     # See `test_redash_dashboard_ownership_is_me` for why we exclude the owner
     assert exclude_fields_from_rows(query_results, "owner") == rows
 
-
+@pytest.mark.skip(reason="Legacy dashboard creation is no longer supported by Databricks.")
 def test_migration_progress_query_dashboards_pending_migration_by_owner_overview(
     dashboard_metadata: DashboardMetadata,
     sql_backend: SqlBackend,
@@ -754,7 +754,7 @@ def test_migration_progress_query_dashboards_pending_migration_by_owner_overview
     query_results = list(sql_backend.fetch(datasets[0].query))
     assert exclude_fields_from_rows(query_results, "owner") == rows
 
-
+@pytest.mark.skip(reason="Legacy dashboard creation is no longer supported by Databricks.")
 def test_migration_progress_query_dashboards_pending_migration(
     ws: WorkspaceClient,
     dashboard_metadata: DashboardMetadata,
