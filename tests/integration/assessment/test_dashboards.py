@@ -8,7 +8,7 @@ from databricks.labs.ucx.assessment.dashboards import (
     RedashDashboardCrawler,
 )
 
-
+@pytest.mark.skip(reason="Legacy dashboard creation is no longer supported by Databricks.")
 def test_redash_dashboard_crawler_crawls_dashboards(ws, make_dashboard, inventory_schema, sql_backend) -> None:
     dashboard: SdkRedashDashboard = make_dashboard()
     crawler = RedashDashboardCrawler(ws, sql_backend, inventory_schema)
@@ -18,7 +18,7 @@ def test_redash_dashboard_crawler_crawls_dashboards(ws, make_dashboard, inventor
     assert len(dashboards) >= 1
     assert dashboard.id in {d.id for d in dashboards}, f"Missing dashboard: {dashboard.id}"
 
-
+@pytest.mark.skip(reason="Legacy dashboard creation is no longer supported by Databricks.")
 def test_redash_dashboard_crawler_crawls_dashboard(ws, make_dashboard, inventory_schema, sql_backend) -> None:
     dashboard: SdkRedashDashboard = make_dashboard()
     assert dashboard.id
@@ -29,7 +29,7 @@ def test_redash_dashboard_crawler_crawls_dashboard(ws, make_dashboard, inventory
 
     assert dashboards == [Dashboard.from_sdk_redash_dashboard(dashboard)]
 
-
+@pytest.mark.skip(reason="Legacy dashboard creation is no longer supported by Databricks.")
 def test_redash_dashboard_crawler_crawls_dashboards_with_debug_listing_upper_limit(
     ws, make_dashboard, inventory_schema, sql_backend
 ) -> None:
