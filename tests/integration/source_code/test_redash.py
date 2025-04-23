@@ -6,6 +6,7 @@ from databricks.sdk.retries import retried
 from databricks.labs.ucx.source_code.linters.redash import Redash
 from databricks.sdk.service.sql import Dashboard
 
+
 @pytest.mark.skip(reason="Legacy dashboard creation is no longer supported by Databricks.")
 def test_migrate_dashboards_sets_migration_tags(installation_ctx) -> None:
     query_in_dashboard, query_outside_dashboard = installation_ctx.make_query(), installation_ctx.make_query()

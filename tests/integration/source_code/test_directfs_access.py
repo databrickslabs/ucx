@@ -4,6 +4,7 @@ from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigra
 from databricks.labs.ucx.source_code.base import DirectFsAccess, LineageAtom
 from databricks.labs.ucx.source_code.linters.jobs import WorkflowLinter
 
+
 @pytest.mark.skip(reason="Legacy dashboard creation is no longer supported by Databricks.")
 def test_legacy_query_dfsa_ownership(runtime_ctx) -> None:
     """Verify the ownership of a direct-fs record for a legacy query."""
