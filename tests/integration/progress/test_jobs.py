@@ -1,9 +1,12 @@
+import pytest
+
 from databricks.labs.ucx.assessment.jobs import JobInfo
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.source_code.base import DirectFsAccess, LineageAtom
 from databricks.labs.ucx.source_code.jobs import JobProblem
 
 
+@pytest.mark.skip(reason="Legacy dashboard creation is no longer supported by Databricks.")
 def test_job_progress_encoder_failures(runtime_ctx, az_cli_ctx) -> None:
     az_cli_ctx.progress_tracking_installation.run()
     runtime_ctx = runtime_ctx.replace(
