@@ -231,14 +231,17 @@ def test_workflow_task_container_builds_dependency_graph_spark_python_task(
 
 
 def test_workflow_linter_lint_job_logs_problems(dependency_resolver, mock_path_lookup, empty_index, caplog) -> None:
-    expected_message = "Found job problems:\nUNKNOWN:-1 [library-install-failed] 'pip --disable-pip-version-check install unknown-library"
+    expected_message = "Found job problems:\n<MISSING_SOURCE_PATH>:-1 [library-install-failed] 'pip --disable-pip-version-check install unknown-library"
 
     ws = create_autospec(WorkspaceClient)
+    sql_backend = MockBackend()
     jobs_crawler = create_autospec(JobsCrawler)
     directfs_crawler = create_autospec(DirectFsAccessCrawler)
     used_tables_crawler = create_autospec(UsedTablesCrawler)
     linter = WorkflowLinter(
         ws,
+        sql_backend,
+        "test",
         jobs_crawler,
         dependency_resolver,
         mock_path_lookup,
@@ -576,6 +579,8 @@ def test_workflow_linter_refresh_report(dependency_resolver, mock_path_lookup, m
     used_tables_crawler = UsedTablesCrawler.for_paths(sql_backend, "test")
     linter = WorkflowLinter(
         ws,
+        sql_backend,
+        "test",
         jobs_crawler,
         dependency_resolver,
         mock_path_lookup,
@@ -583,7 +588,7 @@ def test_workflow_linter_refresh_report(dependency_resolver, mock_path_lookup, m
         directfs_crawler,
         used_tables_crawler,
     )
-    linter.refresh_report(sql_backend, 'test')
+    linter.snapshot()
 
     jobs_crawler.snapshot.assert_called_once()
     sql_backend.has_rows_written_for('test.workflow_problems')

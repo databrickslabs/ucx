@@ -40,6 +40,10 @@ class _ReportingContext:
 
 
 class QueryLinter:
+    """Lint queries
+
+    TODO: Let QueryLinter inherit from `BaseCrawler`
+    """
 
     def __init__(
         self,

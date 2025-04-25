@@ -32,6 +32,7 @@ from databricks.labs.ucx.progress.history import ProgressEncoder
 from databricks.labs.ucx.progress.jobs import JobsProgressEncoder
 from databricks.labs.ucx.progress.tables import TableProgressEncoder
 from databricks.labs.ucx.progress.workflow_runs import WorkflowRunRecorder
+from databricks.labs.ucx.source_code.jobs import JobProblem, JobProblemOwnership
 
 # As with GlobalContext, service factories unavoidably have a lot of public methods.
 # pylint: disable=too-many-public-methods
@@ -71,6 +72,15 @@ class RuntimeContext(GlobalContext):
     @cached_property
     def job_ownership(self) -> JobOwnership:
         return JobOwnership(self.administrator_locator)
+
+    @cached_property
+    def workflow_problem_ownership(self) -> JobProblemOwnership:
+        return JobProblemOwnership(
+            self.administrator_locator,
+            self.workspace_client,
+            self.workspace_path_ownership,
+            self.job_ownership,
+        )
 
     @cached_property
     def submit_runs_crawler(self) -> SubmitRunsCrawler:
@@ -203,6 +213,17 @@ class RuntimeContext(GlobalContext):
             self.job_ownership,
             [self.directfs_access_crawler_for_paths, self.directfs_access_crawler_for_queries],
             self.inventory_database,
+            self.parent_run_id,
+            self.workspace_id,
+            self.config.ucx_catalog,
+        )
+
+    @cached_property
+    def workflow_problem_progress(self) -> ProgressEncoder[JobProblem]:
+        return ProgressEncoder(
+            self.sql_backend,
+            self.workflow_problem_ownership,
+            JobProblem,
             self.parent_run_id,
             self.workspace_id,
             self.config.ucx_catalog,

@@ -80,8 +80,6 @@ def test_lakeview_query_dfsa_ownership(runtime_ctx) -> None:
 def test_path_dfsa_ownership(
     runtime_ctx,
     make_directory,
-    inventory_schema,
-    sql_backend,
 ) -> None:
     """Verify the ownership of a direct-fs record for a notebook/source path associated with a job."""
 
@@ -93,6 +91,8 @@ def test_path_dfsa_ownership(
     # Produce a DFSA record for the job.
     linter = WorkflowLinter(
         runtime_ctx.workspace_client,
+        runtime_ctx.sql_backend,
+        runtime_ctx.inventory_database,
         runtime_ctx.jobs_crawler,
         runtime_ctx.dependency_resolver,
         runtime_ctx.path_lookup,
@@ -100,7 +100,7 @@ def test_path_dfsa_ownership(
         runtime_ctx.directfs_access_crawler_for_paths,
         runtime_ctx.used_tables_crawler_for_paths,
     )
-    linter.refresh_report(sql_backend, inventory_schema)
+    linter.snapshot()
 
     # Find a record for our job.
     records = runtime_ctx.directfs_access_crawler_for_paths.snapshot()

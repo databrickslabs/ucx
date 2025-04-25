@@ -213,7 +213,7 @@ class Assessment(Workflow):  # pylint: disable=too-many-public-methods
 
         Also, stores direct filesystem accesses for display in the migration dashboard.
         """
-        ctx.workflow_linter.refresh_report(ctx.sql_backend, ctx.inventory_database)
+        ctx.workflow_linter.snapshot()
 
 
 class Failing(Workflow):
