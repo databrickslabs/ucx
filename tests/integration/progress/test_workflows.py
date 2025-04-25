@@ -54,4 +54,4 @@ def test_migration_progress_job_has_schedule(ws: WorkspaceClient, installation_c
     assert schedule is not None, "No schedule found for the migration-progress workflow."
     assert schedule.quartz_cron_expression, "No cron expression found for the migration-progress workflow."
     assert schedule.timezone_id, "No time-zone specified for scheduling the migration-progress workflow."
-    assert schedule.pause_status == PauseStatus.UNPAUSED, "Workflow schedule should not be paused."
+    assert schedule.pause_status == PauseStatus.PAUSED, "Workflow schedule should be paused."
