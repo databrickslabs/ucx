@@ -13,8 +13,8 @@ UCX has the following installation requirements:
 - Databricks Premium or Enterprise workspace.
 - Network access to your Databricks Workspace used for the [installation process](#install-ucx).
 - Network access to the Internet for [pypi.org](https://pypi.org) and [github.com](https://github.com) from machine running the installation.
-- Databricks Workspace Administrator privileges for the user, that runs the installation. Running UCX as a Service Principal is not supported.
-- Account level Identity Setup. See instructions for [AWS](https://docs.databricks.com/en/administration-guide/users-groups/best-practices.html), [Azure](https://learn.microsoft.com/en-us/azure/databricks/administration-guide/users-groups/best-practices), and [GCP](https://docs.gcp.databricks.com/administration-guide/users-groups/best-practices.html).
+- Databricks Workspace Administrator privileges for the user that runs the installation. Running UCX as a Service Principal is not supported for workspace installations.
+- Account level Identity Setup. Requires connecting via Service Principal with Account Admin privileges and Workspace Admin privileges in all workspaces See instructions for [AWS](https://docs.databricks.com/en/administration-guide/users-groups/best-practices.html), [Azure](https://learn.microsoft.com/en-us/azure/databricks/administration-guide/users-groups/best-practices), and [GCP](https://docs.gcp.databricks.com/administration-guide/users-groups/best-practices.html).
 - Unity Catalog Metastore Created (per region). See instructions for [AWS](https://docs.databricks.com/en/data-governance/unity-catalog/create-metastore.html), [Azure](https://learn.microsoft.com/en-us/azure/databricks/data-governance/unity-catalog/create-metastore), and [GCP](https://docs.gcp.databricks.com/data-governance/unity-catalog/create-metastore.html).
 - If your Databricks Workspace relies on an external Hive Metastore (such as AWS Glue), make sure to read [this guide](/docs/reference/external_hms_glue).
 - A PRO or Serverless SQL Warehouse to render the [report](/docs/reference/assessment) for the [assessment workflow](/docs/reference/workflows#assessment-workflow).
