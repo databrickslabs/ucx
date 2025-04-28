@@ -241,7 +241,9 @@ class TableMapping:
             return database
         describe = {}
         try:
-            for value in self._sql_backend.fetch(f"DESCRIBE SCHEMA EXTENDED hive_metastore.{escape_sql_identifier(database)}"):
+            for value in self._sql_backend.fetch(
+                f"DESCRIBE SCHEMA EXTENDED hive_metastore.{escape_sql_identifier(database)}"
+            ):
                 describe[value["database_description_item"]] = value["database_description_value"]
         except NotFound:
             logger.warning(
@@ -290,10 +292,10 @@ class TableMapping:
         return table_to_migrate
 
     def _get_table_properties(self, table: Table):
-        table_identifier = f"{escape_sql_identifier(table.database)}.{escape_sql_identifier(table.name)}"
         if table.is_table_in_mount:
             table_identifier = f"delta.`{table.location}`"
-
+        else:
+            table_identifier = f"hive_metastore.{escape_sql_identifier(table.database)}.{escape_sql_identifier(table.name)}"
         try:
             return self._sql_backend.fetch(f"SHOW TBLPROPERTIES {table_identifier}")
         except DatabricksError as err:
