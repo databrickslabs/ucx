@@ -295,7 +295,9 @@ class TableMapping:
         if table.is_table_in_mount:
             table_identifier = f"delta.`{table.location}`"
         else:
-            table_identifier = f"hive_metastore.{escape_sql_identifier(table.database)}.{escape_sql_identifier(table.name)}"
+            table_identifier = (
+                f"hive_metastore.{escape_sql_identifier(table.database)}.{escape_sql_identifier(table.name)}"
+            )
         try:
             return self._sql_backend.fetch(f"SHOW TBLPROPERTIES {table_identifier}")
         except DatabricksError as err:

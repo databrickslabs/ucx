@@ -42,8 +42,12 @@ def test_migrate_recon_should_produce_proper_queries(
             (src_3.schema, src_3.table, tgt_3.catalog, tgt_3.schema, tgt_3.table, "2021-01-01T00:00:00Z"),
             ("schema_none", "table_none", None, "schema_a", "table_a", "2021-01-01T00:00:00Z"),
         ],
-        f"SHOW TBLPROPERTIES hive_metastore.{src.schema}.{src.table} \\('upgraded_to'\\)": UPGRADED_TO[("value", "fake_dest"),],
-        f"SHOW TBLPROPERTIES hive_metastore.{src_2.schema}.{src_2.table} \\('upgraded_to'\\)": UPGRADED_TO[("value", "fake_dest"),],
+        f"SHOW TBLPROPERTIES hive_metastore.{src.schema}.{src.table} \\('upgraded_to'\\)": UPGRADED_TO[
+            ("value", "fake_dest"),
+        ],
+        f"SHOW TBLPROPERTIES hive_metastore.{src_2.schema}.{src_2.table} \\('upgraded_to'\\)": UPGRADED_TO[
+            ("value", "fake_dest"),
+        ],
         "DESCRIBE TABLE": metadata_row_factory[
             ("col1", "int"),
             ("col2", "string"),
