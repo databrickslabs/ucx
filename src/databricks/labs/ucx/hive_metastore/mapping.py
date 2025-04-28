@@ -241,7 +241,7 @@ class TableMapping:
             return database
         describe = {}
         try:
-            for value in self._sql_backend.fetch(f"DESCRIBE SCHEMA EXTENDED {escape_sql_identifier(database)}"):
+            for value in self._sql_backend.fetch(f"DESCRIBE SCHEMA EXTENDED hive_metastore.{escape_sql_identifier(database)}"):
                 describe[value["database_description_item"]] = value["database_description_value"]
         except NotFound:
             logger.warning(
