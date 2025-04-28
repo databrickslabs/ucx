@@ -3,6 +3,7 @@ import logging
 
 from collections.abc import Iterable
 from datetime import datetime, timezone
+from functools import partial
 from pathlib import Path
 
 from databricks.labs.blueprint.parallel import Threads
@@ -59,8 +60,17 @@ class WorkflowLinter:
         self, sql_backend: SqlBackend, inventory_database: str, /, last_run_days: int | None = None
     ) -> None:
         tasks = []
+
+        def lint_job_limited(job_id: int) -> tuple[list[JobProblem], list[DirectFsAccess], list[UsedTable]]:
+            return self.lint_job(job_id, last_run_days=last_run_days)
+
         for job in self._jobs_crawler.snapshot():
-            tasks.append(lambda: self.lint_job(job.job_id, last_run_days=last_run_days))
+            try:
+                job_id = int(job.job_id)
+            except ValueError:
+                logger.warning(f"Invalid job id: {job.job_id}")
+                continue
+            tasks.append(partial(lint_job_limited, job_id))
         #     TODO: Limit Scope
         logger.info(f"Running {len(tasks)} linting tasks in parallel...")
         job_results, errors = Threads.gather('linting workflows', tasks)
