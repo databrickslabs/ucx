@@ -569,7 +569,9 @@ class GroupManager(CrawlerBase[MigratedGroup]):
                 logger.info(f"Skipping {migrated_group.name_in_account}: already in workspace")
                 continue
             if migrated_group.name_in_account in workspace_groups_in_workspace:
-                logger.error(f"Skipping {migrated_group.name_in_account}: group already exists in workspace")
+                ## After introduction of creating nested groups,
+                # we will come across groups that are already in the workspace
+                logger.warning(f"Skipping {migrated_group.name_in_account}: group already exists in workspace")
                 continue
             if migrated_group.name_in_account not in account_groups_in_account:
                 logger.warning(f"Skipping {migrated_group.name_in_account}: not in account")
