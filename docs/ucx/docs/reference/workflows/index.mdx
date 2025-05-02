@@ -19,7 +19,13 @@ relevant for upgrading to UC to assess the compatibility with UC. The `crawl_` t
 [inventory database](/docs/installation#installation-resources) so that it can be used for further analysis and decision-making through
 the [assessment report](/docs/reference/assessment).
 
-> Account groups matching workspace local groups in which UCX is installed need to exist before running assessment, you can run [`create-account-groups` command](/docs/reference/commands#create-account-groups) command before running the assessment workflow.
+> Account groups matching workspace local groups in which UCX is installed need to exist before running assessment.
+
+The account groups can be created in one of three ways:
+1. Manually created using the "Account Console".
+2. Using SCIM or other service utilizing the Account API.
+3. Using the [`create-account-groups` command](/docs/reference/commands#create-account-groups) command.
+
 
 1. `crawl_tables`: This task retrieves table definitions from the Hive metastore and persists the definitions in
    the `tables` table. The definitions include information such as:
