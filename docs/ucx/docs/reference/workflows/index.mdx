@@ -19,6 +19,8 @@ relevant for upgrading to UC to assess the compatibility with UC. The `crawl_` t
 [inventory database](/docs/installation#installation-resources) so that it can be used for further analysis and decision-making through
 the [assessment report](/docs/reference/assessment).
 
+> Account groups matching workspace local groups in which UCX is installed need to exist before running assessment, you can run [`create-account-groups` command](/docs/reference/commands#create-account-groups) command before running the assessment workflow.
+
 1. `crawl_tables`: This task retrieves table definitions from the Hive metastore and persists the definitions in
    the `tables` table. The definitions include information such as:
    - Database/schema name
@@ -106,7 +108,7 @@ to manage groups from a single place: your Databricks account. We expect UCX use
 centrally while most other Databricks resources that UCX touches are scoped to a single workspace.
 For extra confidence, run [`validate-groups-membership` command](/docs/reference/commands#validate-groups-membership) before running the
 group migration. If you do not have account groups matching groups in the workspace in which UCX is installed, you can
-run [`create-account-groups` command](/docs/reference/commands#create-account-groups) before running the group migration workflow.
+run [`create-account-groups` command](/docs/reference/commands#create-account-groups) before running the assessment and group migration workflow.
 
 The group migration workflow is designed to migrate workspace-local groups to account-level groups. It verifies if
 the necessary groups are available to the workspace with the correct permissions, and removes unnecessary groups and
