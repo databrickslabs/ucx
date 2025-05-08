@@ -86,8 +86,9 @@ the [assessment report](/docs/reference/assessment).
 17. `crawl_groups`: This tasks retrieves workspace-local groups and persists these permissions in the `groups` table.
 18. `assess_dashboards`: This task retrieves the dashboards to analyze their queries for
     [migration problems](/docs/reference/linter_codes)
-19. `assess_workflows`: This task retrieves the jobs to analyze their notebooks and files for
-    [migration problems](/docs/reference/linter_codes).
+19. `assess_workflows`(experimnetal): This task retrieves the jobs to analyze their notebooks and files for
+    [migration problems](/docs/reference/linter_codes). This will run for workflows that ran within the last 30 days.
+    To analyze all workflows run the ["migration-progress-experimental"] workflow](/docs/reference/workflows#migration-progress-experimental).
 
 After UCX assessment workflow finished, see the assessment dashboard for findings and recommendations.
 See [this guide](/docs/reference/assessment) for more details.
