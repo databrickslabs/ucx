@@ -336,3 +336,12 @@ class MigrateTablesInMounts(Workflow):
     def record_workflow_run(self, ctx: RuntimeContext) -> None:
         """Record the workflow run of this workflow."""
         ctx.workflow_run_recorder.record()
+
+class ConvertWASBSToADLSGen2(Workflow):
+    def __init__(self):
+        super().__init__('convert-wasbs-to-adls-gen2-experimental')
+
+    @job_task(job_cluster="user_isolation", depends_on=[Assessment.crawl_tables])
+    def convert_wasbs_to_adls_gen2(self, ctx: RuntimeContext):
+        """This workflow task converts WASBS paths to ADLS Gen2 paths in the Hive Metastore."""
+        ctx.tables_migrator.convert_wasbs_to_adls_gen2()

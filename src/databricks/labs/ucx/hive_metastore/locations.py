@@ -216,7 +216,7 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
         return None
 
     @staticmethod
-    def _wasbs_to_abfss(location: str | None) -> str | None:
+    def wasbs_to_abfss(location: str | None) -> str | None:
         """
         Converts a wasbs:// location to abfss://
         """
@@ -266,7 +266,7 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
             return table
         location = self._resolve_jdbc(table)
         location = self.resolve_mount(location)
-        location = self._wasbs_to_abfss(location)
+        location = self.wasbs_to_abfss(location)
         return dataclasses.replace(table, location=location)
 
     def resolve_mount(self, location: str | None) -> str | None:
