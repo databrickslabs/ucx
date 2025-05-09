@@ -385,10 +385,11 @@ class TablesMigrator:
             table_identifier = self._table_identifier(src_table.name, database)
             old_table = self._catalog.getTableMetadata(table_identifier)
             entity_storage_locations = self._get_entity_storage_locations(old_table)
+            table_location:str = old_table.storage()
             new_table = self._catalog_table(
                 old_table.identifier(),
                 old_table.tableType(),
-                ExternalLocations.wasbs_to_abfss(old_table.storage()),
+                ExternalLocations.wasbs_to_abfss(table_location),
                 old_table.schema(),
                 old_table.provider(),
                 old_table.partitionColumnNames(),
