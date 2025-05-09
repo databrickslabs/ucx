@@ -108,7 +108,7 @@ class TablesMigrator:
         tables_in_scope = filter(lambda t: t.src.what == What.EXTERNAL_SYNC, tables_to_migrate)
         tasks = []
         for table in tables_in_scope:
-            if table.location and table.location.startswith("wasbs://"):
+            if table.src.location and table.src.location.startswith("wasbs://"):
                 tasks.append(
                     partial(
                         self._convert_wasbs_table_to_abfss,
