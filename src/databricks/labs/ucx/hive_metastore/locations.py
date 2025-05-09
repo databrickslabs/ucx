@@ -20,7 +20,7 @@ from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler
 
 logger = logging.getLogger(__name__)
 
-_EXTERNAL_FILE_LOCATION_SCHEMES = ("s3", "s3a", "s3n", "gcs", "abfss")
+_EXTERNAL_FILE_LOCATION_SCHEMES = ("s3", "s3a", "s3n", "gcs", "abfss", "wasbs")
 
 
 @dataclass
@@ -215,6 +215,20 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
             return None
         return None
 
+    @staticmethod
+    def _wasbs_to_abfss(location: str | None) -> str | None:
+        """
+        Converts a wasbs:// location to abfss://
+        """
+        if not location:
+            return None
+        if not location.startswith("wasbs://"):
+            return location
+        parsed = urlparse(location)
+        if parsed.scheme == "wasbs":
+            return f"abfss://{parsed.netloc.replace('.blob.core.windows.net','.dfs.core.windows.net')}{parsed.path}"
+        return location
+
     def _external_locations(self) -> Iterable[ExternalLocation]:
         trie = LocationTrie()
         for table in self._tables_crawler.snapshot():
@@ -252,6 +266,7 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
             return table
         location = self._resolve_jdbc(table)
         location = self.resolve_mount(location)
+        location = self._wasbs_to_abfss(location)
         return dataclasses.replace(table, location=location)
 
     def resolve_mount(self, location: str | None) -> str | None:
@@ -331,7 +346,7 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
                 else:
                     res_name = loc.location[prefix_len:].rstrip("/").replace("/", "_")
             if res_name == "":
-                # if the cloud storage url doesn't match the above condition or incorrect (example wasb://)
+                # if the cloud storage url doesn't match the above condition or incorrect
                 # dont generate tf script and ignore
                 logger.warning(f"unsupported storage format {loc.location}")
                 continue
