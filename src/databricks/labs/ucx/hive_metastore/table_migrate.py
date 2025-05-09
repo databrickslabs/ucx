@@ -96,6 +96,30 @@ class TablesMigrator:
             logger.info("No managed hms table found to convert to external")
         return tasks
 
+    def convert_wasbs_to_adls_gen2(
+        self
+    ):
+        """
+        Converts a Hive metastore azure wasbs tables to abfss using spark jvm.
+        """
+
+        self._spark = self._spark_session
+        tables_to_migrate = self._table_mapping.get_tables_to_migrate(self._tables_crawler, False)
+        tables_in_scope = filter(lambda t: t.src.what == What.EXTERNAL_SYNC, tables_to_migrate)
+        tasks = []
+        for table in tables_in_scope:
+            if table.location and table.location.startswith("wasbs://"):
+                tasks.append(
+                    partial(
+                        self._convert_wasbs_table_to_abfss,
+                        table.src,
+                    )
+                )
+        Threads.strict("convert tables to abfss", tasks)
+        if not tasks:
+            logger.info("No wasbs table found to convert to abfss")
+        return tasks
+
     def migrate_tables(
         self,
         what: What,
@@ -346,6 +370,51 @@ class TablesMigrator:
             self._update_table_status(src_table, inventory_table)
         except Exception as e:  # pylint: disable=broad-exception-caught
             logger.warning(f"Error converting HMS table {src_table.name} to external: {e}", exc_info=True)
+            return False
+        logger.info(f"Converted {src_table.name} to External Table type.")
+        return True
+
+    def _convert_wasbs_table_to_abfss(self, src_table: Table) -> bool:
+        """
+        Converts a Hive metastore azure wasbs table to abfss using alter table command.
+        """
+        logger.info(f"Changing HMS managed table {src_table.name} to External Table type.")
+        inventory_table = self._tables_crawler.full_name
+        try:
+            database = self._spark._jvm.scala.Some(src_table.database)  # pylint: disable=protected-access
+            table_identifier = self._table_identifier(src_table.name, database)
+            old_table = self._catalog.getTableMetadata(table_identifier)
+            entity_storage_locations = self._get_entity_storage_locations(old_table)
+            new_table = self._catalog_table(
+                old_table.identifier(),
+                old_table.tableType(),
+                ExternalLocations.wasbs_to_abfss(old_table.storage()),
+                old_table.schema(),
+                old_table.provider(),
+                old_table.partitionColumnNames(),
+                old_table.bucketSpec(),
+                old_table.owner(),
+                old_table.createTime(),
+                old_table.lastAccessTime(),
+                old_table.createVersion(),
+                old_table.properties(),
+                old_table.stats(),
+                old_table.viewText(),
+                old_table.comment(),
+                old_table.unsupportedFeatures(),
+                old_table.tracksPartitionsInCatalog(),
+                old_table.schemaPreservesCase(),
+                old_table.ignoredProperties(),
+                old_table.viewOriginalText(),
+                # From DBR 16, there's a new constructor argument: entityStorageLocations (Seq[EntityStorageLocation])
+                # (We can't detect whether the argument is needed by the constructor, but assume that if the accessor
+                # is present on the source table then the argument is needed.)
+                *([entity_storage_locations] if entity_storage_locations is not None else []),
+            )
+            self._catalog.alterTable(new_table)
+            self._update_table_status(src_table, inventory_table)
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logger.warning(f"Error converting HMS table {src_table.name} to abfss: {e}", exc_info=True)
             return False
         logger.info(f"Converted {src_table.name} to External Table type.")
         return True
