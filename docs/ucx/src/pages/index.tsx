@@ -19,7 +19,7 @@ export default function Home(): JSX.Element {
           <div className="flex justify-center md:justify-start space-x-4">
             <Link
               className="px-6 py-3 text-white bg-red-600 rounded-md hover:bg-red-700"
-              to="/docs/installation"
+              to="/docs/gettingstarted"
             >
               Get Started
             </Link>
