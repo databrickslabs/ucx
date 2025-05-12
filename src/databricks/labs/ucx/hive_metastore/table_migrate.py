@@ -428,15 +428,19 @@ class TablesMigrator:
                 *([entity_storage_locations] if entity_storage_locations is not None else []),
             )
             self._catalog.alterTable(new_table)
+            self._update_table_location(src_table, inventory_table, new_table_location.toString())
         except Exception as e:  # pylint: disable=broad-exception-caught
             logger.warning(f"Error converting HMS table {src_table.name} to abfss: {e}", exc_info=True)
             return False
-        self._update_table_status(src_table, inventory_table)
         logger.info(f"Converted {src_table.name} to External Table type.")
         return True
 
     def _update_table_status(self, src_table: Table, inventory_table: str):
         update_sql = f"UPDATE {escape_sql_identifier(inventory_table)} SET object_type = 'EXTERNAL' WHERE catalog='hive_metastore' AND database='{src_table.database}' AND name='{src_table.name}';"
+        self._sql_backend.execute(update_sql)
+
+    def _update_table_location(self, src_table: Table, inventory_table: str, new_location: str):
+        update_sql = f"UPDATE {escape_sql_identifier(inventory_table)} SET location = {new_location} WHERE catalog='hive_metastore' AND database='{src_table.database}' AND name='{src_table.name}';"
         self._sql_backend.execute(update_sql)
 
     def _migrate_managed_as_external_table(self, src_table: Table, rule: Rule):
