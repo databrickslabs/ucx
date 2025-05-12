@@ -440,7 +440,7 @@ class TablesMigrator:
         self._sql_backend.execute(update_sql)
 
     def _update_table_location(self, src_table: Table, inventory_table: str, new_location: str):
-        update_sql = f"UPDATE {escape_sql_identifier(inventory_table)} SET location = {new_location} WHERE catalog='hive_metastore' AND database='{src_table.database}' AND name='{src_table.name}';"
+        update_sql = f"UPDATE {escape_sql_identifier(inventory_table)} SET location = '{new_location}' WHERE catalog='hive_metastore' AND database='{src_table.database}' AND name='{src_table.name}';"
         self._sql_backend.execute(update_sql)
 
     def _migrate_managed_as_external_table(self, src_table: Table, rule: Rule):
