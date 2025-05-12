@@ -242,7 +242,9 @@ def test_convert_wasbs_to_adls_gen2(ws, mock_pyspark):
     table_migrate.convert_wasbs_to_adls_gen2()
     migrate_grants.apply.assert_not_called()
     external_locations.resolve_mount.assert_not_called()
-    assert backend.queries[0].startswith("UPDATE `hive_metastore`.`inventory_database`.`tables` SET location =")
+    assert backend.queries == [
+        "UPDATE `hive_metastore`.`inventory_database`.`tables` SET location = 'abfss://bucket/test/table1' WHERE catalog='hive_metastore' AND database='db1_src' AND name='wasbs_src';"
+    ]
 
 
 def test_migrate_managed_table_as_external_tables_without_conversion(ws, mock_pyspark):
