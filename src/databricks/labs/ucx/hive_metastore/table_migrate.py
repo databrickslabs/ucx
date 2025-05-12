@@ -384,9 +384,9 @@ class TablesMigrator:
         """
         logger.info(f"Changing HMS managed table {src_table.name} to External Table type.")
         inventory_table = self._tables_crawler.full_name
+        database = self._spark._jvm.scala.Some(src_table.database)  # pylint: disable=protected-access
+        table_identifier = self._table_identifier(src_table.name, database)
         try:
-            database = self._spark._jvm.scala.Some(src_table.database)  # pylint: disable=protected-access
-            table_identifier = self._table_identifier(src_table.name, database)
             old_table = self._catalog.getTableMetadata(table_identifier)
             entity_storage_locations = self._get_entity_storage_locations(old_table)
             table_location = old_table.storage()
@@ -428,10 +428,10 @@ class TablesMigrator:
                 *([entity_storage_locations] if entity_storage_locations is not None else []),
             )
             self._catalog.alterTable(new_table)
-            self._update_table_location(src_table, inventory_table, new_table_location.toString())
         except Exception as e:  # pylint: disable=broad-exception-caught
             logger.warning(f"Error converting HMS table {src_table.name} to abfss: {e}", exc_info=True)
             return False
+        self._update_table_location(src_table, inventory_table, new_table_location.toString())
         logger.info(f"Converted {src_table.name} to External Table type.")
         return True
 
