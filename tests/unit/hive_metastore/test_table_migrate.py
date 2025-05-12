@@ -226,6 +226,25 @@ def test_migrate_managed_table_as_external_tables_with_conversion(ws, mock_pyspa
     ]
 
 
+def test_convert_wasbs_to_adls_gen2(ws, mock_pyspark):
+    errors = {}
+    rows = {r"SYNC .*": MockBackend.rows("status_code", "description")[("SUCCESS", "test")]}
+    crawler_backend = MockBackend(fails_on_first=errors, rows=rows)
+    backend = MockBackend(fails_on_first=errors, rows=rows)
+    table_crawler = TablesCrawler(crawler_backend, "inventory_database")
+    table_mapping = mock_table_mapping(["wasbs_to_adls"])
+    migration_status_refresher = TableMigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
+    migrate_grants = create_autospec(MigrateGrants)
+    external_locations = create_autospec(ExternalLocations)
+    table_migrate = TablesMigrator(
+        table_crawler, ws, backend, table_mapping, migration_status_refresher, migrate_grants, external_locations
+    )
+    table_migrate.convert_wasbs_to_adls_gen2()
+    migrate_grants.apply.assert_not_called()
+    external_locations.resolve_mount.assert_not_called()
+    assert backend.queries[0].startswith("UPDATE `hive_metastore`.`inventory_database`.`tables` SET location =")
+
+
 def test_migrate_managed_table_as_external_tables_without_conversion(ws, mock_pyspark):
     errors = {}
     rows = {r"SYNC .*": MockBackend.rows("status_code", "description")[("SUCCESS", "test")]}
