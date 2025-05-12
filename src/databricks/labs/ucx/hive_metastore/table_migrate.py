@@ -386,16 +386,18 @@ class TablesMigrator:
         inventory_table = self._tables_crawler.full_name
         database = self._spark._jvm.scala.Some(src_table.database)  # pylint: disable=protected-access
         table_identifier = self._table_identifier(src_table.name, database)
+        new_table_location = ExternalLocations.wasbs_to_abfss(src_table.location)
+        if not new_table_location:
+            logger.warning(f"Invalid wasbs location for table {src_table.name}, skipping conversion.")
+            return False
         try:
             old_table = self._catalog.getTableMetadata(table_identifier)
             entity_storage_locations = self._get_entity_storage_locations(old_table)
             table_location = old_table.storage()
-            new_table_location = self._spark._jvm.java.net.URI(  # pylint: disable=protected-access
-                ExternalLocations.wasbs_to_abfss(src_table.location)
-            )
             new_location = self._catalog_storage(
-                self._spark._jvm.scala.Some(new_table_location),  # pylint: disable=protected-access
-                table_location.inputFormat(),
+                self._spark._jvm.scala.Some(  # pylint: disable=protected-access
+                    self._spark._jvm.java.net.URI(new_table_location)  # pylint: disable=protected-access
+                ),
                 table_location.outputFormat(),
                 table_location.serde(),
                 table_location.compressed(),
@@ -431,7 +433,7 @@ class TablesMigrator:
         except Exception as e:  # pylint: disable=broad-exception-caught
             logger.warning(f"Error converting HMS table {src_table.name} to abfss: {e}", exc_info=True)
             return False
-        self._update_table_location(src_table, inventory_table, new_table_location.toString())
+        self._update_table_location(src_table, inventory_table, new_table_location)
         logger.info(f"Converted {src_table.name} to External Table type.")
         return True
 
