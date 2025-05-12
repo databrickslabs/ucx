@@ -96,9 +96,7 @@ class TablesMigrator:
             logger.info("No managed hms table found to convert to external")
         return tasks
 
-    def convert_wasbs_to_adls_gen2(
-        self
-    ):
+    def convert_wasbs_to_adls_gen2(self):
         """
         Converts a Hive metastore azure wasbs tables to abfss using spark jvm.
         """
@@ -385,7 +383,7 @@ class TablesMigrator:
             table_identifier = self._table_identifier(src_table.name, database)
             old_table = self._catalog.getTableMetadata(table_identifier)
             entity_storage_locations = self._get_entity_storage_locations(old_table)
-            table_location:str = old_table.storage()
+            table_location: str = old_table.storage()
             new_table = self._catalog_table(
                 old_table.identifier(),
                 old_table.tableType(),
@@ -413,10 +411,10 @@ class TablesMigrator:
                 *([entity_storage_locations] if entity_storage_locations is not None else []),
             )
             self._catalog.alterTable(new_table)
-            self._update_table_status(src_table, inventory_table)
         except Exception as e:  # pylint: disable=broad-exception-caught
             logger.warning(f"Error converting HMS table {src_table.name} to abfss: {e}", exc_info=True)
             return False
+        self._update_table_status(src_table, inventory_table)
         logger.info(f"Converted {src_table.name} to External Table type.")
         return True
 

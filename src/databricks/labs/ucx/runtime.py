@@ -15,7 +15,8 @@ from databricks.labs.ucx.hive_metastore.workflows import (
     TableMigration,
     MigrateTablesInMounts,
     MigrateHiveSerdeTablesInPlace,
-    MigrateExternalTablesCTAS, ConvertWASBSToADLSGen2,
+    MigrateExternalTablesCTAS,
+    ConvertWASBSToADLSGen2,
 )
 from databricks.labs.ucx.progress.workflows import MigrationProgress
 from databricks.labs.ucx.recon.workflows import MigrationRecon

@@ -337,6 +337,7 @@ class MigrateTablesInMounts(Workflow):
         """Record the workflow run of this workflow."""
         ctx.workflow_run_recorder.record()
 
+
 class ConvertWASBSToADLSGen2(Workflow):
     def __init__(self):
         super().__init__('convert-wasbs-to-adls-gen2-experimental')
