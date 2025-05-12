@@ -391,7 +391,7 @@ class TablesMigrator:
             entity_storage_locations = self._get_entity_storage_locations(old_table)
             table_location = old_table.storage()
             new_table_location = self._spark._jvm.java.net.URI(  # pylint: disable=protected-access
-                ExternalLocations.wasbs_to_abfss(table_location.locationUri().get().toString())
+                ExternalLocations.wasbs_to_abfss(src_table.location)
             )
             new_location = self._catalog_storage(
                 self._spark._jvm.scala.Some(new_table_location),  # pylint: disable=protected-access
