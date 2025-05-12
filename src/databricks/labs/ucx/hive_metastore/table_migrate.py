@@ -319,7 +319,7 @@ class TablesMigrator:
     @cached_property
     def _catalog_storage(self):
         return (
-            self._spark._jvm.org.apache.spark.sql.catalyst.catalog.CatalogStorageFormat # pylint: disable=protected-access
+            self._spark._jvm.org.apache.spark.sql.catalyst.catalog.CatalogStorageFormat  # pylint: disable=protected-access
         )
 
     @staticmethod
@@ -392,7 +392,7 @@ class TablesMigrator:
             table_location = old_table.storage()
             new_table_location = ExternalLocations.wasbs_to_abfss(table_location.locationUri().get().toString())
             new_location = self._catalog_storage(
-                self._spark.scala.Some(new_table_location),
+                self._spark._jvm.scala.Some(new_table_location),
                 table_location.inputFormat(),
                 table_location.outputFormat(),
                 table_location.serde(),
