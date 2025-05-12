@@ -316,6 +316,12 @@ class TablesMigrator:
     def _catalog_table(self):
         return self._spark._jvm.org.apache.spark.sql.catalyst.catalog.CatalogTable  # pylint: disable=protected-access
 
+    @cached_property
+    def _catalog_storage(self):
+        return (
+            self._spark._jvm.org.apache.spark.sql.catalyst.catalog.CatalogStorageFormat # pylint: disable=protected-access
+        )
+
     @staticmethod
     def _get_entity_storage_locations(table_metadata):
         """Obtain the entityStorageLocations property for table metadata, if the property is present."""
@@ -383,11 +389,20 @@ class TablesMigrator:
             table_identifier = self._table_identifier(src_table.name, database)
             old_table = self._catalog.getTableMetadata(table_identifier)
             entity_storage_locations = self._get_entity_storage_locations(old_table)
-            table_location: str = old_table.storage()
+            table_location = old_table.storage()
+            new_table_location = ExternalLocations.wasbs_to_abfss(table_location.locationUri().get().toString())
+            new_location = self._catalog_storage(
+                self._spark.scala.Some(new_table_location),
+                table_location.inputFormat(),
+                table_location.outputFormat(),
+                table_location.serde(),
+                table_location.compressed(),
+                table_location.properties(),
+            )
             new_table = self._catalog_table(
                 old_table.identifier(),
                 old_table.tableType(),
-                ExternalLocations.wasbs_to_abfss(table_location),
+                new_location,
                 old_table.schema(),
                 old_table.provider(),
                 old_table.partitionColumnNames(),
