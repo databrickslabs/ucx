@@ -182,8 +182,9 @@ def acc_client(acc_client: Mock, workspace_clients: list[WorkspaceClient]) -> Mo
     return acc_client
 
 
-def test_workflow(ws, caplog):
-    workflows(ws)
+def test_workflow(ws, caplog) -> None:
+    with caplog.at_level(logging.INFO, logger='databricks.labs.ucx'):
+        workflows(ws)
     assert "Fetching deployed jobs..." in caplog.messages
     ws.jobs.list_runs.assert_called()
 
@@ -419,7 +420,7 @@ def test_no_step_in_repair_run(ws, caplog):
     assert '--step is a required parameter' in caplog.messages
 
 
-def test_revert_migrated_tables(ws, caplog):
+def test_revert_migrated_tables(ws, caplog) -> None:
     # test with no schema and no table, user confirm to not retry
     prompts = MockPrompts({'.*': 'no'})
     ctx = WorkspaceContext(ws).replace(
@@ -432,7 +433,8 @@ def test_revert_migrated_tables(ws, caplog):
 
     # test with no schema and no table, user confirm to retry, but no ucx installation found
     prompts = MockPrompts({'.*': 'yes'})
-    assert revert_migrated_tables(ws, prompts, schema=None, table=None, ctx=ctx) is None
+    with caplog.at_level(logging.INFO, logger='databricks.labs.ucx.hive_metastore'):
+        assert revert_migrated_tables(ws, prompts, schema=None, table=None, ctx=ctx) is None
     assert 'No migrated tables were found.' in caplog.messages
 
 
@@ -902,22 +904,24 @@ def test_create_catalogs_schemas_handles_existing(ws, caplog) -> None:
     ws.schemas.get.assert_called()
 
 
-def test_cluster_remap(ws, caplog):
+def test_cluster_remap(ws, caplog) -> None:
     prompts = MockPrompts({"Please provide the cluster id's as comma separated value from the above list.*": "1"})
     ws.clusters.get.return_value = ClusterDetails(cluster_id="123", cluster_name="test_cluster")
     ws.clusters.list.return_value = [
         ClusterDetails(cluster_id="123", cluster_name="test_cluster", cluster_source=ClusterSource.UI),
         ClusterDetails(cluster_id="1234", cluster_name="test_cluster1", cluster_source=ClusterSource.JOB),
     ]
-    cluster_remap(ws, prompts)
+    with caplog.at_level(logging.INFO, logger="databricks.labs.ucx"):
+        cluster_remap(ws, prompts)
     assert "Remapping the Clusters to UC" in caplog.messages
 
 
-def test_cluster_remap_error(ws, caplog):
+def test_cluster_remap_error(ws, caplog) -> None:
     prompts = MockPrompts({"Please provide the cluster id's as comma separated value from the above list.*": "1"})
     ws.clusters.list.return_value = []
     cluster_remap(ws, prompts)
-    assert "No cluster information present in the workspace" in caplog.messages
+    with caplog.at_level(logging.INFO, logger="databricks.labs.ucx"):
+        assert "No cluster information present in the workspace" in caplog.messages
 
 
 def test_revert_cluster_remap(caplog):
@@ -929,9 +933,10 @@ def test_revert_cluster_remap(caplog):
         revert_cluster_remap(workspace_client, prompts)
 
 
-def test_revert_cluster_remap_empty(ws, caplog):
+def test_revert_cluster_remap_empty(ws, caplog) -> None:
     prompts = MockPrompts({"Please provide the cluster id's as comma separated value from the above list.*": "1"})
-    revert_cluster_remap(ws, prompts)
+    with caplog.at_level(logging.INFO, logger="databricks.labs.ucx"):
+        revert_cluster_remap(ws, prompts)
     assert "There is no cluster files in the backup folder. Skipping the reverting process" in caplog.messages
     ws.workspace.list.assert_called_once()
 
@@ -945,7 +950,8 @@ def test_relay_logs(ws, caplog) -> None:
         ],
         [ObjectInfo(path='/Users/foo/.ucx/logs/run-123-1/foo.log-123')],
     ]
-    logs(ws)
+    with caplog.at_level(logging.INFO, logger="databricks.labs.ucx"):
+        logs(ws)
     assert 'Something is logged' in caplog.messages
 
 
@@ -965,8 +971,9 @@ def test_migrate_local_code(ws) -> None:
         mock_apply.assert_called_once_with(Path.cwd())
 
 
-def test_show_all_metastores(acc_client, caplog):
-    show_all_metastores(acc_client)
+def test_show_all_metastores(acc_client, caplog) -> None:
+    with caplog.at_level(logging.INFO, logger="databricks.labs.ucx.account"):
+        show_all_metastores(acc_client)
     assert 'Matching metastores are:' in caplog.messages
 
 
@@ -974,7 +981,7 @@ def test_assign_metastore_logs_account_id_and_assigns_metastore(caplog, acc_clie
     ctx = AccountContext(acc_client)
     acc_client.metastores.list.return_value = [MetastoreInfo(name="test", metastore_id="123")]
 
-    with caplog.at_level(logging.INFO, logger="databricks.labs.ucx.cli"):
+    with caplog.at_level(logging.INFO, logger="databricks.labs.ucx"):
         assign_metastore(acc_client, "456", ctx=ctx)
 
     assert "Account ID: 123" in caplog.messages
