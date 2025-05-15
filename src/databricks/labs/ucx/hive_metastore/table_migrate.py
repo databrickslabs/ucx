@@ -398,6 +398,7 @@ class TablesMigrator:
                 self._spark._jvm.scala.Some(  # pylint: disable=protected-access
                     self._spark._jvm.java.net.URI(new_table_location)  # pylint: disable=protected-access
                 ),
+                table_location.inputFormat(),
                 table_location.outputFormat(),
                 table_location.serde(),
                 table_location.compressed(),
