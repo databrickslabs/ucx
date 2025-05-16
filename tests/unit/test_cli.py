@@ -919,9 +919,9 @@ def test_cluster_remap(ws, caplog) -> None:
 def test_cluster_remap_error(ws, caplog) -> None:
     prompts = MockPrompts({"Please provide the cluster id's as comma separated value from the above list.*": "1"})
     ws.clusters.list.return_value = []
-    cluster_remap(ws, prompts)
     with caplog.at_level(logging.INFO, logger="databricks.labs.ucx"):
-        assert "No cluster information present in the workspace" in caplog.messages
+        cluster_remap(ws, prompts)
+    assert "No cluster information present in the workspace" in caplog.messages
 
 
 def test_revert_cluster_remap(caplog):
