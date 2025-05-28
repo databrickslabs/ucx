@@ -18,7 +18,7 @@ export default function Home(): JSX.Element {
           </p>
           <div className="flex justify-center md:justify-start space-x-4">
             <Link
-              className="px-6 py-3 text-white bg-red-600 rounded-md hover:bg-red-700"
+              className="px-6 py-3 text-white bg-red-600 rounded-md hover:bg-red-700 hover:text-white transition-colors duration-200"
               to="/docs/gettingstarted"
             >
               Get Started
