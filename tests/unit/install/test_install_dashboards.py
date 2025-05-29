@@ -129,9 +129,24 @@ def test_installation_recreates_trashed_lakeview_dashboard(caplog, ws, workspace
     [MockInstallation({'state.json': {'resources': {'dashboards': {"assessment_main": "lakeview_id"}}}})],
     indirect=True,
 )
-@pytest.mark.parametrize("exception", [InvalidParameterValue, NotFound])
-def test_installation_recovers_invalid_dashboard(caplog, ws, workspace_installation, exception):
-    ws.lakeview.get.side_effect = exception
+def test_installation_recovers_invalid_dashboard_invalidparametervalue(caplog, ws, workspace_installation):
+    ws.lakeview.get.side_effect = InvalidParameterValue
+    with caplog.at_level(logging.DEBUG, logger="databricks.labs.ucx.install"):
+        workspace_installation.run()
+    assert "Recovering invalid dashboard" in caplog.text
+    assert "Deleted dangling dashboard" in caplog.text
+    ws.workspace.delete.assert_called()
+    ws.lakeview.create.assert_called()
+    ws.lakeview.update.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "workspace_installation",
+    [MockInstallation({'state.json': {'resources': {'dashboards': {"assessment_main": "lakeview_id"}}}})],
+    indirect=True,
+)
+def test_installation_recovers_invalid_dashboard_notfound(caplog, ws, workspace_installation):
+    ws.lakeview.get.side_effect = NotFound
     with caplog.at_level(logging.DEBUG, logger="databricks.labs.ucx.install"):
         workspace_installation.run()
     assert "Recovering invalid dashboard" in caplog.text
