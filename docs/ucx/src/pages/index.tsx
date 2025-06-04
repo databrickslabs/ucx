@@ -5,7 +5,7 @@ import Link from '@docusaurus/Link';
 export default function Home(): JSX.Element {
   return (
     <Layout
-      title="UCX - Unity Catalog Migration Accelerator"
+      title="UCX - Unity Catalog Toolkit"
       description="UCX helps assess, plan, and execute your Databricks Unity Catalog migration efficiently."
     >
       <main className="flex flex-col md:flex-row items-center justify-center px-6 md:px-12 py-12">
