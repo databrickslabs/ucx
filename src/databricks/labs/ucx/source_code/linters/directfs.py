@@ -143,11 +143,20 @@ class DirectFsAccessPyLinter(PythonLinter, DfsaPyCollector):
 
 class DirectFsAccessSqlLinter(SqlLinter, DfsaSqlCollector):
 
+    def __init__(self, session_state: CurrentSessionState):
+        self._session_state = session_state
+
+        super().__init__()
+        # Load the location-to-table map at initialization
+        self.load_location_to_table_map()
+
+
+
     def lint_expression(self, expression: Expression) -> Iterable[Deprecation]:
         for dfsa in self._collect_dfsas(SqlExpression(expression)):
             yield Deprecation(
                 code='direct-filesystem-access-in-sql-query',
-                message=f"The use of direct filesystem references is deprecated: {dfsa.path}",
+                message=f"The use of direct filesystem references is deprecated: {dfsa.path}. Use {dfsa.table} instead.",
                 # SQLGlot does not propagate tokens yet. See https://github.com/tobymao/sqlglot/issues/3159
                 start_line=0,
                 start_col=0,
@@ -182,10 +191,12 @@ class DirectFsAccessSqlLinter(SqlLinter, DfsaSqlCollector):
         if any(pattern.matches(path) for pattern in DIRECT_FS_ACCESS_PATTERNS):
             is_read = cls._is_read(expression)
             is_write = cls._is_write(expression)
+            table = cls.fetch_table_for_path(path)
             yield DirectFsAccess(
                 path=path,
                 is_read=is_read,
                 is_write=is_write,
+                table=table
             )
 
     @classmethod
