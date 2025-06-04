@@ -251,6 +251,7 @@ class DirectFsAccess(SourceInfo):
     path: str = SourceInfo.UNKNOWN
     is_read: bool = False
     is_write: bool = False
+    table: str | None = None  # Add table attribute to store corresponding table
 
 
 @dataclass
@@ -265,8 +266,31 @@ class DfsaCollector(ABC):
     def collect_dfsas(self, source_code: str) -> Iterable[DirectFsAccess]: ...
 
 
-class DfsaSqlCollector(DfsaCollector, ABC): ...
+class DfsaSqlCollector(DfsaCollector, ABC):
+    _location_to_table_map: dict[str, str] = {}
 
+    @classmethod
+    def load_location_to_table_map(cls):
+        """
+        Load all location-to-table mappings from the hive_metastore.inventory_database table.
+        """
+        return {}
+
+
+
+
+    @classmethod
+    def fetch_table_for_path(cls, path: str) -> str | None:
+        """
+        Fetch the corresponding table for a given filesystem path from the preloaded map.
+
+        Args:
+            path (str): The filesystem path.
+
+        Returns:
+            str | None: The corresponding table name if found, otherwise None.
+        """
+        return cls._location_to_table_map.get(path)
 
 # The default schema to use when the schema is not specified in a table reference
 # See: https://spark.apache.org/docs/3.0.0-preview/sql-ref-syntax-qry-select-usedb.html
