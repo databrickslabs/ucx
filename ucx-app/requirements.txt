@@ -1,0 +1,8 @@
+dash
+dash-bootstrap-components
+pandas
+plotly
+databricks-sql-connector
+databricks-sdk
+python-dotenv
+dash-ag-grid
