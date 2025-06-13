@@ -3,6 +3,7 @@ from abc import ABC
 from collections.abc import Iterable
 
 from astroid import Call, InferenceError, NodeNG  # type: ignore
+from databricks.sdk import WorkspaceClient
 from sqlglot.expressions import Alter, Create, Delete, Drop, Expression, Identifier, Insert, Literal, Select
 
 from databricks.labs.ucx.source_code.base import (
@@ -143,20 +144,21 @@ class DirectFsAccessPyLinter(PythonLinter, DfsaPyCollector):
 
 class DirectFsAccessSqlLinter(SqlLinter, DfsaSqlCollector):
 
-    def __init__(self, session_state: CurrentSessionState):
+    def __init__(self, session_state: CurrentSessionState, workspace_client: WorkspaceClient | None = None):
         self._session_state = session_state
+        self._workspace_client = workspace_client
 
         super().__init__()
         # Load the location-to-table map at initialization
-        self.load_location_to_table_map()
-
+        self.load_location_to_table_map(self._workspace_client)
 
 
     def lint_expression(self, expression: Expression) -> Iterable[Deprecation]:
         for dfsa in self._collect_dfsas(SqlExpression(expression)):
+            replacement_table_name = self.fetch_table_for_path(dfsa.path)
             yield Deprecation(
                 code='direct-filesystem-access-in-sql-query',
-                message=f"The use of direct filesystem references is deprecated: {dfsa.path}. Use {dfsa.table} instead.",
+                message=f"The use of direct filesystem references is deprecated: {dfsa.path}. Use {replacement_table_name} instead.",
                 # SQLGlot does not propagate tokens yet. See https://github.com/tobymao/sqlglot/issues/3159
                 start_line=0,
                 start_col=0,

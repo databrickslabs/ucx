@@ -229,5 +229,5 @@ class LocalCheckoutContext(WorkspaceContext):
             self.folder_loader,
             self.path_lookup,
             self.dependency_resolver,
-            lambda: LinterContext(self._migration_index),
+            lambda: LinterContext(self._migration_index, workspace_client=self.workspace_client),
         )

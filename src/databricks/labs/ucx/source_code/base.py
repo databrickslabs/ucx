@@ -17,7 +17,10 @@ from typing import Any, BinaryIO, TextIO, TypeVar
 from astroid import NodeNG  # type: ignore
 
 from databricks.labs.blueprint.paths import WorkspacePath
+from databricks.sdk import WorkspaceClient
+from databricks.sdk.errors import DatabricksError, NotFound
 from databricks.sdk.service import compute
+from databricks.sdk.service.catalog import CatalogInfo, SchemaInfo
 from databricks.sdk.service.workspace import Language
 
 
@@ -270,13 +273,61 @@ class DfsaSqlCollector(DfsaCollector, ABC):
     _location_to_table_map: dict[str, str] = {}
 
     @classmethod
-    def load_location_to_table_map(cls):
+    def load_location_to_table_map(cls, workspace_client: WorkspaceClient | None = None) -> None:
         """
-        Load all location-to-table mappings from the hive_metastore.inventory_database table.
+        Load all location-to-table mappings from the UC catalog.
         """
-        return {}
+        if not workspace_client:
+            logger.warning("Workspace client is not provided, skipping loading location-to-table map.")
+            return None
 
+        for schema in cls._iter_schemas(workspace_client):
+            if schema.catalog_name is None or schema.name is None:
+                continue
+            try:
+                tables = list(workspace_client.tables.list(catalog_name=schema.catalog_name, schema_name=schema.name))
+            except NotFound:
+                logger.warning(f"Schema {schema.full_name} no longer exists. Skipping checking its migration status.")
+                continue
+            except DatabricksError as e:
+                logger.warning(f"Error while listing tables in schema: {schema.full_name}", exc_info=e)
+                continue
+            for table in tables:
+                if not table.properties:
+                    continue
+                if not table.full_name:
+                    logger.warning(f"The table {table.name} in {schema.name} has no full name")
+                    continue
+                if not table.storage_location:
+                    logger.warning(f"The table {table.full_name} has no storage location, skipping it")
+                    continue
+                cls._location_to_table_map[table.storage_location] = table.full_name.lower()
+        return None
 
+    @classmethod
+    def _iter_catalogs(cls, workspace_client: WorkspaceClient) -> Iterable[CatalogInfo]:
+        try:
+            for catalog in workspace_client.catalogs.list():
+                if catalog.name == "labs_azure_ucws_labs_ng":
+                # if catalog.catalog_type in self._skip_catalog_types:
+                #     continue
+                    yield catalog
+        except DatabricksError as e:
+            logger.error("Cannot list catalogs", exc_info=e)
+
+    @classmethod
+    def _iter_schemas(cls, workspace_client: WorkspaceClient) -> Iterable[SchemaInfo]:
+        for catalog in cls._iter_catalogs(workspace_client):
+            if catalog.name is None:
+                continue
+            try:
+                yield from workspace_client.schemas.list(catalog_name=catalog.name)
+            except NotFound:
+                logger.warning(f"Catalog {catalog.name} no longer exists. Skipping checking its migration status.")
+                continue
+            except DatabricksError as e:
+                logger.warning(f"Error while listing schemas in catalog: {catalog.name}", exc_info=e)
+                continue
 
 
     @classmethod

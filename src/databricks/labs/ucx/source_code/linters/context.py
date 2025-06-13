@@ -47,9 +47,11 @@ class LinterContext:
         self,
         index: TableMigrationIndex | None = None,
         session_state: CurrentSessionState | None = None,
+        workspace_client: None = None,
     ):
         self._index = index
         self.session_state = CurrentSessionState() if not session_state else session_state
+        self.workspace_client = workspace_client
 
         python_linters: list[PythonLinter] = []
         python_fixers: list[Fixer] = []
@@ -75,7 +77,7 @@ class LinterContext:
             python_fixers.append(spark_table)
             python_table_collectors.append(spark_table)
 
-        sql_direct_fs = DirectFsAccessSqlLinter()
+        sql_direct_fs = DirectFsAccessSqlLinter(self.session_state, self.workspace_client)
         sql_linters.append(sql_direct_fs)
         sql_dfsa_collectors.append(sql_direct_fs)
 
