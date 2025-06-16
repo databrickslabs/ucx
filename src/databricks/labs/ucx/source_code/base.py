@@ -299,7 +299,7 @@ class DfsaSqlCollector(DfsaCollector, ABC):
                     logger.warning(f"The table {table.name} in {schema.name} has no full name")
                     continue
                 if not table.storage_location:
-                    logger.warning(f"The table {table.full_name} has no storage location, skipping it")
+                    logger.debug(f"The table {table.full_name} has no storage location, skipping it")
                     continue
                 cls._location_to_table_map[table.storage_location] = table.full_name.lower()
         return None
