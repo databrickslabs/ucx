@@ -308,9 +308,8 @@ class DfsaSqlCollector(DfsaCollector, ABC):
     def _iter_catalogs(cls, workspace_client: WorkspaceClient) -> Iterable[CatalogInfo]:
         try:
             for catalog in workspace_client.catalogs.list():
-                if catalog.name == "labs_azure_ucws_labs_ng":
-                # if catalog.catalog_type in self._skip_catalog_types:
-                #     continue
+                # Skip the HMS catalog 'hive_metastore'.
+                if catalog.name != 'hive_metastore':
                     yield catalog
         except DatabricksError as e:
             logger.error("Cannot list catalogs", exc_info=e)
