@@ -129,7 +129,7 @@ def test_installation_recreates_trashed_lakeview_dashboard(caplog, ws, workspace
     [MockInstallation({'state.json': {'resources': {'dashboards': {"assessment_main": "lakeview_id"}}}})],
     indirect=True,
 )
-def test_installation_recovers_invalid_dashboard_invalidparametervalue(caplog, ws, workspace_installation):
+def test_installation_recovers_invalid_dashboard_invalidparametervalue(caplog, ws, workspace_installation) -> None:
     ws.lakeview.get.side_effect = InvalidParameterValue
     with caplog.at_level(logging.DEBUG, logger="databricks.labs.ucx.install"):
         workspace_installation.run()
@@ -145,7 +145,7 @@ def test_installation_recovers_invalid_dashboard_invalidparametervalue(caplog, w
     [MockInstallation({'state.json': {'resources': {'dashboards': {"assessment_main": "lakeview_id"}}}})],
     indirect=True,
 )
-def test_installation_recovers_invalid_dashboard_notfound(caplog, ws, workspace_installation):
+def test_installation_recovers_invalid_dashboard_notfound(caplog, ws, workspace_installation) -> None:
     ws.lakeview.get.side_effect = NotFound
     with caplog.at_level(logging.DEBUG, logger="databricks.labs.ucx.install"):
         workspace_installation.run()
