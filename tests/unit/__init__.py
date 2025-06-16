@@ -8,7 +8,7 @@ from pathlib import Path
 from unittest.mock import create_autospec
 
 import yaml
-from databricks.labs.blueprint.installation import MockInstallation
+from databricks.labs.blueprint.installation import MockInstallation, RootJsonValue
 from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
@@ -24,7 +24,7 @@ from databricks.labs.ucx.source_code.graph import SourceContainer
 logging.getLogger("tests").setLevel("DEBUG")
 logger = logging.getLogger(__name__)
 
-DEFAULT_CONFIG = {
+DEFAULT_CONFIG: dict[str, RootJsonValue] = {
     "config.yml": {
         'version': 2,
         'inventory_database': 'ucx',
