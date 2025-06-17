@@ -31,7 +31,7 @@ from databricks.labs.ucx.hive_metastore.federation import (
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocation
 
 
-def test_create_federated_catalog_int(mock_installation):
+def test_create_federated_catalog_int(mock_installation) -> None:
     workspace_client = create_autospec(WorkspaceClient)
     external_locations = create_autospec(ExternalLocations)
     workspace_info = create_autospec(WorkspaceInfo)
@@ -141,7 +141,7 @@ def test_create_federated_catalog_int(mock_installation):
         ),
     ],
 )
-def test_create_federated_catalog_ext(mock_installation, config, expected):
+def test_create_federated_catalog_ext(mock_installation, config, expected) -> None:
     workspace_client = create_autospec(WorkspaceClient)
     external_locations = create_autospec(ExternalLocations)
     workspace_info = create_autospec(WorkspaceInfo)
@@ -199,7 +199,7 @@ def test_create_federated_catalog_ext(mock_installation, config, expected):
     assert calls == workspace_client.grants.method_calls
 
 
-def test_already_existing_connection(mock_installation):
+def test_already_existing_connection(mock_installation) -> None:
     workspace_client = create_autospec(WorkspaceClient)
     external_locations = create_autospec(ExternalLocations)
     workspace_info = create_autospec(WorkspaceInfo)
@@ -211,7 +211,7 @@ def test_already_existing_connection(mock_installation):
         ExternalLocation('s3://h/i/j', 1),
     ]
     workspace_client.current_user.me.return_value = User(user_name='serge')
-    workspace_client.connections.create.side_effect = AlreadyExists(...)
+    workspace_client.connections.create.side_effect = AlreadyExists()
     workspace_client.connections.list.return_value = [ConnectionInfo(name='a'), ConnectionInfo(name='b')]
     workspace_client.external_locations.list.return_value = [
         ExternalLocationInfo(url='s3://b/c/d', name='b'),

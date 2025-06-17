@@ -192,7 +192,7 @@ class TableMove:
                 logger.error(f"Failed to alias table {from_table_name}: {err!s}", exc_info=True)
             return False
 
-    def _reapply_grants(self, from_table_name, to_table_name, *, target_view: bool = False):
+    def _reapply_grants(self, from_table_name: str, to_table_name: str, *, target_view: bool = False) -> None:
         try:
             grants = self._ws.grants.get(SecurableType.TABLE, from_table_name)
         except NotFound:

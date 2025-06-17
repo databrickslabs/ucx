@@ -231,7 +231,7 @@ def test_move_tables_get_grants_fails_because_table_removed(caplog):
 
 
 @pytest.mark.parametrize("del_table", [True, False])
-def test_move_all_tables(del_table: bool):
+def test_move_all_tables(del_table: bool) -> None:
     client = create_autospec(WorkspaceClient)
 
     client.tables.list.return_value = [
@@ -353,7 +353,7 @@ def test_move_all_tables(del_table: bool):
     assert sorted(expected_queries) == sorted(backend.queries)
 
 
-def test_alias_all_tables():
+def test_alias_all_tables() -> None:
     client = create_autospec(WorkspaceClient)
 
     client.tables.list.return_value = [
@@ -441,7 +441,7 @@ def test_alias_all_tables():
     ] == sorted(backend.queries)
 
 
-def test_move_one_table_without_dropping_source():
+def test_move_one_table_without_dropping_source() -> None:
     client = create_autospec(WorkspaceClient)
 
     client.tables.list.return_value = [
@@ -483,7 +483,7 @@ def test_move_one_table_without_dropping_source():
     ] == sorted(backend.queries)
 
 
-def test_move_apply_grants():
+def test_move_apply_grants() -> None:
     client = create_autospec(WorkspaceClient)
 
     client.tables.list.return_value = [
@@ -523,7 +523,7 @@ def test_move_apply_grants():
     )
 
 
-def test_alias_apply_grants():
+def test_alias_apply_grants() -> None:
     client = create_autospec(WorkspaceClient)
 
     client.tables.list.return_value = [

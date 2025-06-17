@@ -737,7 +737,7 @@ class PrincipalACL:
                 self._update_location_permissions(location_name, principals)
         logger.info("Applied all the permission on external location")
 
-    def _update_location_permissions(self, location_name: str, principals: list[str]):
+    def _update_location_permissions(self, location_name: str, principals: list[str]) -> None:
         permissions = [Privilege.CREATE_EXTERNAL_TABLE, Privilege.CREATE_EXTERNAL_VOLUME, Privilege.READ_FILES]
         changes = [PermissionsChange(add=permissions, principal=principal) for principal in principals]
         self._ws.grants.update(

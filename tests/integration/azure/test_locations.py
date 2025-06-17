@@ -4,6 +4,7 @@ from urllib.parse import urlparse
 import pytest
 from databricks.labs.blueprint.installation import MockInstallation
 from databricks.labs.blueprint.tui import MockPrompts
+from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors.platform import NotFound
 from databricks.sdk.service.iam import PermissionLevel
 from databricks.sdk.service.compute import DataSecurityMode
@@ -217,7 +218,9 @@ def test_overlapping_location(caplog, ws, sql_backend, inventory_schema, az_cli_
         save_delete_location(ws, "uctest_ziyuanqintest_overlap")
 
 
-def test_run_validate_acl(make_cluster_permissions, ws, make_user, make_cluster, az_cli_ctx, env_or_skip):
+def test_run_validate_acl(
+    make_cluster_permissions, ws: WorkspaceClient, make_user, make_cluster, az_cli_ctx, env_or_skip
+) -> None:
     az_cli_ctx.with_dummy_resource_permission()
     az_cli_ctx.save_locations()
     cluster = make_cluster(single_node=True, spark_conf=_SPARK_CONF, data_security_mode=DataSecurityMode.NONE)
@@ -238,7 +241,7 @@ def test_run_validate_acl(make_cluster_permissions, ws, make_user, make_cluster,
             principal=user.user_name,
             privileges=[Privilege.CREATE_EXTERNAL_TABLE, Privilege.CREATE_EXTERNAL_VOLUME, Privilege.READ_FILES],
         )
-        assert expected_azure_permission in permissions.privilege_assignments
+        assert permissions.privilege_assignments and expected_azure_permission in permissions.privilege_assignments
     finally:
         remove_azure_permissions = [
             Privilege.CREATE_EXTERNAL_TABLE,

@@ -2,6 +2,8 @@ import logging
 from datetime import timedelta
 
 import pytest
+
+from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound, BadRequest
 from databricks.sdk.retries import retried
 from databricks.sdk.service.catalog import Privilege, PrivilegeAssignment, SecurableType
@@ -26,7 +28,7 @@ def test_move_tables_no_from_schema(ws, sql_backend, make_random, make_catalog, 
 
 
 def test_move_tables(
-    ws,
+    ws: WorkspaceClient,
     sql_backend,
     make_catalog,
     make_schema,
@@ -148,7 +150,7 @@ def test_move_views(ws, sql_backend, make_catalog, make_schema, make_table, make
 
 
 def test_alias_tables(
-    ws,
+    ws: WorkspaceClient,
     sql_backend,
     make_catalog,
     make_schema,
