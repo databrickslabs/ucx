@@ -7,8 +7,8 @@ from databricks.labs.lsql.backends import MockBackend, StatementExecutionBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service.catalog import (
+    GetPermissionsResponse,
     PermissionsChange,
-    PermissionsList,
     Privilege,
     PrivilegeAssignment,
     SchemaInfo,
@@ -296,8 +296,8 @@ def test_move_all_tables(del_table: bool) -> None:
         ),
     ]
 
-    perm_list = PermissionsList([PrivilegeAssignment("foo", [Privilege.SELECT])])
-    perm_none = PermissionsList(None)
+    perm_list = GetPermissionsResponse(privilege_assignments=[PrivilegeAssignment("foo", [Privilege.SELECT])])
+    perm_none = GetPermissionsResponse(privilege_assignments=None)
 
     grants_mapping = {
         "SrcC.SrcS.table1": perm_list,
@@ -404,8 +404,8 @@ def test_alias_all_tables() -> None:
         ),
     ]
 
-    perm_list = PermissionsList([PrivilegeAssignment("foo", [Privilege.SELECT])])
-    perm_none = PermissionsList(None)
+    perm_list = GetPermissionsResponse(privilege_assignments=[PrivilegeAssignment("foo", [Privilege.SELECT])])
+    perm_none = GetPermissionsResponse(privilege_assignments=None)
 
     grants_mapping = {
         "SrcC.SrcS.table1": perm_list,
@@ -461,7 +461,7 @@ def test_move_one_table_without_dropping_source() -> None:
         ),
     ]
 
-    perm_none = PermissionsList(None)
+    perm_none = GetPermissionsResponse(privilege_assignments=None)
 
     rows = {
         "SHOW CREATE TABLE `SrcC`.`SrcS`.`table1`": [
@@ -496,7 +496,9 @@ def test_move_apply_grants() -> None:
         ),
     ]
 
-    perm = PermissionsList([PrivilegeAssignment("user@email.com", [Privilege.SELECT, Privilege.MODIFY])])
+    perm = GetPermissionsResponse(
+        privilege_assignments=[PrivilegeAssignment("user@email.com", [Privilege.SELECT, Privilege.MODIFY])]
+    )
 
     rows = {
         "SHOW CREATE TABLE `SrcC`.`SrcS`.`table1`": [
@@ -517,7 +519,7 @@ def test_move_apply_grants() -> None:
         "SHOW CREATE TABLE `SrcC`.`SrcS`.`table1`",
     ] == sorted(backend.queries)
     client.grants.update.assert_called_with(
-        SecurableType.TABLE,
+        SecurableType.TABLE.value,
         'TgtC.TgtS.table1',
         changes=[PermissionsChange([Privilege.SELECT, Privilege.MODIFY], "user@email.com")],
     )
@@ -536,7 +538,9 @@ def test_alias_apply_grants() -> None:
         ),
     ]
 
-    perm = PermissionsList([PrivilegeAssignment("user@email.com", [Privilege.SELECT, Privilege.MODIFY])])
+    perm = GetPermissionsResponse(
+        privilege_assignments=[PrivilegeAssignment("user@email.com", [Privilege.SELECT, Privilege.MODIFY])]
+    )
 
     rows = {
         "SHOW CREATE TABLE `SrcC`.`SrcS`.`table1`": [
@@ -553,5 +557,5 @@ def test_alias_apply_grants() -> None:
 
     assert ["CREATE VIEW `TgtC`.`TgtS`.`table1` AS SELECT * FROM `SrcC`.`SrcS`.`table1`"] == sorted(backend.queries)
     client.grants.update.assert_called_with(
-        SecurableType.TABLE, 'TgtC.TgtS.table1', changes=[PermissionsChange([Privilege.SELECT], "user@email.com")]
+        SecurableType.TABLE.value, 'TgtC.TgtS.table1', changes=[PermissionsChange([Privilege.SELECT], "user@email.com")]
     )

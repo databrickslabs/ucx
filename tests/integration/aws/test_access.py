@@ -150,7 +150,7 @@ def test_create_external_location_validate_acl(
     try:
         external_location_migration.run()
         permissions = ws.grants.get(
-            SecurableType.EXTERNAL_LOCATION, external_location_name, principal=cluster_user.user_name
+            SecurableType.EXTERNAL_LOCATION.value, external_location_name, principal=cluster_user.user_name
         )
         expected_aws_permission = PrivilegeAssignment(
             principal=cluster_user.user_name,
@@ -165,7 +165,7 @@ def test_create_external_location_validate_acl(
         ]
         ws.external_locations.delete(external_location_name)
         ws.grants.update(
-            SecurableType.EXTERNAL_LOCATION,
+            SecurableType.EXTERNAL_LOCATION.value,
             env_or_skip("TEST_A_LOCATION"),
             changes=[PermissionsChange(remove=remove_aws_permissions, principal=cluster_user.user_name)],
         )

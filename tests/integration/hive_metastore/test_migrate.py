@@ -694,7 +694,7 @@ def test_migrate_managed_tables_with_acl(
     assert target_table_properties["upgraded_from"] == src_managed_table.full_name
     assert target_table_properties[Table.UPGRADED_FROM_WS_PARAM] == str(ws.get_workspace_id())
 
-    target_table_grants = ws.grants.get(SecurableType.TABLE, f"{dst_schema.full_name}.{src_managed_table.name}")
+    target_table_grants = ws.grants.get(SecurableType.TABLE.value, f"{dst_schema.full_name}.{src_managed_table.name}")
     target_principals = [pa for pa in target_table_grants.privilege_assignments or [] if pa.principal == user.user_name]
     assert len(target_principals) == 1, f"Missing grant for user {user.user_name}"
     assert target_principals[0].privileges == [Privilege.MODIFY, Privilege.SELECT]
@@ -745,7 +745,7 @@ def test_migrate_external_tables_with_principal_acl_azure(
     )
     table_migrate.migrate_tables(what=What.EXTERNAL_SYNC)
 
-    target_table_grants = ws.grants.get(SecurableType.TABLE, table_full_name)
+    target_table_grants = ws.grants.get(SecurableType.TABLE.value, table_full_name)
     assert target_table_grants.privilege_assignments is not None
     match = False
     for _ in target_table_grants.privilege_assignments:
@@ -787,7 +787,7 @@ def test_migrate_external_tables_with_principal_acl_aws(
     )
     table_migrate.migrate_tables(what=What.EXTERNAL_SYNC)
 
-    target_table_grants = ws.grants.get(SecurableType.TABLE, table_full_name)
+    target_table_grants = ws.grants.get(SecurableType.TABLE.value, table_full_name)
     assert target_table_grants.privilege_assignments is not None
     match = False
     for _ in target_table_grants.privilege_assignments:
@@ -819,7 +819,7 @@ def test_migrate_external_tables_with_principal_acl_aws_warehouse(
     )
     table_migrate.migrate_tables(what=What.EXTERNAL_SYNC)
 
-    target_table_grants = ws.grants.get(SecurableType.TABLE, table_full_name)
+    target_table_grants = ws.grants.get(SecurableType.TABLE.value, table_full_name)
     assert target_table_grants.privilege_assignments is not None
     match = False
     for _ in target_table_grants.privilege_assignments:
@@ -908,7 +908,7 @@ def test_migrate_external_tables_with_spn_azure(
     )
     table_migrate.migrate_tables(what=What.EXTERNAL_SYNC)
 
-    target_table_grants = ws.grants.get(SecurableType.TABLE, table_full_name)
+    target_table_grants = ws.grants.get(SecurableType.TABLE.value, table_full_name)
     assert target_table_grants.privilege_assignments is not None
     match = False
     for _ in target_table_grants.privilege_assignments:

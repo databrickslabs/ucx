@@ -235,7 +235,7 @@ def test_run_validate_acl(
     try:
         location_migration.run()
         permissions = ws.grants.get(
-            SecurableType.EXTERNAL_LOCATION, env_or_skip("TEST_A_LOCATION"), principal=user.user_name
+            SecurableType.EXTERNAL_LOCATION.value, env_or_skip("TEST_A_LOCATION"), principal=user.user_name
         )
         expected_azure_permission = PrivilegeAssignment(
             principal=user.user_name,
@@ -249,7 +249,7 @@ def test_run_validate_acl(
             Privilege.READ_FILES,
         ]
         ws.grants.update(
-            SecurableType.EXTERNAL_LOCATION,
+            SecurableType.EXTERNAL_LOCATION.value,
             env_or_skip("TEST_A_LOCATION"),
             changes=[PermissionsChange(remove=remove_azure_permissions, principal=user.user_name)],
         )

@@ -600,7 +600,7 @@ def test_apply_location_acl_single_spn_azure(ws, installation) -> None:
     permissions = [Privilege.CREATE_EXTERNAL_TABLE, Privilege.CREATE_EXTERNAL_VOLUME, Privilege.READ_FILES]
     calls = [
         call(
-            SecurableType.EXTERNAL_LOCATION,
+            SecurableType.EXTERNAL_LOCATION.value,
             'loc1',
             changes=[
                 PermissionsChange(add=permissions, principal='group1'),
@@ -608,7 +608,7 @@ def test_apply_location_acl_single_spn_azure(ws, installation) -> None:
             ],
         ),
         call(
-            SecurableType.EXTERNAL_LOCATION,
+            SecurableType.EXTERNAL_LOCATION.value,
             'loc2',
             changes=[
                 PermissionsChange(add=permissions, principal='group2'),
@@ -637,7 +637,15 @@ def test_apply_location_acl_single_spn_aws(ws, installation):
     location_acl.apply_location_acl()
     permissions = [Privilege.CREATE_EXTERNAL_TABLE, Privilege.CREATE_EXTERNAL_VOLUME, Privilege.READ_FILES]
     calls = [
-        call(SecurableType.EXTERNAL_LOCATION, 'loc1', changes=[PermissionsChange(add=permissions, principal='spn1')]),
-        call(SecurableType.EXTERNAL_LOCATION, 'loc1', changes=[PermissionsChange(add=permissions, principal='group2')]),
+        call(
+            SecurableType.EXTERNAL_LOCATION.value,
+            'loc1',
+            changes=[PermissionsChange(add=permissions, principal='spn1')],
+        ),
+        call(
+            SecurableType.EXTERNAL_LOCATION.value,
+            'loc1',
+            changes=[PermissionsChange(add=permissions, principal='group2')],
+        ),
     ]
     ws.grants.update.assert_has_calls(calls, any_order=True)

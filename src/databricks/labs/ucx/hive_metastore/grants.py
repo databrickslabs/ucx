@@ -741,7 +741,7 @@ class PrincipalACL:
         permissions = [Privilege.CREATE_EXTERNAL_TABLE, Privilege.CREATE_EXTERNAL_VOLUME, Privilege.READ_FILES]
         changes = [PermissionsChange(add=permissions, principal=principal) for principal in principals]
         self._ws.grants.update(
-            SecurableType.EXTERNAL_LOCATION,
+            SecurableType.EXTERNAL_LOCATION.value,
             location_name,
             changes=changes,
         )

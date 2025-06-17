@@ -11,7 +11,7 @@ from databricks.sdk.service.catalog import (
     ConnectionType,
     CatalogInfo,
     ExternalLocationInfo,
-    PermissionsList,
+    GetPermissionsResponse,
     PrivilegeAssignment,
     SecurableType,
     PermissionsChange,
@@ -48,7 +48,7 @@ def test_create_federated_catalog_int(mock_installation) -> None:
         ExternalLocationInfo(url='s3://b/c/d', name='b'),
         ExternalLocationInfo(url='s3://e/f/g', name='e'),
     ]
-    workspace_client.grants.get.return_value = PermissionsList(
+    workspace_client.grants.get.return_value = GetPermissionsResponse(
         privilege_assignments=[PrivilegeAssignment(privileges=[Privilege.MANAGE], principal='any')]
     )
 
@@ -73,15 +73,15 @@ def test_create_federated_catalog_int(mock_installation) -> None:
         options={"authorized_paths": 's3://b/c/d,s3://e/f/g'},
     )
     calls = [
-        call.get(SecurableType.EXTERNAL_LOCATION, 'b'),
+        call.get(SecurableType.EXTERNAL_LOCATION.value, 'b'),
         call.update(
-            SecurableType.EXTERNAL_LOCATION,
+            SecurableType.EXTERNAL_LOCATION.value,
             'b',
             changes=[PermissionsChange(principal='serge', add=[Privilege.CREATE_FOREIGN_SECURABLE])],
         ),
-        call.get(SecurableType.EXTERNAL_LOCATION, 'e'),
+        call.get(SecurableType.EXTERNAL_LOCATION.value, 'e'),
         call.update(
-            SecurableType.EXTERNAL_LOCATION,
+            SecurableType.EXTERNAL_LOCATION.value,
             'e',
             changes=[PermissionsChange(principal='serge', add=[Privilege.CREATE_FOREIGN_SECURABLE])],
         ),
@@ -158,7 +158,7 @@ def test_create_federated_catalog_ext(mock_installation, config, expected) -> No
     workspace_client.external_locations.list.return_value = [
         ExternalLocationInfo(url='s3://b/c/d', name='b'),
     ]
-    workspace_client.grants.get.return_value = PermissionsList(
+    workspace_client.grants.get.return_value = GetPermissionsResponse(
         privilege_assignments=[PrivilegeAssignment(privileges=[Privilege.MANAGE], principal='any')]
     )
     mock_installation.load = lambda _: WorkspaceConfig(
@@ -189,9 +189,9 @@ def test_create_federated_catalog_ext(mock_installation, config, expected) -> No
         options={"authorized_paths": 's3://b/c/d'},
     )
     calls = [
-        call.get(SecurableType.EXTERNAL_LOCATION, 'b'),
+        call.get(SecurableType.EXTERNAL_LOCATION.value, 'b'),
         call.update(
-            SecurableType.EXTERNAL_LOCATION,
+            SecurableType.EXTERNAL_LOCATION.value,
             'b',
             changes=[PermissionsChange(principal='serge', add=[Privilege.CREATE_FOREIGN_SECURABLE])],
         ),
@@ -217,7 +217,7 @@ def test_already_existing_connection(mock_installation) -> None:
         ExternalLocationInfo(url='s3://b/c/d', name='b'),
         ExternalLocationInfo(url='s3://e/f/g', name='e'),
     ]
-    workspace_client.grants.get.return_value = PermissionsList(
+    workspace_client.grants.get.return_value = GetPermissionsResponse(
         privilege_assignments=[PrivilegeAssignment(privileges=[Privilege.MANAGE], principal='any')]
     )
 

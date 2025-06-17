@@ -299,11 +299,11 @@ class HiveMetastoreFederation(SecretsMixin):
         grants = self._location_grants(location_name)
         if Privilege.CREATE_FOREIGN_SECURABLE not in grants[current_user]:
             change = PermissionsChange(principal=current_user, add=[Privilege.CREATE_FOREIGN_SECURABLE])
-            self._ws.grants.update(SecurableType.EXTERNAL_LOCATION, location_name, changes=[change])
+            self._ws.grants.update(SecurableType.EXTERNAL_LOCATION.value, location_name, changes=[change])
 
     def _location_grants(self, location_name: str) -> dict[str, set[Privilege]]:
         grants: dict[str, set[Privilege]] = collections.defaultdict(set)
-        result = self._ws.grants.get(SecurableType.EXTERNAL_LOCATION, location_name)
+        result = self._ws.grants.get(SecurableType.EXTERNAL_LOCATION.value, location_name)
         if not result.privilege_assignments:
             return grants
         for assignment in result.privilege_assignments:

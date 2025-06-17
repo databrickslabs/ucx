@@ -194,7 +194,7 @@ class TableMove:
 
     def _reapply_grants(self, from_table_name: str, to_table_name: str, *, target_view: bool = False) -> None:
         try:
-            grants = self._ws.grants.get(SecurableType.TABLE, from_table_name)
+            grants = self._ws.grants.get(SecurableType.TABLE.value, from_table_name)
         except NotFound:
             logger.warning(f"removed on the backend {from_table_name}")
             return
@@ -215,7 +215,7 @@ class TableMove:
             if privileges:
                 grants_changes.append(PermissionsChange(list(privileges), permission.principal))
 
-        self._ws.grants.update(SecurableType.TABLE, to_table_name, changes=grants_changes)
+        self._ws.grants.update(SecurableType.TABLE.value, to_table_name, changes=grants_changes)
 
     def _recreate_table(self, from_table_name, to_table_name, *, is_managed: bool, del_table: bool):
         drop_table = f"DROP TABLE {escape_sql_identifier(from_table_name)}"
