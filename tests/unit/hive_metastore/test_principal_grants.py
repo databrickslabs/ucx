@@ -1,4 +1,4 @@
-from unittest.mock import create_autospec, call
+from unittest.mock import Mock, create_autospec, call
 
 import pytest
 from databricks.labs.blueprint.installation import MockInstallation
@@ -35,7 +35,7 @@ from databricks.labs.ucx.hive_metastore.tables import Table
 
 
 @pytest.fixture
-def ws():
+def ws() -> Mock:
     w = create_autospec(WorkspaceClient)
     w.external_locations.list.return_value = [
         ExternalLocationInfo(url="abfss://container1@storage1.dfs.core.windows.net/folder1", name='loc1'),
@@ -97,7 +97,7 @@ def ws():
     return w
 
 
-def azure_acl(w, install, cluster_spn: list, warehouse_spn: list):
+def azure_acl(w: WorkspaceClient, install, cluster_spn: list, warehouse_spn: list) -> AzureACL:
     config = install.load(WorkspaceConfig)
     sql_backend = StatementExecutionBackend(w, config.warehouse_id)
     spn_crawler = create_autospec(AzureServicePrincipalCrawler)
@@ -106,13 +106,13 @@ def azure_acl(w, install, cluster_spn: list, warehouse_spn: list):
     return AzureACL(w, sql_backend, spn_crawler, install)
 
 
-def aws_acl(w, install):
+def aws_acl(w: WorkspaceClient, install) -> AwsACL:
     config = install.load(WorkspaceConfig)
     sql_backend = StatementExecutionBackend(w, config.warehouse_id)
     return AwsACL(w, sql_backend, install)
 
 
-def principal_acl(w, install, cluster_spn: list, warehouse_spn: list):
+def principal_acl(w: WorkspaceClient, install, cluster_spn: list, warehouse_spn: list) -> PrincipalACL:
     config = install.load(WorkspaceConfig)
     sql_backend = StatementExecutionBackend(w, config.warehouse_id)
     table_crawler = create_autospec(TablesCrawler)
@@ -586,7 +586,7 @@ def test_apply_location_acl_no_location_name(ws, installation):
     ws.grants.update.assert_not_called()
 
 
-def test_apply_location_acl_single_spn_azure(ws, installation):
+def test_apply_location_acl_single_spn_azure(ws, installation) -> None:
     ws.config.is_azure = True
     ws.config.is_aws = False
     cluster_spn = ServicePrincipalClusterMapping(
@@ -600,7 +600,7 @@ def test_apply_location_acl_single_spn_azure(ws, installation):
     permissions = [Privilege.CREATE_EXTERNAL_TABLE, Privilege.CREATE_EXTERNAL_VOLUME, Privilege.READ_FILES]
     calls = [
         call(
-            SecurableType.EXTERNAL_LOCATION,
+            SecurableType.EXTERNAL_LOCATION.value,
             'loc1',
             changes=[
                 PermissionsChange(add=permissions, principal='group1'),
@@ -608,7 +608,7 @@ def test_apply_location_acl_single_spn_azure(ws, installation):
             ],
         ),
         call(
-            SecurableType.EXTERNAL_LOCATION,
+            SecurableType.EXTERNAL_LOCATION.value,
             'loc2',
             changes=[
                 PermissionsChange(add=permissions, principal='group2'),
@@ -637,7 +637,15 @@ def test_apply_location_acl_single_spn_aws(ws, installation):
     location_acl.apply_location_acl()
     permissions = [Privilege.CREATE_EXTERNAL_TABLE, Privilege.CREATE_EXTERNAL_VOLUME, Privilege.READ_FILES]
     calls = [
-        call(SecurableType.EXTERNAL_LOCATION, 'loc1', changes=[PermissionsChange(add=permissions, principal='spn1')]),
-        call(SecurableType.EXTERNAL_LOCATION, 'loc1', changes=[PermissionsChange(add=permissions, principal='group2')]),
+        call(
+            SecurableType.EXTERNAL_LOCATION.value,
+            'loc1',
+            changes=[PermissionsChange(add=permissions, principal='spn1')],
+        ),
+        call(
+            SecurableType.EXTERNAL_LOCATION.value,
+            'loc1',
+            changes=[PermissionsChange(add=permissions, principal='group2')],
+        ),
     ]
     ws.grants.update.assert_has_calls(calls, any_order=True)

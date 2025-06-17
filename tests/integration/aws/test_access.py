@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 
 from databricks.labs.blueprint.tui import MockPrompts
+from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.catalog import AwsIamRoleRequest
 from databricks.sdk.service.compute import DataSecurityMode, AwsAttributes
 from databricks.sdk.service.iam import PermissionLevel
@@ -104,13 +105,13 @@ def test_create_uber_instance_profile(ws, env_or_skip, make_random, make_cluster
 
 def test_create_external_location_validate_acl(
     make_cluster_permissions,
-    ws,
+    ws: WorkspaceClient,
     make_user,
     make_cluster,
     aws_cli_ctx,
     env_or_skip,
     inventory_schema,
-):
+) -> None:
     aws_cli_ctx.workspace_installation.run()
     aws_cli_ctx.with_dummy_resource_permission()
     aws_cli_ctx.sql_backend.save_table(
@@ -149,13 +150,13 @@ def test_create_external_location_validate_acl(
     try:
         external_location_migration.run()
         permissions = ws.grants.get(
-            SecurableType.EXTERNAL_LOCATION, external_location_name, principal=cluster_user.user_name
+            SecurableType.EXTERNAL_LOCATION.value, external_location_name, principal=cluster_user.user_name
         )
         expected_aws_permission = PrivilegeAssignment(
             principal=cluster_user.user_name,
             privileges=[Privilege.CREATE_EXTERNAL_TABLE, Privilege.CREATE_EXTERNAL_VOLUME, Privilege.READ_FILES],
         )
-        assert expected_aws_permission in permissions.privilege_assignments
+        assert permissions.privilege_assignments and expected_aws_permission in permissions.privilege_assignments
     finally:
         remove_aws_permissions = [
             Privilege.CREATE_EXTERNAL_TABLE,
@@ -164,7 +165,7 @@ def test_create_external_location_validate_acl(
         ]
         ws.external_locations.delete(external_location_name)
         ws.grants.update(
-            SecurableType.EXTERNAL_LOCATION,
+            SecurableType.EXTERNAL_LOCATION.value,
             env_or_skip("TEST_A_LOCATION"),
             changes=[PermissionsChange(remove=remove_aws_permissions, principal=cluster_user.user_name)],
         )

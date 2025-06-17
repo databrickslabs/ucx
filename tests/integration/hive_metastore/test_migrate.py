@@ -2,12 +2,13 @@ import logging
 from datetime import timedelta
 
 import pytest
-from databricks.sdk import AccountClient
+from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service.compute import DataSecurityMode, AwsAttributes
 from databricks.sdk.service.catalog import Privilege, SecurableType, TableInfo, TableType
 from databricks.sdk.service.iam import PermissionLevel
+
 from databricks.labs.ucx.__about__ import __version__
 
 from databricks.labs.ucx.config import WorkspaceConfig
@@ -650,7 +651,9 @@ def test_mapping_reverts_table(ws, sql_backend, runtime_ctx, make_catalog):
 
 
 # @retried(on=[NotFound], timeout=timedelta(minutes=3))
-def test_migrate_managed_tables_with_acl(ws, sql_backend, runtime_ctx, make_catalog, make_user, env_or_skip):
+def test_migrate_managed_tables_with_acl(
+    ws: WorkspaceClient, sql_backend, runtime_ctx, make_catalog, make_user, env_or_skip
+) -> None:
     src_schema = runtime_ctx.make_schema(catalog_name="hive_metastore")
     src_managed_table = runtime_ctx.make_table(catalog_name=src_schema.catalog_name, schema_name=src_schema.name)
     user = make_user()
@@ -687,10 +690,11 @@ def test_migrate_managed_tables_with_acl(ws, sql_backend, runtime_ctx, make_cata
     assert len(target_tables) == 1
 
     target_table_properties = ws.tables.get(f"{dst_schema.full_name}.{src_managed_table.name}").properties
+    assert target_table_properties
     assert target_table_properties["upgraded_from"] == src_managed_table.full_name
     assert target_table_properties[Table.UPGRADED_FROM_WS_PARAM] == str(ws.get_workspace_id())
 
-    target_table_grants = ws.grants.get(SecurableType.TABLE, f"{dst_schema.full_name}.{src_managed_table.name}")
+    target_table_grants = ws.grants.get(SecurableType.TABLE.value, f"{dst_schema.full_name}.{src_managed_table.name}")
     target_principals = [pa for pa in target_table_grants.privilege_assignments or [] if pa.principal == user.user_name]
     assert len(target_principals) == 1, f"Missing grant for user {user.user_name}"
     assert target_principals[0].privileges == [Privilege.MODIFY, Privilege.SELECT]
@@ -721,8 +725,8 @@ def test_migrate_managed_tables_with_acl(ws, sql_backend, runtime_ctx, make_cata
 
 @retried(on=[NotFound], timeout=timedelta(minutes=3))
 def test_migrate_external_tables_with_principal_acl_azure(
-    ws, make_user, prepared_principal_acl, make_cluster_permissions, make_cluster, make_ucx_group
-):
+    ws: WorkspaceClient, make_user, prepared_principal_acl, make_cluster_permissions, make_cluster, make_ucx_group
+) -> None:
     if not ws.config.is_azure:
         pytest.skip("only works in azure test env")
     ctx, table_full_name, _, _ = prepared_principal_acl
@@ -741,7 +745,8 @@ def test_migrate_external_tables_with_principal_acl_azure(
     )
     table_migrate.migrate_tables(what=What.EXTERNAL_SYNC)
 
-    target_table_grants = ws.grants.get(SecurableType.TABLE, table_full_name)
+    target_table_grants = ws.grants.get(SecurableType.TABLE.value, table_full_name)
+    assert target_table_grants.privilege_assignments is not None
     match = False
     for _ in target_table_grants.privilege_assignments:
         if _.principal == user_with_cluster_access.user_name and _.privileges == [Privilege.ALL_PRIVILEGES]:
@@ -764,8 +769,8 @@ def test_migrate_external_tables_with_principal_acl_azure(
 
 @retried(on=[NotFound], timeout=timedelta(minutes=3))
 def test_migrate_external_tables_with_principal_acl_aws(
-    ws, make_user, prepared_principal_acl, make_cluster_permissions, make_cluster, env_or_skip
-):
+    ws: WorkspaceClient, make_user, prepared_principal_acl, make_cluster_permissions, make_cluster, env_or_skip
+) -> None:
     ctx, table_full_name, _, _ = prepared_principal_acl
     ctx.with_dummy_resource_permission()
     cluster = make_cluster(
@@ -782,7 +787,8 @@ def test_migrate_external_tables_with_principal_acl_aws(
     )
     table_migrate.migrate_tables(what=What.EXTERNAL_SYNC)
 
-    target_table_grants = ws.grants.get(SecurableType.TABLE, table_full_name)
+    target_table_grants = ws.grants.get(SecurableType.TABLE.value, table_full_name)
+    assert target_table_grants.privilege_assignments is not None
     match = False
     for _ in target_table_grants.privilege_assignments:
         if _.principal == user.user_name and _.privileges == [Privilege.ALL_PRIVILEGES]:
@@ -793,8 +799,12 @@ def test_migrate_external_tables_with_principal_acl_aws(
 
 @retried(on=[NotFound], timeout=timedelta(minutes=3))
 def test_migrate_external_tables_with_principal_acl_aws_warehouse(
-    ws, make_user, prepared_principal_acl, make_warehouse_permissions, make_warehouse, env_or_skip
-):
+    ws: WorkspaceClient,
+    make_user,
+    prepared_principal_acl,
+    make_warehouse_permissions,
+    make_warehouse,
+) -> None:
     if not ws.config.is_aws:
         pytest.skip("temporary: only works in aws test env")
     ctx, table_full_name, _, _ = prepared_principal_acl
@@ -809,7 +819,8 @@ def test_migrate_external_tables_with_principal_acl_aws_warehouse(
     )
     table_migrate.migrate_tables(what=What.EXTERNAL_SYNC)
 
-    target_table_grants = ws.grants.get(SecurableType.TABLE, table_full_name)
+    target_table_grants = ws.grants.get(SecurableType.TABLE.value, table_full_name)
+    assert target_table_grants.privilege_assignments is not None
     match = False
     for _ in target_table_grants.privilege_assignments:
         if _.principal == user.user_name and _.privileges == [Privilege.ALL_PRIVILEGES]:
@@ -879,8 +890,8 @@ def test_migrate_table_in_mount(
 
 
 def test_migrate_external_tables_with_spn_azure(
-    ws, make_user, prepared_principal_acl, make_cluster_permissions, make_cluster
-):
+    ws: WorkspaceClient, prepared_principal_acl, make_cluster_permissions, make_cluster
+) -> None:
     if not ws.config.is_azure:
         pytest.skip("temporary: only works in azure test env")
     ctx, table_full_name, _, _ = prepared_principal_acl
@@ -897,7 +908,8 @@ def test_migrate_external_tables_with_spn_azure(
     )
     table_migrate.migrate_tables(what=What.EXTERNAL_SYNC)
 
-    target_table_grants = ws.grants.get(SecurableType.TABLE, table_full_name)
+    target_table_grants = ws.grants.get(SecurableType.TABLE.value, table_full_name)
+    assert target_table_grants.privilege_assignments is not None
     match = False
     for _ in target_table_grants.privilege_assignments:
         if _.principal == spn_with_mount_access and _.privileges == [Privilege.ALL_PRIVILEGES]:
