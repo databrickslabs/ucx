@@ -218,13 +218,18 @@ CLUSTER_WITHOUT_ACL_FRAGMENT = "Table Access Control is not enabled on this clus
 class GrantsCrawler(CrawlerBase[Grant]):
     """Crawler that captures access controls that relate to data and other securable objects."""
 
-    def __init__(self, tables_crawler: TablesCrawler, udf: UdfsCrawler, include_databases: list[str] | None = None):
-        assert tables_crawler._sql_backend == udf._sql_backend
-        assert tables_crawler._catalog == udf._catalog
-        assert tables_crawler._schema == udf._schema
-        super().__init__(tables_crawler._sql_backend, tables_crawler._catalog, tables_crawler._schema, "grants", Grant)
+    def __init__(
+        self,
+        sql_backend: SqlBackend,
+        schema: str,
+        tables_crawler: TablesCrawler,
+        udfs_crawler: UdfsCrawler,
+        *,
+        include_databases: list[str] | None = None,
+    ):
+        super().__init__(sql_backend, "hive_metastore", schema, "grants", Grant)
         self._tables_crawler = tables_crawler
-        self._udf = udf
+        self._udfs_crawler = udfs_crawler
         self._include_databases = include_databases
 
     def snapshot(self, *, force_refresh: bool = False) -> Iterable[Grant]:
@@ -286,7 +291,7 @@ class GrantsCrawler(CrawlerBase[Grant]):
             else:
                 task = partial(fn, view=table.name)
             tasks.append(task)
-        for udf in self._udf.snapshot():
+        for udf in self._udfs_crawler.snapshot():
             fn = partial(self.grants, catalog=catalog, database=udf.database)
             tasks.append(partial(fn, udf=udf.name))
         catalog_grants, errors = Threads.gather(f"listing grants for {catalog}", tasks)
