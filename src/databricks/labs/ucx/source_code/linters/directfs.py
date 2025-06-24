@@ -156,9 +156,13 @@ class DirectFsAccessSqlLinter(SqlLinter, DfsaSqlCollector):
     def lint_expression(self, expression: Expression) -> Iterable[Deprecation]:
         for dfsa in self._collect_dfsas(SqlExpression(expression)):
             replacement_table_name = self.fetch_table_for_path(dfsa.path)
+            if replacement_table_name is not None:
+                dfsa_message = f"The use of direct filesystem references is deprecated: {dfsa.path}. Use {replacement_table_name} instead."
+            else:
+                dfsa_message = f"The use of direct filesystem references is deprecated: {dfsa.path}. No replacement table found"
             yield Deprecation(
                 code='direct-filesystem-access-in-sql-query',
-                message=f"The use of direct filesystem references is deprecated: {dfsa.path}. Use {replacement_table_name} instead.",
+                message=dfsa_message,
                 # SQLGlot does not propagate tokens yet. See https://github.com/tobymao/sqlglot/issues/3159
                 start_line=0,
                 start_col=0,
