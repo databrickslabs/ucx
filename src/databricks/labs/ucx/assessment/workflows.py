@@ -8,7 +8,8 @@ logger = logging.getLogger(__name__)
 
 
 class Assessment(Workflow):  # pylint: disable=too-many-public-methods
-    def __init__(self):
+    def __init__(self, force_refresh: bool = False):
+        self._force_refresh = force_refresh
         super().__init__('assessment')
 
     @job_task
@@ -18,14 +19,14 @@ class Assessment(Workflow):  # pylint: disable=too-many-public-methods
         `$inventory_database.tables`. Note that the `inventory_database` is set in the configuration file. The metadata
         stored is then used in the subsequent tasks and workflows to, for example,  find all Hive Metastore tables that
         cannot easily be migrated to Unity Catalog."""
-        ctx.tables_crawler.snapshot(force_refresh=True)
+        ctx.tables_crawler.snapshot(force_refresh=self._force_refresh)
 
     @job_task
     def crawl_udfs(self, ctx: RuntimeContext):
         """Iterates over all UDFs in the Hive Metastore of the current workspace and persists their metadata in the
         table named `$inventory_database.udfs`. This inventory is currently used when scanning securable objects for
         issues with grants that cannot be migrated to Unit Catalog."""
-        ctx.udfs_crawler.snapshot(force_refresh=True)
+        ctx.udfs_crawler.snapshot(force_refresh=self._force_refresh)
 
     @job_task(job_cluster="tacl")
     def setup_tacl(self, ctx: RuntimeContext):
@@ -40,7 +41,7 @@ class Assessment(Workflow):  # pylint: disable=too-many-public-methods
 
         Note: This job runs on a separate cluster (named `tacl`) as it requires the proper configuration to have the Table
         ACLs enabled and available for retrieval."""
-        ctx.grants_crawler.snapshot(force_refresh=True)
+        ctx.grants_crawler.snapshot(force_refresh=self._force_refresh)
 
     @job_task(depends_on=[crawl_tables])
     def estimate_table_size_for_migration(self, ctx: RuntimeContext):
@@ -48,7 +49,7 @@ class Assessment(Workflow):  # pylint: disable=too-many-public-methods
         "synced". These tables will have to be cloned in the migration process.
         Assesses the size of these tables and create `$inventory_database.table_size` table to list these sizes.
         The table size is a factor in deciding whether to clone these tables."""
-        ctx.table_size_crawler.snapshot(force_refresh=True)
+        ctx.table_size_crawler.snapshot(force_refresh=self._force_refresh)
 
     @job_task
     def crawl_mounts(self, ctx: RuntimeContext):
@@ -58,7 +59,7 @@ class Assessment(Workflow):  # pylint: disable=too-many-public-methods
 
         The assessment involves scanning the workspace to compile a list of all existing mount points and subsequently
         storing this information in the `$inventory.mounts` table. This is crucial for planning the migration."""
-        ctx.mounts_crawler.snapshot(force_refresh=True)
+        ctx.mounts_crawler.snapshot(force_refresh=self._force_refresh)
 
     @job_task(depends_on=[crawl_mounts, crawl_tables])
     def guess_external_locations(self, ctx: RuntimeContext):
@@ -70,7 +71,7 @@ class Assessment(Workflow):  # pylint: disable=too-many-public-methods
           - Extracting all the locations associated with tables that do not use DBFS directly, but a mount point instead
           - Scanning all these locations to identify folders that can act as shared path prefixes
           - These identified external locations will be created subsequently prior to the actual table migration"""
-        ctx.external_locations.snapshot(force_refresh=True)
+        ctx.external_locations.snapshot(force_refresh=self._force_refresh)
 
     @job_task
     def assess_jobs(self, ctx: RuntimeContext):
@@ -83,7 +84,7 @@ class Assessment(Workflow):  # pylint: disable=too-many-public-methods
           - Clusters with incompatible Spark config tags
           - Clusters referencing DBFS locations in one or more config options
         """
-        ctx.jobs_crawler.snapshot(force_refresh=True)
+        ctx.jobs_crawler.snapshot(force_refresh=self._force_refresh)
 
     @job_task
     def assess_clusters(self, ctx: RuntimeContext):
@@ -96,7 +97,7 @@ class Assessment(Workflow):  # pylint: disable=too-many-public-methods
           - Clusters with incompatible spark config tags
           - Clusters referencing DBFS locations in one or more config options
         """
-        ctx.clusters_crawler.snapshot(force_refresh=True)
+        ctx.clusters_crawler.snapshot(force_refresh=self._force_refresh)
 
     @job_task
     def assess_pipelines(self, ctx: RuntimeContext):
@@ -109,7 +110,7 @@ class Assessment(Workflow):  # pylint: disable=too-many-public-methods
 
         Subsequently, a list of all the pipelines with matching configurations are stored in the
         `$inventory.pipelines` table."""
-        ctx.pipelines_crawler.snapshot(force_refresh=True)
+        ctx.pipelines_crawler.snapshot(force_refresh=self._force_refresh)
 
     @job_task
     def assess_incompatible_submit_runs(self, ctx: RuntimeContext):
@@ -122,7 +123,7 @@ class Assessment(Workflow):  # pylint: disable=too-many-public-methods
         It also combines several submit runs under a single pseudo_id based on hash of the submit run configuration.
         Subsequently, a list of all the incompatible runs with failures are stored in the
         `$inventory.submit_runs` table."""
-        ctx.submit_runs_crawler.snapshot(force_refresh=True)
+        ctx.submit_runs_crawler.snapshot(force_refresh=self._force_refresh)
 
     @job_task
     def crawl_cluster_policies(self, ctx: RuntimeContext):
@@ -133,7 +134,7 @@ class Assessment(Workflow):  # pylint: disable=too-many-public-methods
 
           Subsequently, a list of all the policies with matching configurations are stored in the
         `$inventory.policies` table."""
-        ctx.policies_crawler.snapshot(force_refresh=True)
+        ctx.policies_crawler.snapshot(force_refresh=self._force_refresh)
 
     @job_task(cloud="azure")
     def assess_azure_service_principals(self, ctx: RuntimeContext):
@@ -147,7 +148,7 @@ class Assessment(Workflow):  # pylint: disable=too-many-public-methods
         Subsequently, the list of all the Azure Service Principals referred in those configurations are saved
         in the `$inventory.azure_service_principals` table."""
         if ctx.is_azure:
-            ctx.azure_service_principal_crawler.snapshot(force_refresh=True)
+            ctx.azure_service_principal_crawler.snapshot(force_refresh=self._force_refresh)
 
     @job_task
     def assess_global_init_scripts(self, ctx: RuntimeContext):
@@ -156,7 +157,7 @@ class Assessment(Workflow):  # pylint: disable=too-many-public-methods
 
         It looks in:
           - the list of all the global init scripts are saved in the `$inventory.global_init_scripts` table."""
-        ctx.global_init_scripts_crawler.snapshot(force_refresh=True)
+        ctx.global_init_scripts_crawler.snapshot(force_refresh=self._force_refresh)
 
     @job_task
     def workspace_listing(self, ctx: RuntimeContext):
@@ -168,7 +169,7 @@ class Assessment(Workflow):  # pylint: disable=too-many-public-methods
         if not ctx.config.use_legacy_permission_migration:
             logger.info("Skipping workspace listing as legacy permission migration is disabled.")
             return
-        ctx.workspace_listing.snapshot(force_refresh=True)
+        ctx.workspace_listing.snapshot(force_refresh=self._force_refresh)
 
     @job_task(depends_on=[crawl_grants, workspace_listing])
     def crawl_permissions(self, ctx: RuntimeContext):
@@ -182,22 +183,22 @@ class Assessment(Workflow):  # pylint: disable=too-many-public-methods
             return
         permission_manager = ctx.permission_manager
         permission_manager.reset()
-        permission_manager.snapshot(force_refresh=True)
+        permission_manager.snapshot(force_refresh=self._force_refresh)
 
     @job_task
     def crawl_groups(self, ctx: RuntimeContext):
         """Scans all groups for the local group migration scope"""
-        ctx.group_manager.snapshot(force_refresh=True)
+        ctx.group_manager.snapshot(force_refresh=self._force_refresh)
 
     @job_task
     def crawl_redash_dashboards(self, ctx: RuntimeContext):
         """Scans all Redash dashboards."""
-        ctx.redash_crawler.snapshot(force_refresh=True)
+        ctx.redash_crawler.snapshot(force_refresh=self._force_refresh)
 
     @job_task
     def crawl_lakeview_dashboards(self, ctx: RuntimeContext):
         """Scans all Lakeview dashboards."""
-        ctx.lakeview_crawler.snapshot(force_refresh=True)
+        ctx.lakeview_crawler.snapshot(force_refresh=self._force_refresh)
 
     @job_task(depends_on=[crawl_redash_dashboards, crawl_lakeview_dashboards])
     def assess_dashboards(self, ctx: RuntimeContext):
