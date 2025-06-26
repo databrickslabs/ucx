@@ -855,6 +855,7 @@ class WorkflowsDeployment(InstallationMixin):
             "email_notifications": email_notifications,
             "schedule": workflow.schedule,
             "tasks": job_tasks,
+            "parameters": workflow.parameters,
         }
 
     def _job_task(self, task: Task, remote_wheels: list[str]) -> jobs.Task:
