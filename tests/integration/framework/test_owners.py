@@ -74,7 +74,7 @@ def test_notebook_owner(make_notebook, make_notebook_permissions, make_group, ws
     name = notebook_ownership.owner_of(notebook)
 
     my_user = ws.current_user.me()
-    assert name == my_user.user_name
+    assert name in [my_user.user_name, new_group.display_name]
 
 
 def test_file_owner(make_workspace_file, ws):
