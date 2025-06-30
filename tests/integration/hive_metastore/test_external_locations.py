@@ -101,6 +101,6 @@ def test_save_external_location_mapping_missing_location(ws, sql_backend, invent
     tables_crawler = TablesCrawler(sql_backend, inventory_schema)
     mounts_crawler = MountsCrawler(sql_backend, ws, inventory_schema)
     location_crawler = ExternalLocations(ws, sql_backend, inventory_schema, tables_crawler, mounts_crawler)
-    installation = Installation(ws, make_random)
+    installation = Installation(ws, make_random())
     path = location_crawler.save_as_terraform_definitions_on_workspace(installation)
     assert ws.workspace.get_status(path)
