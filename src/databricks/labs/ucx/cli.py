@@ -219,15 +219,16 @@ def validate_external_locations(
 
 
 @ucx.command
-def ensure_assessment_run(w: WorkspaceClient, run_as_collection: bool = False, a: AccountClient | None = None):
+def ensure_assessment_run(w: WorkspaceClient, run_as_collection: bool = False, a: AccountClient | None = None, **named_parameters):
     """ensure the assessment job was run on a workspace"""
     workspace_contexts = _get_workspace_contexts(w, a, run_as_collection)
+    force_refresh = named_parameters.get("force_refresh", "false").lower() == "true"
     for ctx in workspace_contexts:
         workspace_id = ctx.workspace_client.get_workspace_id()
         logger.info(f"Checking assessment workflow in workspace: {workspace_id}")
         deployed_workflows = ctx.deployed_workflows
         # Note: will block if the workflow is already underway but not completed.
-        if deployed_workflows.validate_step("assessment"):
+        if deployed_workflows.validate_step("assessment") and not force_refresh:
             logger.info(f"The assessment workflow has successfully completed in workspace: {workspace_id}")
         else:
             logger.info(f"Starting assessment workflow in workspace: {workspace_id}")
