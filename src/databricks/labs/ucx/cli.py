@@ -230,11 +230,12 @@ def ensure_assessment_run(w: WorkspaceClient, run_as_collection: bool = False, a
         # Note: will block if the workflow is already underway but not completed.
         if deployed_workflows.validate_step("assessment") and not force_refresh:
             logger.info(f"The assessment workflow has successfully completed in workspace: {workspace_id}")
+        elif force_refresh:
+            logger.info(f"Re-running assessment workflow in workspace: {workspace_id}")
+            deployed_workflows.run_workflow("assessment", skip_job_wait=run_as_collection, named_parameters={"force_refresh": "true"})
         else:
             logger.info(f"Starting assessment workflow in workspace: {workspace_id}")
             # If running for a collection, don't wait for each assessment job to finish as that will take a long time.
-            deployed_workflows.run_workflow("assessment", skip_job_wait=run_as_collection)
-
 
 @ucx.command
 def update_migration_progress(
