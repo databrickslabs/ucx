@@ -1,4 +1,5 @@
 import logging
+from functools import cached_property
 
 from databricks.sdk.service.jobs import JobParameterDefinition
 
@@ -11,8 +12,21 @@ logger = logging.getLogger(__name__)
 
 class Assessment(Workflow):  # pylint: disable=too-many-public-methods
     def __init__(self):
-        self._force_refresh_param = JobParameterDefinition(name="force_refresh", default=False)
-        super().__init__('assessment', [self._force_refresh_param])
+        super().__init__('assessment', [JobParameterDefinition(name="force_refresh", default=False)])
+
+    @staticmethod
+    def _get_force_refresh(ctx: RuntimeContext) -> bool:
+        """Extracts the force_refresh parameter from the job run parameters."""
+        force_refresh = False
+        job_id = ctx.install_state.jobs["assessment"]
+        job_runs = [job_run for job_run in ctx.workspace_client.jobs.list_runs(active_only=True, job_id=job_id)]
+        job_parameters = job_runs[0].job_parameters if job_runs else []
+        for job_parameter in job_parameters:
+            if job_parameter.name == "force_refresh" and job_parameter.value is not None:
+                force_refresh = job_parameter.value.lower() in {"true", "1"}
+                logger.info("Found force_refresh parameter in job run: %s", force_refresh)
+                break
+        return force_refresh
 
     @job_task
     def crawl_tables(self, ctx: RuntimeContext):
@@ -21,8 +35,7 @@ class Assessment(Workflow):  # pylint: disable=too-many-public-methods
         `$inventory_database.tables`. Note that the `inventory_database` is set in the configuration file. The metadata
         stored is then used in the subsequent tasks and workflows to, for example, find all Hive Metastore tables that
         cannot easily be migrated to Unity Catalog."""
-        force_refresh = ctx.named_parameters.get("force_refresh", "False").lower() in {"true", "1"}
-        ctx.tables_crawler.snapshot(force_refresh=force_refresh)
+        ctx.tables_crawler.snapshot(force_refresh=self._get_force_refresh(ctx))
 
     @job_task
     def crawl_udfs(self, ctx: RuntimeContext):

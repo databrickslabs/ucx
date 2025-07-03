@@ -249,13 +249,14 @@ class DeployedWorkflows:
         self._ws = ws
         self._install_state = install_state
 
-    def run_workflow(self, step: str, skip_job_wait: bool = False, max_wait: timedelta = timedelta(minutes=20)) -> int:
+    def run_workflow(self, step: str, skip_job_wait: bool = False, max_wait: timedelta = timedelta(minutes=20),
+                     named_parameters: dict[str, str] | None = None ) -> int:
         # this dunder variable is hiding this method from tracebacks, making it cleaner
         # for the user to see the actual error without too much noise.
         __tracebackhide__ = True  # pylint: disable=unused-variable
         job_id = int(self._install_state.jobs[step])
         logger.debug(f"starting {step} job: {self._ws.config.host}#job/{job_id}")
-        job_initial_run = self._ws.jobs.run_now(job_id)
+        job_initial_run = self._ws.jobs.run_now(job_id, job_parameters=named_parameters)
         run_id = job_initial_run.run_id
         if not run_id:
             raise NotFound(f"job run not found for {step}")
