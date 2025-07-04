@@ -219,7 +219,9 @@ def validate_external_locations(
 
 
 @ucx.command
-def ensure_assessment_run(w: WorkspaceClient, run_as_collection: bool = False, a: AccountClient | None = None, **named_parameters):
+def ensure_assessment_run(
+    w: WorkspaceClient, run_as_collection: bool = False, a: AccountClient | None = None, **named_parameters
+):
     """ensure the assessment job was run on a workspace"""
     workspace_contexts = _get_workspace_contexts(w, a, run_as_collection)
     force_refresh = named_parameters.get("force_refresh", "false").lower() == "true"
@@ -232,10 +234,13 @@ def ensure_assessment_run(w: WorkspaceClient, run_as_collection: bool = False, a
             logger.info(f"The assessment workflow has successfully completed in workspace: {workspace_id}")
         elif force_refresh:
             logger.info(f"Re-running assessment workflow in workspace: {workspace_id}")
-            deployed_workflows.run_workflow("assessment", skip_job_wait=run_as_collection, named_parameters={"force_refresh": "true"})
+            deployed_workflows.run_workflow(
+                "assessment", skip_job_wait=run_as_collection, named_parameters={"force_refresh": "true"}
+            )
         else:
             logger.info(f"Starting assessment workflow in workspace: {workspace_id}")
             # If running for a collection, don't wait for each assessment job to finish as that will take a long time.
+
 
 @ucx.command
 def update_migration_progress(

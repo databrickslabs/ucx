@@ -1,5 +1,4 @@
 import logging
-from functools import cached_property
 
 from databricks.sdk.service.jobs import JobParameterDefinition
 
@@ -19,12 +18,14 @@ class Assessment(Workflow):  # pylint: disable=too-many-public-methods
         """Extracts the force_refresh parameter from the job run parameters."""
         force_refresh = False
         job_id = ctx.install_state.jobs["assessment"]
-        job_runs = [job_run for job_run in ctx.workspace_client.jobs.list_runs(active_only=True, job_id=job_id)]
+        job_runs = list(ctx.workspace_client.jobs.list_runs(active_only=True, job_id=job_id))
         job_parameters = job_runs[0].job_parameters if job_runs else []
+        if not job_parameters:
+            return False
         for job_parameter in job_parameters:
             if job_parameter.name == "force_refresh" and job_parameter.value is not None:
                 force_refresh = job_parameter.value.lower() in {"true", "1"}
-                logger.info("Found force_refresh parameter in job run: %s", force_refresh)
+                logger.info(f"Found force_refresh parameter in job run: {force_refresh}")
                 break
         return force_refresh
 
