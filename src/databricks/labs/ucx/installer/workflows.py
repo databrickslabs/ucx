@@ -249,8 +249,13 @@ class DeployedWorkflows:
         self._ws = ws
         self._install_state = install_state
 
-    def run_workflow(self, step: str, skip_job_wait: bool = False, max_wait: timedelta = timedelta(minutes=20),
-                     named_parameters: dict[str, str] | None = None ) -> int:
+    def run_workflow(
+        self,
+        step: str,
+        skip_job_wait: bool = False,
+        max_wait: timedelta = timedelta(minutes=20),
+        named_parameters: dict[str, str] | None = None,
+    ) -> int:
         # this dunder variable is hiding this method from tracebacks, making it cleaner
         # for the user to see the actual error without too much noise.
         __tracebackhide__ = True  # pylint: disable=unused-variable
