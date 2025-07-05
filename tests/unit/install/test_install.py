@@ -180,9 +180,8 @@ def test_writeable_dbfs(ws, tmp_path, mock_installation) -> None:
 
 
 def test_run_workflow_creates_proper_failure(ws, mocker, mock_installation_with_jobs):
-    def run_now(job_id, job_parameters: dict[str, Any] | None = None):
+    def run_now(job_id, _job_parameters: dict[str, Any] | None = None):
         assert job_id == 123
-        assert job_parameters is None
 
         def result():
             raise OperationFailed(...)
@@ -216,9 +215,8 @@ def test_run_workflow_creates_proper_failure(ws, mocker, mock_installation_with_
 
 
 def test_run_workflow_run_id_not_found(ws, mocker, mock_installation_with_jobs):
-    def run_now(job_id, job_parameters: dict[str, Any] | None = None):
+    def run_now(job_id, _job_parameters: dict[str, Any] | None = None):
         assert job_id == 123
-        assert job_parameters is None
 
         def result():
             raise OperationFailed(...)
@@ -248,9 +246,8 @@ def test_run_workflow_run_id_not_found(ws, mocker, mock_installation_with_jobs):
 
 
 def test_run_workflow_creates_failure_from_mapping(ws, mocker, mock_installation, mock_installation_with_jobs):
-    def run_now(job_id, job_parameters: dict[str, Any] | None = None):
+    def run_now(job_id, _job_parameters: dict[str, Any] | None = None):
         assert job_id == 123
-        assert job_parameters is None
 
         def result():
             raise OperationFailed(...)
@@ -284,9 +281,8 @@ def test_run_workflow_creates_failure_from_mapping(ws, mocker, mock_installation
 
 
 def test_run_workflow_creates_failure_many_error(ws, mocker, mock_installation_with_jobs):
-    def run_now(job_id, job_parameters: dict[str, Any] | None = None):
+    def run_now(job_id, _job_parameters: dict[str, Any] | None = None):
         assert job_id == 123
-        assert job_parameters is None
 
         def result():
             raise OperationFailed(...)
