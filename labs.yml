@@ -87,6 +87,9 @@ commands:
       - name: run-as-collection
         description: (Optional) Whether to check (and run if necessary) the assessment for the collection of workspaces
           with ucx installed. Default is false.
+      - name: force_refresh
+        description: (Optional) Force a full refresh of the assessment job, even if it was run recently.
+          Default is false.
 
   - name: update-migration-progress
     description: trigger the `migration-progress-experimental` job to refresh the inventory that tracks the workspace
