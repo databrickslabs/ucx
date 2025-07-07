@@ -731,13 +731,14 @@ are displayed. To display `DEBUG` logs, use the `--debug` flag.
 ### `ensure-assessment-run`
 
 ```commandline
-databricks labs ucx ensure-assessment-run
+databricks labs ucx ensure-assessment-run [--force-refresh true/false]
 ```
 
 This command ensures that the [assessment workflow](/docs/reference/workflows#assessment-workflow) was run on a workspace.
 This command will block until job finishes.
 Failed workflows can be fixed with the [`repair-run` command](/docs/reference/commands#repair-run). Workflows and their status can be
 listed with the [`workflows` command](/docs/reference/commands#workflows).
+The `--force-refresh` flag can be used to force the assessment workflow to run again overwriting the previous assessment results, even if it was already run before.
 
 ### `update-migration-progress`
 
