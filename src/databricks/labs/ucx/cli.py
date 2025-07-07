@@ -239,6 +239,7 @@ def ensure_assessment_run(
             )
         else:
             logger.info(f"Starting assessment workflow in workspace: {workspace_id}")
+            deployed_workflows.run_workflow("assessment", skip_job_wait=run_as_collection)
             # If running for a collection, don't wait for each assessment job to finish as that will take a long time.
 
 
