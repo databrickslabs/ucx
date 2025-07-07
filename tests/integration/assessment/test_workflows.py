@@ -65,5 +65,5 @@ def test_running_real_assessment_job(
     }
 
     query = f"SELECT * FROM {installation_ctx.inventory_database}.tables"
-    tables_after_assessment_rerun = set([table.name for table in sql_backend.fetch(query)])
+    tables_after_assessment_rerun = {table.name for table in sql_backend.fetch(query)}
     assert tables_after_assessment_rerun == expected_tables
