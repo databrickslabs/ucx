@@ -119,7 +119,7 @@ def test_installation_recreates_trashed_lakeview_dashboard(caplog, ws, workspace
     ws.lakeview.get.return_value = LakeviewDashboard(lifecycle_state=LifecycleState.TRASHED)
     with caplog.at_level(logging.INFO, logger="databricks.labs.ucx.install"):
         workspace_installation.run()
-    assert "Recreating trashed dashboard" in caplog.text
+    assert "Dashboard life cycle in trashed state" in caplog.text
     ws.lakeview.create.assert_called()
     ws.lakeview.update.assert_not_called()
 
