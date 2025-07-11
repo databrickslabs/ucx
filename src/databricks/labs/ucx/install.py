@@ -634,7 +634,6 @@ class WorkspaceInstallation(InstallationMixin):
         return dashboard_id  # Update the existing dashboard
 
     def _is_redash_dashboard(self, dashboard_id: str) -> bool:
-        """Check if the dashboard is a Redash dashboard"""
         return "-" in dashboard_id
 
     def _upgrade_redash_dashboard(self, dashboard_id: str, display_name: str) -> None:
