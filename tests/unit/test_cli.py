@@ -406,7 +406,7 @@ def test_ensure_assessment_run_collection(workspace_clients, acc_client):
     ensure_assessment_run(workspace_clients[0], run_as_collection=True, a=acc_client)
 
     for workspace_client in workspace_clients:
-        workspace_client.jobs.run_now.assert_called_with(123)
+        workspace_client.jobs.run_now.assert_called_with(123, job_parameters=None)
 
 
 def test_repair_run(ws):
@@ -1035,7 +1035,7 @@ def test_migrate_tables_calls_migrate_table_job_run_now(
     migrate_tables(workspace_clients[0], MockPrompts({}), run_as_collection=run_as_collection, a=acc_client)
 
     for workspace_client in workspace_clients:
-        workspace_client.jobs.run_now.assert_called_with(456)
+        workspace_client.jobs.run_now.assert_called_with(456, job_parameters=None)
         workspace_client.jobs.wait_get_run_job_terminated_or_skipped.assert_called_once()
 
 
@@ -1079,7 +1079,7 @@ def test_migrate_tables_calls_external_hiveserde_tables_job_run_now(ws) -> None:
 
     migrate_tables(ws, prompts, ctx=ctx)
 
-    ws.jobs.run_now.assert_called_with(789)
+    ws.jobs.run_now.assert_called_with(789, job_parameters=None)
     ws.jobs.wait_get_run_job_terminated_or_skipped.call_count = 2
 
 
@@ -1114,7 +1114,7 @@ def test_migrate_tables_calls_external_tables_ctas_job_run_now(ws) -> None:
 
     migrate_tables(ws, prompts, ctx=ctx)
 
-    ws.jobs.run_now.assert_called_with(987)
+    ws.jobs.run_now.assert_called_with(987, job_parameters=None)
     ws.jobs.wait_get_run_job_terminated_or_skipped.call_count = 2
 
 
