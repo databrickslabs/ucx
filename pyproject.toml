@@ -45,16 +45,16 @@ classifiers = [
 ]
 
 
-dependencies = ["databricks-sdk>=0.56.0,<0.58.0",
+dependencies = ["databricks-sdk>=0.58.0,<0.59.0",
                 "databricks-labs-lsql>=0.16.0,<0.17.0",
                 "databricks-labs-blueprint>=0.11.0,<0.12.0",
                 "PyYAML>=6.0.0,<6.1.0",
-                "sqlglot>=26.7.0,<26.8.0",
+                "sqlglot>=26.7.0,<27.1.0",
                 "astroid>=3.3.0,<3.4.0"]
 
 [project.optional-dependencies]
 pylsp = [
-    "python-lsp-server>=1.12.0,<1.13.0"
+    "python-lsp-server>=1.13.0,<1.14.0"
 ]
 
 [project.entry-points.databricks]
