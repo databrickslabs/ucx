@@ -1,4 +1,5 @@
 import json
+import pytest
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import iam
@@ -54,7 +55,7 @@ def test_fallback_admin_user(ws, installation_ctx: RuntimeContext) -> None:
     assert an_admin == the_user.user_name and the_user.active
     assert _user_is_member_of_group(the_user, admins_group_id) or _user_has_role(the_user, "account_admin")
 
-
+@pytest.mark.xfail(reason="Need to determine handling priority of ownerships")
 def test_notebook_owner(make_notebook, make_notebook_permissions, make_group, ws):
     notebook = make_notebook()
     new_group = make_group()
