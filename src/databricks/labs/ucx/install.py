@@ -649,7 +649,7 @@ class WorkspaceInstallation(InstallationMixin):
             msg = f"Dashboard life cycle state: {display_name} ({dashboard_id})"
             raise NotFound(msg)
         if dashboard.lifecycle_state == LifecycleState.TRASHED:
-            logger.info(f"Recreating trashed dashboard: {display_name} ({dashboard_id})")
+            logger.info(f"Dashboard life cycle in trashed state: {display_name} ({dashboard_id})")
             return True
         return False
 
