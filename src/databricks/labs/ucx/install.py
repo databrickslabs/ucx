@@ -646,7 +646,8 @@ class WorkspaceInstallation(InstallationMixin):
 
     def _is_trashed_dashboard(self, dashboard, display_name: str, dashboard_id: str) -> bool:
         if dashboard.lifecycle_state is None:
-            raise NotFound(f"Dashboard life cycle state: {display_name} ({dashboard_id})")
+            msg = f"Dashboard life cycle state: {display_name} ({dashboard_id})"
+            raise NotFound(msg)
         if dashboard.lifecycle_state == LifecycleState.TRASHED:
             logger.info(f"Recreating trashed dashboard: {display_name} ({dashboard_id})")
             return True
