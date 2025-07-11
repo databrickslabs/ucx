@@ -642,6 +642,10 @@ class WorkspaceInstallation(InstallationMixin):
             except NotFound:
                 pass
             return None  # Recreate the dashboard if it's reference is corrupted (manually)
+        except PermissionDenied:
+                logger.warning(f"Cannot access dashboard {display_name} ({dashboard_id}), permission denied")
+                pass
+                return None  # Create a new dashboard if permission is denied.
         return dashboard_id  # Update the existing dashboard
 
     # InternalError and DeadlineExceeded are retried because of Lakeview internal issues
