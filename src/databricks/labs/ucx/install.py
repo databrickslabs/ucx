@@ -619,30 +619,47 @@ class WorkspaceInstallation(InstallationMixin):
             str | None :
                 The dashboard id. If None, the dashboard will be recreated.
         """
-        if "-" in dashboard_id:
-            logger.info(f"Upgrading dashboard to Lakeview: {display_name} ({dashboard_id})")
-            try:
-                self._ws.dashboards.delete(dashboard_id=dashboard_id)
-            except BadRequest:
-                logger.warning(f"Cannot delete dashboard: {display_name} ({dashboard_id})")
-            return None  # Recreate the dashboard if upgrading from Redash
+        if self._is_redash_dashboard(dashboard_id):
+            self._upgrade_redash_dashboard(dashboard_id, display_name)
         try:
             dashboard = self._ws.lakeview.get(dashboard_id)
-            if dashboard.lifecycle_state is None:
-                raise NotFound(f"Dashboard life cycle state: {display_name} ({dashboard_id})")
-            if dashboard.lifecycle_state == LifecycleState.TRASHED:
-                logger.info(f"Recreating trashed dashboard: {display_name} ({dashboard_id})")
+            if self._is_trashed_dashboard(dashboard, display_name, dashboard_id):
                 return None  # Recreate the dashboard if it is trashed (manually)
         except (NotFound, InvalidParameterValue):
-            logger.info(f"Recovering invalid dashboard: {display_name} ({dashboard_id})")
-            try:
-                dashboard_path = f"{parent_path}/{display_name}.lvdash.json"
-                self._ws.workspace.delete(dashboard_path)  # Cannot recreate dashboard if file still exists
-                logger.debug(f"Deleted dangling dashboard {display_name} ({dashboard_id}): {dashboard_path}")
-            except NotFound:
-                pass
-            return None  # Recreate the dashboard if it's reference is corrupted (manually)
+            self._recover_invalid_dashboard(dashboard_id, display_name, parent_path)
+            return None
+        except PermissionDenied:
+            logger.warning(f"Cannot access dashboard {display_name} ({dashboard_id}), permission denied")
+            return None  # Create a new dashboard if permission is denied.
         return dashboard_id  # Update the existing dashboard
+
+    def _is_redash_dashboard(self, dashboard_id: str) -> bool:
+        return "-" in dashboard_id
+
+    def _upgrade_redash_dashboard(self, dashboard_id: str, display_name: str) -> None:
+        logger.info(f"Upgrading dashboard to Lakeview: {display_name} ({dashboard_id})")
+        try:
+            self._ws.dashboards.delete(dashboard_id=dashboard_id)
+        except BadRequest:
+            logger.warning(f"Cannot delete dashboard: {display_name} ({dashboard_id})")
+
+    def _is_trashed_dashboard(self, dashboard, display_name: str, dashboard_id: str) -> bool:
+        if dashboard.lifecycle_state is None:
+            msg = f"Dashboard life cycle state: {display_name} ({dashboard_id})"
+            raise NotFound(msg)
+        if dashboard.lifecycle_state == LifecycleState.TRASHED:
+            logger.info(f"Dashboard life cycle in trashed state: {display_name} ({dashboard_id})")
+            return True
+        return False
+
+    def _recover_invalid_dashboard(self, dashboard_id: str, display_name: str, parent_path: str) -> None:
+        logger.info(f"Recovering invalid dashboard: {display_name} ({dashboard_id})")
+        try:
+            dashboard_path = f"{parent_path}/{display_name}.lvdash.json"
+            self._ws.workspace.delete(dashboard_path)  # Cannot recreate dashboard if file still exists
+            logger.debug(f"Deleted dangling dashboard {display_name} ({dashboard_id}): {dashboard_path}")
+        except NotFound:
+            pass
 
     # InternalError and DeadlineExceeded are retried because of Lakeview internal issues
     # These issues have been reported to and are resolved by the Lakeview team
@@ -662,7 +679,7 @@ class WorkspaceInstallation(InstallationMixin):
                 catalog_to_replace="ucx_catalog",
             )
         )
-        metadata.display_name = f"{self._name('UCX ')} {folder.parent.stem.title()} ({folder.stem.title()})"
+        metadata.display_name = self._name(f"{folder.parent.stem.title()} ({folder.stem.title()})")
         reference = f"{folder.parent.stem}_{folder.stem}".lower()
         dashboard_id = self._install_state.dashboards.get(reference)
         if dashboard_id is not None:

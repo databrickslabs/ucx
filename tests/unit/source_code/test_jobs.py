@@ -10,7 +10,7 @@ from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service import compute, jobs
-from databricks.sdk.service.jobs import Job, SparkPythonTask
+from databricks.sdk.service.jobs import Job, SparkPythonTask, BaseRun, RunResultState
 from databricks.sdk.service.pipelines import (
     GetPipelineResponse,
     FileLibrary,
@@ -34,6 +34,7 @@ from databricks.labs.ucx.source_code.linters.jobs import WorkflowLinter
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader, NotebookResolver
 from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
 from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
+from databricks.sdk.errors.platform import ResourceDoesNotExist
 
 
 def test_job_problem_as_message() -> None:
@@ -486,6 +487,14 @@ def test_workflow_linter_dlt_pipeline_task(graph) -> None:
     assert len(problems) == 4
     ws.assert_not_called()
 
+    task = jobs.Task(task_key="test", pipeline_task=jobs.PipelineTask(pipeline_id='1234'))
+
+    ws.pipelines.get.side_effect = ResourceDoesNotExist("Could not find pipeline: 1234")
+
+    workflow_task_container = WorkflowTaskContainer(ws, task, Job())
+    problems = workflow_task_container.build_dependency_graph(graph)
+    assert len(problems) == 1
+
 
 def test_xxx(graph) -> None:
     ws = create_autospec(WorkspaceClient)
@@ -577,6 +586,70 @@ def test_workflow_linter_refresh_report(dependency_resolver, mock_path_lookup, m
     linter.refresh_report(sql_backend, 'test')
 
     jobs_crawler.snapshot.assert_called_once()
+    sql_backend.has_rows_written_for('test.workflow_problems')
+    sql_backend.has_rows_written_for('hive_metastore.test.used_tables_in_paths')
+    sql_backend.has_rows_written_for('hive_metastore.test.directfs_in_paths')
+
+
+def test_workflow_linter_refresh_report_time_bound(dependency_resolver, mock_path_lookup, migration_index) -> None:
+    ws = create_autospec(WorkspaceClient)
+    ws.workspace.get_status.return_value = ObjectInfo(object_id=123, language=Language.PYTHON)
+    some_things = mock_path_lookup.resolve(Path("functional/zoo.py"))
+    assert some_things is not None
+    ws.workspace.download.return_value = some_things.read_bytes()
+    notebook_task = jobs.NotebookTask(
+        notebook_path=some_things.absolute().as_posix(),
+        base_parameters={"a": "b", "c": "dbfs:/mnt/foo"},
+    )
+    task = jobs.Task(
+        task_key="test",
+        job_cluster_key="main",
+        notebook_task=notebook_task,
+    )
+    settings = jobs.JobSettings(
+        tasks=[task],
+        name='some',
+        job_clusters=[
+            jobs.JobCluster(
+                job_cluster_key="main",
+                new_cluster=compute.ClusterSpec(
+                    spark_version="15.2.x-photon-scala2.12",
+                    node_type_id="Standard_F4s",
+                    num_workers=2,
+                    data_security_mode=compute.DataSecurityMode.LEGACY_TABLE_ACL,
+                    spark_conf={"spark.databricks.cluster.profile": "singleNode"},
+                ),
+            ),
+        ],
+    )
+    ws.jobs.list.return_value = [Job(job_id=1, settings=settings), Job(job_id=2, settings=settings)]
+    ws.jobs.get.side_effect = [Job(job_id=1, settings=settings), Job(job_id=2, settings=settings)]
+    ws.jobs.list_runs.side_effect = [
+        [
+            BaseRun(
+                state=jobs.RunState(result_state=RunResultState.SUCCESS),
+                run_id=1,
+                job_id=2,
+                run_page_url="http://example.com",
+            )
+        ],
+        [],
+    ]
+    sql_backend = MockBackend()
+    jobs_crawler = JobsCrawler(ws, sql_backend, 'test')
+    directfs_crawler = DirectFsAccessCrawler.for_paths(sql_backend, "test")
+    used_tables_crawler = UsedTablesCrawler.for_paths(sql_backend, "test")
+    linter = WorkflowLinter(
+        ws,
+        jobs_crawler,
+        dependency_resolver,
+        mock_path_lookup,
+        migration_index,
+        directfs_crawler,
+        used_tables_crawler,
+    )
+    linter.refresh_report(sql_backend, 'test', last_run_days=30)
+
     sql_backend.has_rows_written_for('test.workflow_problems')
     sql_backend.has_rows_written_for('hive_metastore.test.used_tables_in_paths')
     sql_backend.has_rows_written_for('hive_metastore.test.directfs_in_paths')

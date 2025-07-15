@@ -190,6 +190,7 @@ def test_repair_run_workflow_job(installation_ctx, mocker):
     assert installation_ctx.deployed_workflows.validate_step("failing")
 
 
+@pytest.mark.skip(reason="Legacy dashboard creation is no longer supported by Databricks.")
 def test_installation_deletes_redash_dashboard_when_upgrading_to_lakeview(ws, installation_ctx, make_dashboard):
     """The installation should handle upgrading dashboards from redash."""
 

@@ -6,9 +6,8 @@ from databricks.labs.blueprint.tui import MockPrompts
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
-from databricks.sdk.service.catalog import PermissionsList
 from databricks.sdk.service.compute import DataSecurityMode, AwsAttributes
-from databricks.sdk.service.catalog import Privilege, SecurableType, PrivilegeAssignment
+from databricks.sdk.service.catalog import GetPermissionsResponse, Privilege, SecurableType, PrivilegeAssignment
 from databricks.sdk.service.iam import PermissionLevel
 
 from databricks.labs.ucx.hive_metastore.grants import Grant
@@ -94,8 +93,8 @@ def test_create_catalog_schema_with_principal_acl_azure(
     mock_prompts = MockPrompts({"Please provide storage location url for catalog: *": ""})
     catalog_schema.create_all_catalogs_schemas(mock_prompts)
 
-    schema_grants = ws.grants.get(SecurableType.SCHEMA, schema_name)
-    catalog_grants = ws.grants.get(SecurableType.CATALOG, catalog_name)
+    schema_grants = ws.grants.get(SecurableType.SCHEMA.value, schema_name)
+    catalog_grants = ws.grants.get(SecurableType.CATALOG.value, catalog_name)
     schema_grant = PrivilegeAssignment(user.user_name, [Privilege.USE_SCHEMA])
     catalog_grant = PrivilegeAssignment(user.user_name, [Privilege.USE_CATALOG])
     assert schema_grant in schema_grants.privilege_assignments
@@ -128,8 +127,8 @@ def test_create_catalog_schema_with_principal_acl_aws(
     mock_prompts = MockPrompts({"Please provide storage location url for catalog: *": ""})
     catalog_schema.create_all_catalogs_schemas(mock_prompts)
 
-    schema_grants = ws.grants.get(SecurableType.SCHEMA, schema_name)
-    catalog_grants = ws.grants.get(SecurableType.CATALOG, catalog_name)
+    schema_grants = ws.grants.get(SecurableType.SCHEMA.value, schema_name)
+    catalog_grants = ws.grants.get(SecurableType.CATALOG.value, catalog_name)
     schema_grant = PrivilegeAssignment(user.user_name, [Privilege.USE_SCHEMA])
     catalog_grant = PrivilegeAssignment(user.user_name, [Privilege.USE_CATALOG])
     assert schema_grant in schema_grants.privilege_assignments
@@ -167,8 +166,8 @@ def test_create_catalog_schema_with_legacy_hive_metastore_privileges(
     runtime_ctx.catalog_schema.create_all_catalogs_schemas(mock_prompts, properties=properties)
 
     @retried(on=[NotFound], timeout=timedelta(seconds=20))
-    def get_schema_permissions_list(full_name: str) -> PermissionsList:
-        return ws.grants.get(SecurableType.SCHEMA, full_name)
+    def get_schema_permissions_list(full_name: str) -> GetPermissionsResponse:
+        return ws.grants.get(SecurableType.SCHEMA.value, full_name)
 
     assert (
         ws.schemas.get(f"{dst_catalog_name}.{dst_schema_name}").owner

@@ -29,7 +29,7 @@ class MigrationProgress(Workflow):
     def schedule(self) -> CronSchedule:
         """Schedule the migration progress workflow to run by default daily at 5:00 a.m. (UTC)."""
         return CronSchedule(
-            quartz_cron_expression="0 0 5 * * ?", timezone_id="Etc/UTC", pause_status=PauseStatus.UNPAUSED
+            quartz_cron_expression="0 0 5 * * ?", timezone_id="Etc/UTC", pause_status=PauseStatus.PAUSED
         )
 
     @job_task(job_cluster="user_isolation")
@@ -181,7 +181,7 @@ class MigrationProgress(Workflow):
         """Scans all jobs for migration issues in notebooks.
         Also stores direct filesystem accesses for display in the migration dashboard."""
         # TODO: Ensure these are captured in the history log.
-        ctx.workflow_linter.refresh_report(ctx.sql_backend, ctx.inventory_database)
+        ctx.workflow_linter.refresh_report(ctx.sql_backend, ctx.inventory_database, last_run_days=30)
 
     @job_task(
         depends_on=[

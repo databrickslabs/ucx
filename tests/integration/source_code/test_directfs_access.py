@@ -5,6 +5,7 @@ from databricks.labs.ucx.source_code.base import DirectFsAccess, LineageAtom
 from databricks.labs.ucx.source_code.linters.jobs import WorkflowLinter
 
 
+@pytest.mark.skip(reason="Legacy dashboard creation is no longer supported by Databricks.")
 def test_legacy_query_dfsa_ownership(runtime_ctx) -> None:
     """Verify the ownership of a direct-fs record for a legacy query."""
     query = runtime_ctx.make_query(sql_query="SELECT * from csv.`dbfs://some_folder/some_file.csv`")

@@ -2,6 +2,8 @@ import logging
 from datetime import timedelta
 
 import pytest
+
+from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound, BadRequest
 from databricks.sdk.retries import retried
 from databricks.sdk.service.catalog import Privilege, PrivilegeAssignment, SecurableType
@@ -26,7 +28,7 @@ def test_move_tables_no_from_schema(ws, sql_backend, make_random, make_catalog, 
 
 
 def test_move_tables(
-    ws,
+    ws: WorkspaceClient,
     sql_backend,
     make_catalog,
     make_schema,
@@ -60,16 +62,16 @@ def test_move_tables(
 
     to_tables = ws.tables.list(catalog_name=to_catalog.name, schema_name=to_schema.name)
     table_1_grant = ws.grants.get(
-        securable_type=SecurableType.TABLE, full_name=f"{to_catalog.name}.{to_schema.name}.{from_table_1.name}"
+        securable_type=SecurableType.TABLE.value, full_name=f"{to_catalog.name}.{to_schema.name}.{from_table_1.name}"
     )
     table_2_grant = ws.grants.get(
-        securable_type=SecurableType.TABLE, full_name=f"{to_catalog.name}.{to_schema.name}.{from_table_2.name}"
+        securable_type=SecurableType.TABLE.value, full_name=f"{to_catalog.name}.{to_schema.name}.{from_table_2.name}"
     )
     table_3_grant = ws.grants.get(
-        securable_type=SecurableType.TABLE, full_name=f"{to_catalog.name}.{to_schema.name}.{from_table_3.name}"
+        securable_type=SecurableType.TABLE.value, full_name=f"{to_catalog.name}.{to_schema.name}.{from_table_3.name}"
     )
     view_1_grant = ws.grants.get(
-        securable_type=SecurableType.TABLE, full_name=f"{to_catalog.name}.{to_schema.name}.{from_view_1.name}"
+        securable_type=SecurableType.TABLE.value, full_name=f"{to_catalog.name}.{to_schema.name}.{from_view_1.name}"
     )
     for table in to_tables:
         assert table.name in [from_table_1.name, from_table_2.name, from_table_3.name, from_view_1.name]
@@ -148,7 +150,7 @@ def test_move_views(ws, sql_backend, make_catalog, make_schema, make_table, make
 
 
 def test_alias_tables(
-    ws,
+    ws: WorkspaceClient,
     sql_backend,
     make_catalog,
     make_schema,
@@ -182,16 +184,16 @@ def test_alias_tables(
 
     to_tables = ws.tables.list(catalog_name=to_catalog.name, schema_name=to_schema.name)
     table_1_grant = ws.grants.get(
-        securable_type=SecurableType.TABLE, full_name=f"{to_catalog.name}.{to_schema.name}.{from_table_1.name}"
+        securable_type=SecurableType.TABLE.value, full_name=f"{to_catalog.name}.{to_schema.name}.{from_table_1.name}"
     )
     table_2_grant = ws.grants.get(
-        securable_type=SecurableType.TABLE, full_name=f"{to_catalog.name}.{to_schema.name}.{from_table_2.name}"
+        securable_type=SecurableType.TABLE.value, full_name=f"{to_catalog.name}.{to_schema.name}.{from_table_2.name}"
     )
     table_3_grant = ws.grants.get(
-        securable_type=SecurableType.TABLE, full_name=f"{to_catalog.name}.{to_schema.name}.{from_table_3.name}"
+        securable_type=SecurableType.TABLE.value, full_name=f"{to_catalog.name}.{to_schema.name}.{from_table_3.name}"
     )
     view_1_grant = ws.grants.get(
-        securable_type=SecurableType.TABLE, full_name=f"{to_catalog.name}.{to_schema.name}.{from_view_1.name}"
+        securable_type=SecurableType.TABLE.value, full_name=f"{to_catalog.name}.{to_schema.name}.{from_view_1.name}"
     )
     for table in to_tables:
         assert table.name in [from_table_1.name, from_table_2.name, from_table_3.name, from_view_1.name]

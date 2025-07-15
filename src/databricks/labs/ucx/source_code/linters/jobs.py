@@ -1,9 +1,9 @@
 import dataclasses
-import functools
 import logging
 
 from collections.abc import Iterable
 from datetime import datetime, timezone
+from functools import partial
 from pathlib import Path
 
 from databricks.labs.blueprint.parallel import Threads
@@ -56,10 +56,22 @@ class WorkflowLinter:
         self._directfs_crawler = directfs_crawler
         self._used_tables_crawler = used_tables_crawler
 
-    def refresh_report(self, sql_backend: SqlBackend, inventory_database: str) -> None:
+    def refresh_report(
+        self, sql_backend: SqlBackend, inventory_database: str, /, last_run_days: int | None = None
+    ) -> None:
         tasks = []
+
+        def lint_job_limited(job_id: int) -> tuple[list[JobProblem], list[DirectFsAccess], list[UsedTable]]:
+            return self.lint_job(job_id, last_run_days=last_run_days)
+
         for job in self._jobs_crawler.snapshot():
-            tasks.append(functools.partial(self.lint_job, job.job_id))
+            try:
+                job_id = int(job.job_id)
+            except ValueError:
+                logger.warning(f"Invalid job id: {job.job_id}")
+                continue
+            tasks.append(partial(lint_job_limited, job_id))
+        #     TODO: Limit Scope
         logger.info(f"Running {len(tasks)} linting tasks in parallel...")
         job_results, errors = Threads.gather('linting workflows', tasks)
         job_problems: list[JobProblem] = []
@@ -82,12 +94,26 @@ class WorkflowLinter:
             error_messages = "\n".join([str(error) for error in errors])
             logger.warning(f"Errors occurred during linting:\n{error_messages}")
 
-    def lint_job(self, job_id: int) -> tuple[list[JobProblem], list[DirectFsAccess], list[UsedTable]]:
+    def lint_job(
+        self, job_id: int, /, last_run_days: int | None = None
+    ) -> tuple[list[JobProblem], list[DirectFsAccess], list[UsedTable]]:
         try:
             job = self._ws.jobs.get(job_id)
         except NotFound:
             logger.warning(f'Could not find job: {job_id}')
-            return ([], [], [])
+            return [], [], []
+
+        if last_run_days:
+            current_day_ms = int(datetime.now().timestamp() * 1000)
+            last_run_day_ms = current_day_ms - (last_run_days * 24 * 60 * 60 * 1000)
+            runs = self._ws.jobs.list_runs(
+                job_id=job_id,
+                limit=1,
+                start_time_from=last_run_day_ms,
+            )
+            if not runs:
+                logger.warning(f'Could not find job runs in the last {last_run_days} days: {job_id}')
+                return [], [], []
 
         problems, dfsas, tables = self._lint_job(job)
         if len(problems) > 0:

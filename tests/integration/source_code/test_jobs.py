@@ -519,6 +519,16 @@ def test_job_dlt_task_linter_unhappy_path(
         len([problem for problem in problems if problem.message == "Could not locate import: library_not_found"]) == 1
     )
 
+    # Pipeline id does not exist
+    task = jobs.Task(
+        task_key=make_random(4),
+        pipeline_task=jobs.PipelineTask(pipeline_id="1234"),
+    )
+    j = make_job(tasks=[task])
+
+    problems, *_ = simple_ctx.workflow_linter.lint_job(j.job_id)
+    assert len([problem for problem in problems if problem.message == "Could not find pipeline: 1234"]) == 1
+
 
 def test_job_dlt_task_linter_happy_path(
     simple_ctx,

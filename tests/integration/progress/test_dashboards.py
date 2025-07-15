@@ -22,6 +22,7 @@ from databricks.labs.ucx.hive_metastore.tables import Table
         ),
     ],
 )
+@pytest.mark.skip(reason="Legacy dashboard creation is no longer supported by Databricks.")
 def test_dashboard_progress_encoder_table_failures(runtime_ctx, az_cli_ctx, query: str, failures: list[str]) -> None:
     az_cli_ctx.progress_tracking_installation.run()
     runtime_ctx = runtime_ctx.replace(

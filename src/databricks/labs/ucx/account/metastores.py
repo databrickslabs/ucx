@@ -79,7 +79,8 @@ class AccountMetastores:
             etag = default_namespace.get().etag
         except NotFound as err:
             # if not found, the etag is returned in the header
-            etag = err.details[0].metadata.get("etag")
+            if err.details[0].metadata:
+                etag = err.details[0].metadata.get("etag")
         default_namespace.update(
             allow_missing=True,
             field_mask="namespace.value",

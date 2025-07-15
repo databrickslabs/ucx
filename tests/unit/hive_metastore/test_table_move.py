@@ -7,8 +7,8 @@ from databricks.labs.lsql.backends import MockBackend, StatementExecutionBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service.catalog import (
+    GetPermissionsResponse,
     PermissionsChange,
-    PermissionsList,
     Privilege,
     PrivilegeAssignment,
     SchemaInfo,
@@ -231,7 +231,7 @@ def test_move_tables_get_grants_fails_because_table_removed(caplog):
 
 
 @pytest.mark.parametrize("del_table", [True, False])
-def test_move_all_tables(del_table: bool):
+def test_move_all_tables(del_table: bool) -> None:
     client = create_autospec(WorkspaceClient)
 
     client.tables.list.return_value = [
@@ -296,8 +296,8 @@ def test_move_all_tables(del_table: bool):
         ),
     ]
 
-    perm_list = PermissionsList([PrivilegeAssignment("foo", [Privilege.SELECT])])
-    perm_none = PermissionsList(None)
+    perm_list = GetPermissionsResponse(privilege_assignments=[PrivilegeAssignment("foo", [Privilege.SELECT])])
+    perm_none = GetPermissionsResponse(privilege_assignments=None)
 
     grants_mapping = {
         "SrcC.SrcS.table1": perm_list,
@@ -353,7 +353,7 @@ def test_move_all_tables(del_table: bool):
     assert sorted(expected_queries) == sorted(backend.queries)
 
 
-def test_alias_all_tables():
+def test_alias_all_tables() -> None:
     client = create_autospec(WorkspaceClient)
 
     client.tables.list.return_value = [
@@ -404,8 +404,8 @@ def test_alias_all_tables():
         ),
     ]
 
-    perm_list = PermissionsList([PrivilegeAssignment("foo", [Privilege.SELECT])])
-    perm_none = PermissionsList(None)
+    perm_list = GetPermissionsResponse(privilege_assignments=[PrivilegeAssignment("foo", [Privilege.SELECT])])
+    perm_none = GetPermissionsResponse(privilege_assignments=None)
 
     grants_mapping = {
         "SrcC.SrcS.table1": perm_list,
@@ -441,7 +441,7 @@ def test_alias_all_tables():
     ] == sorted(backend.queries)
 
 
-def test_move_one_table_without_dropping_source():
+def test_move_one_table_without_dropping_source() -> None:
     client = create_autospec(WorkspaceClient)
 
     client.tables.list.return_value = [
@@ -461,7 +461,7 @@ def test_move_one_table_without_dropping_source():
         ),
     ]
 
-    perm_none = PermissionsList(None)
+    perm_none = GetPermissionsResponse(privilege_assignments=None)
 
     rows = {
         "SHOW CREATE TABLE `SrcC`.`SrcS`.`table1`": [
@@ -483,7 +483,7 @@ def test_move_one_table_without_dropping_source():
     ] == sorted(backend.queries)
 
 
-def test_move_apply_grants():
+def test_move_apply_grants() -> None:
     client = create_autospec(WorkspaceClient)
 
     client.tables.list.return_value = [
@@ -496,7 +496,9 @@ def test_move_apply_grants():
         ),
     ]
 
-    perm = PermissionsList([PrivilegeAssignment("user@email.com", [Privilege.SELECT, Privilege.MODIFY])])
+    perm = GetPermissionsResponse(
+        privilege_assignments=[PrivilegeAssignment("user@email.com", [Privilege.SELECT, Privilege.MODIFY])]
+    )
 
     rows = {
         "SHOW CREATE TABLE `SrcC`.`SrcS`.`table1`": [
@@ -517,13 +519,13 @@ def test_move_apply_grants():
         "SHOW CREATE TABLE `SrcC`.`SrcS`.`table1`",
     ] == sorted(backend.queries)
     client.grants.update.assert_called_with(
-        SecurableType.TABLE,
+        SecurableType.TABLE.value,
         'TgtC.TgtS.table1',
         changes=[PermissionsChange([Privilege.SELECT, Privilege.MODIFY], "user@email.com")],
     )
 
 
-def test_alias_apply_grants():
+def test_alias_apply_grants() -> None:
     client = create_autospec(WorkspaceClient)
 
     client.tables.list.return_value = [
@@ -536,7 +538,9 @@ def test_alias_apply_grants():
         ),
     ]
 
-    perm = PermissionsList([PrivilegeAssignment("user@email.com", [Privilege.SELECT, Privilege.MODIFY])])
+    perm = GetPermissionsResponse(
+        privilege_assignments=[PrivilegeAssignment("user@email.com", [Privilege.SELECT, Privilege.MODIFY])]
+    )
 
     rows = {
         "SHOW CREATE TABLE `SrcC`.`SrcS`.`table1`": [
@@ -553,5 +557,5 @@ def test_alias_apply_grants():
 
     assert ["CREATE VIEW `TgtC`.`TgtS`.`table1` AS SELECT * FROM `SrcC`.`SrcS`.`table1`"] == sorted(backend.queries)
     client.grants.update.assert_called_with(
-        SecurableType.TABLE, 'TgtC.TgtS.table1', changes=[PermissionsChange([Privilege.SELECT], "user@email.com")]
+        SecurableType.TABLE.value, 'TgtC.TgtS.table1', changes=[PermissionsChange([Privilege.SELECT], "user@email.com")]
     )
