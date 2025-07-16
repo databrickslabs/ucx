@@ -3,8 +3,8 @@ from collections.abc import Callable, Iterable
 from typing import TypeVar
 
 from sqlglot import parse
-from sqlglot.errors import SqlglotError
-from sqlglot.expressions import Create, Delete, Drop, Expression, Select, Table, Update, Use
+from sqlglot.errors import SqlglotError, UnsupportedError
+from sqlglot.expressions import Create, Delete, Drop, Expression, Select, Table, Update, Use, Identifier
 
 from databricks.labs.ucx.source_code.base import UsedTable, CurrentSessionState
 
@@ -54,6 +54,13 @@ class SqlExpression:
         if not src_schema:
             logger.warning(f"Could not determine schema for table {table.name}")
             return None
+        # Sqlglot handlers parameter markers by returning an Identifier as the name instead of a string.
+        # For example: {foo} -> Identifier(this=foo)
+        if isinstance(table.name, Identifier):
+            # TODO: Support these properly, for example by inferring the placeholder value from the outside context.
+            msg = f"Table placeholder detected, not yet supported: {{{table.name}}}"
+            logger.debug(msg)
+            raise UnsupportedError(msg)
         return UsedTable(
             catalog_name=catalog_name,
             schema_name=src_schema,
