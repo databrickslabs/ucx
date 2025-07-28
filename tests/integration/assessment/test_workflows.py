@@ -55,14 +55,7 @@ def test_running_real_assessment_job(
         workflow, skip_job_wait=False, named_parameters={"force_refresh": "true"}
     )
     assert installation_ctx.deployed_workflows.validate_step(workflow), f"Workflow failed: {workflow}"
-    expected_tables = {
-        managed_table.name,
-        external_table.name,
-        tmp_table.name,
-        view.name,
-        non_delta.name,
-        post_assessment_table.name,
-    }
+    expected_tables += post_assessment_table.name
 
     query = f"SELECT * FROM {installation_ctx.inventory_database}.tables"
     tables_after_assessment_rerun = {table.name for table in sql_backend.fetch(query)}
