@@ -738,7 +738,7 @@ This command ensures that the [assessment workflow](/docs/reference/workflows#as
 This command will block until job finishes.
 Failed workflows can be fixed with the [`repair-run` command](/docs/reference/commands#repair-run). Workflows and their status can be
 listed with the [`workflows` command](/docs/reference/commands#workflows).
-The `--force-refresh` flag can be used to force the assessment workflow to run again overwriting the previous assessment results, even if it was already run before.
+The `--force-refresh` flag can be used to force the assessment workflow to run again overwriting the previous assessment results, even if it was already run before.  By default, the assessment workflow will not update the output of previously run assessments.
 
 ### `update-migration-progress`
 
