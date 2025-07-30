@@ -438,15 +438,15 @@ class TablesMigrator:
         logger.info(f"Converted {src_table.name} to External Table type.")
         return True
 
-    def _update_table_status(self, src_table: Table, inventory_table: str):
+    def _update_table_status(self, src_table: Table, inventory_table: str) -> None:
         update_sql = f"UPDATE {escape_sql_identifier(inventory_table)} SET object_type = 'EXTERNAL' WHERE catalog='hive_metastore' AND database='{src_table.database}' AND name='{src_table.name}';"
         self._sql_backend.execute(update_sql)
 
-    def _update_table_location(self, src_table: Table, inventory_table: str, new_location: str):
+    def _update_table_location(self, src_table: Table, inventory_table: str, new_location: str) -> None:
         update_sql = f"UPDATE {escape_sql_identifier(inventory_table)} SET location = '{new_location}' WHERE catalog='hive_metastore' AND database='{src_table.database}' AND name='{src_table.name}';"
         self._sql_backend.execute(update_sql)
 
-    def _migrate_managed_as_external_table(self, src_table: Table, rule: Rule):
+    def _migrate_managed_as_external_table(self, src_table: Table, rule: Rule) -> bool:
         target_table_key = rule.as_uc_table_key
         table_migrate_sql = src_table.sql_migrate_as_external(target_table_key)
         logger.debug(f"Migrating external table {src_table.key} to using SQL query: {table_migrate_sql}")
@@ -461,7 +461,7 @@ class TablesMigrator:
         self._sql_backend.execute(self._sql_alter_from(src_table, rule.as_uc_table_key, self._ws.get_workspace_id()))
         return self._migrate_grants.apply(src_table, rule.as_uc_table)
 
-    def _migrate_external_table(self, src_table: Table, rule: Rule):
+    def _migrate_external_table(self, src_table: Table, rule: Rule) -> bool:
         target_table_key = rule.as_uc_table_key
         table_migrate_sql = src_table.sql_migrate_external(target_table_key)
         logger.debug(f"Migrating external table {src_table.key} to using SQL query: {table_migrate_sql}")
@@ -476,7 +476,7 @@ class TablesMigrator:
         self._sql_backend.execute(self._sql_alter_from(src_table, rule.as_uc_table_key, self._ws.get_workspace_id()))
         return self._migrate_grants.apply(src_table, rule.as_uc_table)
 
-    def _migrate_external_table_hiveserde_in_place(self, src_table: Table, rule: Rule):
+    def _migrate_external_table_hiveserde_in_place(self, src_table: Table, rule: Rule) -> bool:
         # verify hive serde type
         hiveserde_type = src_table.hiveserde_type(self._sql_backend)
         if hiveserde_type in [
@@ -516,7 +516,7 @@ class TablesMigrator:
             return False
         return self._migrate_grants.apply(src_table, rule.as_uc_table)
 
-    def _migrate_dbfs_root_table(self, src_table: Table, rule: Rule):
+    def _migrate_dbfs_root_table(self, src_table: Table, rule: Rule) -> bool:
         target_table_key = rule.as_uc_table_key
         table_migrate_sql = src_table.sql_migrate_dbfs(target_table_key)
         logger.debug(
@@ -534,7 +534,7 @@ class TablesMigrator:
             return False
         return self._migrate_grants.apply(src_table, rule.as_uc_table)
 
-    def _migrate_table_create_ctas(self, src_table: Table, rule: Rule):
+    def _migrate_table_create_ctas(self, src_table: Table, rule: Rule) -> bool:
         if src_table.what not in [What.EXTERNAL_NO_SYNC, What.EXTERNAL_HIVESERDE]:
             table_migrate_sql = src_table.sql_migrate_ctas_managed(rule.as_uc_table_key)
         elif not src_table.location:
@@ -560,7 +560,7 @@ class TablesMigrator:
             return False
         return self._migrate_grants.apply(src_table, rule.as_uc_table)
 
-    def _migrate_table_in_mount(self, src_table: Table, rule: Rule):
+    def _migrate_table_in_mount(self, src_table: Table, rule: Rule) -> bool:
         target_table_key = rule.as_uc_table_key
         try:
             table_schema = self._sql_backend.fetch(f"DESCRIBE TABLE delta.`{src_table.location}`;")
@@ -615,7 +615,7 @@ class TablesMigrator:
             )
         Threads.strict("revert migrated tables", tasks)
 
-    def _revert_migrated_table(self, table: Table, target_table_key: str):
+    def _revert_migrated_table(self, table: Table, target_table_key: str) -> None:
         logger.info(
             f"Reverting {table.object_type} table {table.database}.{table.name} upgraded_to {table.upgraded_to}"
         )
@@ -689,17 +689,27 @@ class TablesMigrator:
             print("To revert and delete Migrated Tables, add --delete_managed true flag to the command")
         return True
 
-    def _init_seen_tables(self):
+    def _init_seen_tables(self) -> None:
         self._seen_tables = self._migration_status_refresher.get_seen_tables()
 
-    def _sql_alter_to(self, table: Table, target_table_key: str):
+    def _sql_alter_to(self, table: Table, target_table_key: str) -> str:
         return f"ALTER {table.kind} {escape_sql_identifier(table.key)} SET TBLPROPERTIES ('upgraded_to' = '{target_table_key}');"
 
-    def _sql_add_migrated_comment(self, table: Table, target_table_key: str):
+    def _sql_add_migrated_comment(self, table: Table, target_table_key: str) -> str:
         """Docs: https://docs.databricks.com/en/data-governance/unity-catalog/migrate.html#add-comments-to-indicate-that-a-hive-table-has-been-migrated"""
         return f"COMMENT ON {table.kind} {escape_sql_identifier(table.key)} IS 'This {table.kind.lower()} is deprecated. Please use `{target_table_key}` instead of `{table.key}`.';"
 
-    def _sql_alter_from(self, table: Table, target_table_key: str, ws_id: int):
+    def _sql_alter_from(self, table: Table, target_table_key: str, ws_id: int) -> str:
+        """Adds a property to the table indicating the source of the migration.
+        This is used to track the source of the migration for auditing purposes.
+        Args:
+            table: The table being migrated.
+            target_table_key: The key of the target table.
+            ws_id: The workspace ID where the migration is happening.
+        Returns:
+            str: The SQL command to alter the table and set the properties.
+        """
+
         source = table.location if table.is_table_in_mount else table.key
         return (
             f"ALTER {table.kind} {escape_sql_identifier(target_table_key)} SET TBLPROPERTIES "

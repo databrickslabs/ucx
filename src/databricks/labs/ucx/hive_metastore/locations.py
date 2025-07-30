@@ -222,9 +222,11 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
         """
         if not location:
             return None
-        if not location.startswith("wasbs://"):
+        try:
+            parsed = urlparse(location)
+        except ValueError as e:
+            logger.warning(f"Invalid URL format for location {location}: {e}")
             return location
-        parsed = urlparse(location)
         if parsed.scheme == "wasbs":
             return f"abfss://{parsed.netloc.replace('.blob.core.windows.net','.dfs.core.windows.net')}{parsed.path}"
         return location
