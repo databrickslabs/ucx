@@ -28,7 +28,15 @@ class Assessment(Workflow):  # pylint: disable=too-many-public-methods
         for job_parameter in job_parameters:
             if job_parameter.name == "force_refresh" and job_parameter.value is not None:
                 force_refresh = job_parameter.value.lower() in {"true", "1"}
-                logger.info(f"Found force_refresh parameter in job run: {force_refresh}")
+                logger.info(f"Found force_refresh parameter in job run with value: {force_refresh}")
+                break
+            if (
+                job_parameter.name == "force_refresh"
+                and job_parameter.value is None
+                and job_parameter.default is not None
+            ):
+                force_refresh = job_parameter.default.lower() in {"true", "1"}
+                logger.info(f"Found force_refresh parameter in job run with default: {force_refresh}")
                 break
         return force_refresh
 
