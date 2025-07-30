@@ -18,8 +18,11 @@ class Assessment(Workflow):  # pylint: disable=too-many-public-methods
         """Extracts the force_refresh parameter from the job run parameters."""
         force_refresh = False
         job_id = ctx.install_state.jobs["assessment"]
-        job_runs = list(ctx.workspace_client.jobs.list_runs(active_only=True, job_id=job_id))
-        job_parameters = job_runs[0].job_parameters if job_runs else []
+        job_runs = ctx.workspace_client.jobs.list_runs(active_only=True, job_id=int(job_id))
+        current_run = next(job_runs, None)
+        if current_run is None:
+            return False
+        job_parameters = current_run.job_parameters if job_runs else []
         if not job_parameters:
             return False
         for job_parameter in job_parameters:
