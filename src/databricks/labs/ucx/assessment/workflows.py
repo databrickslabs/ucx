@@ -16,7 +16,10 @@ class Assessment(Workflow):  # pylint: disable=too-many-public-methods
     @staticmethod
     def _get_force_refresh(ctx: RuntimeContext) -> bool:
         """Extracts the force_refresh parameter from the named parameters of the context."""
-        force_refresh = ctx.named_parameters.get("force_refresh").lower() in {"true", "1"} if ctx.named_parameters.get("force_refresh") else False
+        force_refresh = False
+        value = ctx.named_parameters.get("force_refresh")
+        if isinstance(value, str):
+            force_refresh = value.lower() in {"true", "1"}
         logger.info(f"Using force refresh value of: {force_refresh}")
         return force_refresh
 
