@@ -15,29 +15,9 @@ class Assessment(Workflow):  # pylint: disable=too-many-public-methods
 
     @staticmethod
     def _get_force_refresh(ctx: RuntimeContext) -> bool:
-        """Extracts the force_refresh parameter from the job run parameters."""
-        force_refresh = False
-        job_id = ctx.install_state.jobs["assessment"]
-        job_runs = ctx.workspace_client.jobs.list_runs(active_only=True, job_id=int(job_id))
-        current_run = next(job_runs, None)
-        if current_run is None:
-            return False
-        job_parameters = current_run.job_parameters if job_runs else []
-        if not job_parameters:
-            return False
-        for job_parameter in job_parameters:
-            if job_parameter.name == "force_refresh" and job_parameter.value is not None:
-                force_refresh = job_parameter.value.lower() in {"true", "1"}
-                logger.info(f"Found force_refresh parameter in job run with value: {force_refresh}")
-                break
-            if (
-                job_parameter.name == "force_refresh"
-                and job_parameter.value is None
-                and job_parameter.default is not None
-            ):
-                force_refresh = job_parameter.default.lower() in {"true", "1"}
-                logger.info(f"Found force_refresh parameter in job run with default: {force_refresh}")
-                break
+        """Extracts the force_refresh parameter from the named parameters of the context."""
+        force_refresh = ctx.named_parameters.get("force_refresh").lower() in {"true", "1"} if ctx.named_parameters.get("force_refresh") else False
+        logger.info(f"Using force refresh value of: {force_refresh}")
         return force_refresh
 
     @job_task
