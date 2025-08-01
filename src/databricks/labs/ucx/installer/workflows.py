@@ -118,7 +118,8 @@ main(f'--config=/Workspace{config_file}',
      f'--run_id=' + dbutils.widgets.get('run_id'),
      f'--start_time=' + dbutils.widgets.get('start_time'),
      f'--attempt=' + dbutils.widgets.get('attempt'),
-     f'--parent_run_id=' + dbutils.widgets.get('parent_run_id'))
+     f'--parent_run_id=' + dbutils.widgets.get('parent_run_id'),
+     f'--force_refresh=' + dbutils.widgets.get('force_refresh'))
 """
 
 EXPORT_TO_EXCEL_NOTEBOOK = """# Databricks notebook source
@@ -261,6 +262,7 @@ class DeployedWorkflows:
         __tracebackhide__ = True  # pylint: disable=unused-variable
         job_id = int(self._install_state.jobs[step])
         logger.debug(f"starting {step} job: {self._ws.config.host}#job/{job_id}")
+        logger.info(f"Named parameters for {step} job: {named_parameters}")
         job_initial_run = self._ws.jobs.run_now(job_id, job_parameters=named_parameters)
         run_id = job_initial_run.run_id
         if not run_id:
