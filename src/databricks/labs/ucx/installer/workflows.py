@@ -111,6 +111,12 @@ dbutils.library.restartPython()
 
 from databricks.labs.ucx.runtime import main
 
+force_refresh = "false"
+try:
+    force_refresh = dbutils.widgets.get("force_refresh")
+except Exception:
+    pass
+
 main(f'--config=/Workspace{config_file}',
      f'--workflow=' + dbutils.widgets.get('workflow'),
      f'--task=' + dbutils.widgets.get('task'),
@@ -119,7 +125,7 @@ main(f'--config=/Workspace{config_file}',
      f'--start_time=' + dbutils.widgets.get('start_time'),
      f'--attempt=' + dbutils.widgets.get('attempt'),
      f'--parent_run_id=' + dbutils.widgets.get('parent_run_id'),
-     f'--force_refresh=' + dbutils.widgets.get('force_refresh'))
+     f'--force_refresh=' + force_refresh)
 """
 
 EXPORT_TO_EXCEL_NOTEBOOK = """# Databricks notebook source
