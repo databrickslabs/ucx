@@ -219,7 +219,9 @@ def validate_external_locations(
 
 
 @ucx.command
-def ensure_assessment_run(w: WorkspaceClient, run_as_collection: bool = False, a: AccountClient | None = None):
+def ensure_assessment_run(
+    w: WorkspaceClient, run_as_collection: bool = False, a: AccountClient | None = None, force_refresh: bool = False
+):
     """ensure the assessment job was run on a workspace"""
     workspace_contexts = _get_workspace_contexts(w, a, run_as_collection)
     for ctx in workspace_contexts:
@@ -227,12 +229,17 @@ def ensure_assessment_run(w: WorkspaceClient, run_as_collection: bool = False, a
         logger.info(f"Checking assessment workflow in workspace: {workspace_id}")
         deployed_workflows = ctx.deployed_workflows
         # Note: will block if the workflow is already underway but not completed.
-        if deployed_workflows.validate_step("assessment"):
+        if deployed_workflows.validate_step("assessment") and not force_refresh:
             logger.info(f"The assessment workflow has successfully completed in workspace: {workspace_id}")
+        elif force_refresh:
+            logger.info(f"Re-running assessment workflow in workspace: {workspace_id}")
+            deployed_workflows.run_workflow(
+                "assessment", skip_job_wait=run_as_collection, named_parameters={"force_refresh": "true"}
+            )
         else:
             logger.info(f"Starting assessment workflow in workspace: {workspace_id}")
-            # If running for a collection, don't wait for each assessment job to finish as that will take a long time.
             deployed_workflows.run_workflow("assessment", skip_job_wait=run_as_collection)
+            # If running for a collection, don't wait for each assessment job to finish as that will take a long time.
 
 
 @ucx.command

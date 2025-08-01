@@ -49,3 +49,14 @@ def test_running_real_assessment_job(
     query = f"SELECT * FROM {installation_ctx.inventory_database}.workflow_problems"
     workflow_problems_without_path = [problem for problem in sql_backend.fetch(query) if problem["path"] == "UNKNOWN"]
     assert not workflow_problems_without_path
+
+    post_assessment_table = installation_ctx.make_table(schema_name=source_schema.name, ctas="SELECT 1 AS one")
+    installation_ctx.deployed_workflows.run_workflow(
+        workflow, skip_job_wait=False, named_parameters={"force_refresh": "true"}
+    )
+    assert installation_ctx.deployed_workflows.validate_step(workflow), f"Workflow failed: {workflow}"
+    expected_tables.add(post_assessment_table.name)
+
+    query = f"SELECT * FROM {installation_ctx.inventory_database}.tables"
+    tables_after_assessment_rerun = {table.name for table in sql_backend.fetch(query)}
+    assert tables_after_assessment_rerun == expected_tables

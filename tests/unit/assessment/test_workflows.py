@@ -6,7 +6,12 @@ from databricks.labs.lsql.backends import SqlBackend
 from databricks.labs.ucx.assessment.workflows import Assessment, Failing
 
 
-def test_assess_azure_service_principals(run_workflow):
+@pytest.fixture(autouse=True)
+def mock_list_runs(ws):
+    ws.jobs.list_runs.return_value = iter([])
+
+
+def test_assess_azure_service_principals(ws, run_workflow):
     sql_backend = create_autospec(SqlBackend)
     sql_backend.fetch.return_value = [
         ["1", "secret_scope", "secret_key", "tenant_id", "storage_account"],
