@@ -44,4 +44,4 @@ def test_query_linter_lints_queries_and_stores_dfsas_and_tables(simple_ctx) -> N
     # By comparing the element instead of the list the `field(compare=False)` of the dataclass attributes take effect
     # The "query" in the source and object id, and "count" in the name are hardcoded in the
     # `make_lakeview_dashboard` fixture
-    assert used_tables == []
+    assert not used_tables
