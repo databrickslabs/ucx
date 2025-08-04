@@ -29,7 +29,7 @@ from databricks.sdk.service.compute import CreatePolicyResponse
 from databricks.sdk.service.dashboards import Dashboard as SdkLakeviewDashboard
 from databricks.sdk.service.iam import Group
 from databricks.sdk.service.jobs import Job, SparkPythonTask
-from databricks.sdk.service.sql import Dashboard as SdkRedashDashboard, WidgetPosition, WidgetOptions, LegacyQuery
+from databricks.sdk.service.sql import Dashboard as SdkRedashDashboard, LegacyQuery
 
 from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.account.workspaces import AccountWorkspaces
@@ -133,66 +133,6 @@ def make_lakeview_dashboard(ws, make_random, env_or_skip, watchdog_purge_suffix)
         ws.lakeview.trash(dashboard.dashboard_id)
 
     yield from factory("dashboard", create, delete)
-
-
-@pytest.fixture
-def make_dashboard(
-    ws: WorkspaceClient,
-    make_random: Callable[[int], str],
-    make_query,
-    watchdog_purge_suffix,
-):
-    """Create a legacy dashboard.
-    This fixture is used to test migrating legacy dashboards to Lakeview.
-    """
-
-    def create(query: LegacyQuery | None = None) -> SdkRedashDashboard:
-        if not query:
-            query = make_query()
-        assert query
-        assert query.id
-        viz = ws.query_visualizations_legacy.create(
-            type="table",
-            query_id=query.id,
-            options={
-                "itemsPerPage": 1,
-                "condensed": True,
-                "withRowNumber": False,
-                "version": 2,
-                "columns": [
-                    {"name": "id", "title": "id", "allowSearch": True},
-                ],
-            },
-        )
-
-        dashboard_name = f"ucx_D{make_random(4)}_{watchdog_purge_suffix}"
-        dashboard = ws.dashboards.create(name=dashboard_name, tags=["original_dashboard_tag"])
-        assert dashboard.id is not None
-        ws.dashboard_widgets.create(
-            dashboard_id=dashboard.id,
-            visualization_id=viz.id,
-            width=1,
-            options=WidgetOptions(
-                title="",
-                position=WidgetPosition(
-                    col=0,
-                    row=0,
-                    size_x=3,
-                    size_y=3,
-                ),
-            ),
-        )
-        logger.info(f"Dashboard Created {dashboard_name}: {ws.config.host}/sql/dashboards/{dashboard.id}")
-        return ws.dashboards.get(dashboard.id)  # Dashboard with widget
-
-    def remove(dashboard: SdkRedashDashboard) -> None:
-        try:
-            assert dashboard.id is not None
-            ws.dashboards.delete(dashboard_id=dashboard.id)
-        except RuntimeError as e:
-            logger.info(f"Can't delete dashboard {e}")
-
-    yield from factory("dashboard", create, remove)
 
 
 @pytest.fixture
