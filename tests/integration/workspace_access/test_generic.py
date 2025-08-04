@@ -504,7 +504,8 @@ def test_feature_tables(
     after = generic_permissions.load_as_dict("feature-tables", feature_table["id"])
     assert after[migrated_group.name_in_account] == PermissionLevel.CAN_EDIT_METADATA
 
-
+# TODO: Uncomment this test when the feature store is available in the test infra again
+@pytest.mark.skip("Workspace Feature Store has been deprecated in the current workspace.")
 @pytest.mark.parametrize("is_experimental", [True, False])
 def test_feature_store_root_page(ws: WorkspaceClient, migrated_group, is_experimental: bool):
     ws.permissions.update(
