@@ -542,12 +542,6 @@ class MockRuntimeContext(
         self._queries.append(query)
         return query
 
-    def make_dashboard(self, *, query: LegacyQuery | None = None, **kwargs) -> SdkRedashDashboard:
-        dashboard = self._make_dashboard(query=query, **kwargs)
-        if query:
-            self._queries.append(query)
-        self._dashboards.append(dashboard)
-        return dashboard
 
     def make_lakeview_dashboard(self, **kwargs) -> SdkLakeviewDashboard:
         dashboard = self._make_lakeview_dashboard(**kwargs)
