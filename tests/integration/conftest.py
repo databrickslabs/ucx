@@ -407,7 +407,6 @@ class MockRuntimeContext(
         make_job_fixture,
         make_notebook_fixture,
         make_query_fixture,
-        make_dashboard_fixture,
         make_lakeview_dashboard_fixture,
         make_cluster_policy_fixture,
         make_cluster_policy_permissions_fixture,
@@ -432,7 +431,6 @@ class MockRuntimeContext(
         self._make_job = make_job_fixture
         self._make_notebook = make_notebook_fixture
         self._make_query = make_query_fixture
-        self._make_dashboard = make_dashboard_fixture
         self._make_lakeview_dashboard = make_lakeview_dashboard_fixture
         self._make_cluster_policy = make_cluster_policy_fixture
         self._make_cluster_policy_permissions = make_cluster_policy_permissions_fixture
@@ -958,7 +956,6 @@ class MockInstallationContext(MockRuntimeContext):
         make_job_fixture,
         make_notebook_fixture,
         make_query_fixture,
-        make_dashboard_fixture,
         make_lakeview_dashboard_fixture,
         make_cluster_policy,
         make_cluster_policy_permissions,
@@ -976,7 +973,6 @@ class MockInstallationContext(MockRuntimeContext):
             make_job_fixture,
             make_notebook_fixture,
             make_query_fixture,
-            make_dashboard_fixture,
             make_lakeview_dashboard_fixture,
             make_cluster_policy,
             make_cluster_policy_permissions,
@@ -1158,7 +1154,6 @@ def installation_ctx(  # pylint: disable=too-many-arguments,too-many-locals
     make_job,
     make_notebook,
     make_query,
-    make_dashboard,
     make_lakeview_dashboard,
     make_cluster_policy,
     make_cluster_policy_permissions,
@@ -1179,7 +1174,6 @@ def installation_ctx(  # pylint: disable=too-many-arguments,too-many-locals
         make_job,
         make_notebook,
         make_query,
-        make_dashboard,
         make_lakeview_dashboard,
         make_cluster_policy,
         make_cluster_policy_permissions,
