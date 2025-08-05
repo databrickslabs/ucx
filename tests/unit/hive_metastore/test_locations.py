@@ -29,6 +29,7 @@ from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler
         "s3n://bucket-name",
         "gcs://test_location2/test2/table2",
         "abfss://cont1@storagetest1.dfs.core.windows.net/test2/table3",
+        "wasbs://container2@test.blob.core.windows.net/test3/table4",
     ],
 )
 def test_location_trie_valid_and_full_location(location):
@@ -170,6 +171,8 @@ def test_external_locations():
         table_factory(["s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-23/testloc/Table3", ""]),
         table_factory(["s3://us-east-1-dev-account-staging-uc-ext-loc-bucket-23/anotherloc/Table4", ""]),
         table_factory(["s3://root_location", ""]),
+        table_factory(["abfss://container1@storagetest1.dfs.core.windows.net/test2/table3", ""]),
+        table_factory(["wasbs://container2@storagetest2.blob.core.windows.net/test3/table4", ""]),
         table_factory(["gcs://test_location2/a/b/table2", ""]),
         table_factory(["dbfs:/mnt/ucx/database1/table1", ""]),
         table_factory(["/dbfs/mnt/ucx/database2/table2", ""]),
@@ -218,6 +221,8 @@ def test_external_locations():
     sql_backend = MockBackend()
     crawler = ExternalLocations(Mock(), sql_backend, "test", tables_crawler, mounts_crawler)
     assert crawler.snapshot() == [
+        ExternalLocation('abfss://container1@storagetest1.dfs.core.windows.net/test2', 1),
+        ExternalLocation('abfss://container2@storagetest2.dfs.core.windows.net/test3', 1),
         ExternalLocation('gcs://test_location2/a/b', 1),
         ExternalLocation(
             'jdbc:databricks://dbc-test1-aa11.cloud.databricks.com;httpPath=/sql/1.0/warehouses/65b52fb5bd86a7be', 1
