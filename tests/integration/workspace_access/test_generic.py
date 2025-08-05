@@ -239,6 +239,9 @@ def test_warehouses(
     else:
         apply_tasks(generic_permissions, [migrated_group])
 
+    assert_generic_permissions_with_retry(
+        generic_permissions, "sql/warehouses", warehouse.id, migrated_group.name_in_account, PermissionLevel.CAN_MANAGE
+    )
     after = generic_permissions.load_as_dict("sql/warehouses", warehouse.id)
     assert after[migrated_group.name_in_account] == PermissionLevel.CAN_MANAGE
 
