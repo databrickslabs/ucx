@@ -1,5 +1,4 @@
 import json
-import time
 from datetime import timedelta
 
 import pytest
@@ -27,7 +26,9 @@ from . import apply_tasks
 
 
 @retried(on=[KeyError], timeout=timedelta(seconds=10))
-def assert_generic_permissions_with_retry(generic_permissions, object_type, object_id, migrated_group_name, expected_permission_level):
+def assert_generic_permissions_with_retry(
+    generic_permissions, object_type, object_id, migrated_group_name, expected_permission_level
+):
     after = generic_permissions.load_as_dict(object_type, object_id)
     assert after[migrated_group_name] == expected_permission_level
 
@@ -62,7 +63,13 @@ def test_instance_pools(
     else:
         apply_tasks(generic_permissions, [migrated_group])
 
-    assert_generic_permissions_with_retry(generic_permissions, "instance-pools", pool.instance_pool_id, migrated_group.name_in_account, expected_permission_level=PermissionLevel.CAN_MANAGE)
+    assert_generic_permissions_with_retry(
+        generic_permissions,
+        "instance-pools",
+        pool.instance_pool_id,
+        migrated_group.name_in_account,
+        expected_permission_level=PermissionLevel.CAN_MANAGE,
+    )
 
 
 @pytest.mark.parametrize("is_experimental", [True, False])
@@ -96,7 +103,9 @@ def test_clusters(
     else:
         apply_tasks(generic_permissions, [migrated_group])
 
-    assert_generic_permissions_with_retry(generic_permissions, "clusters", cluster.cluster_id, migrated_group.name_in_account, PermissionLevel.CAN_MANAGE)
+    assert_generic_permissions_with_retry(
+        generic_permissions, "clusters", cluster.cluster_id, migrated_group.name_in_account, PermissionLevel.CAN_MANAGE
+    )
 
 
 @pytest.mark.parametrize("is_experimental", [True, False])
@@ -123,7 +132,9 @@ def test_jobs(ws: WorkspaceClient, migrated_group, make_job, make_job_permission
     else:
         apply_tasks(generic_permissions, [migrated_group])
 
-    assert_generic_permissions_with_retry(generic_permissions, "jobs", job.job_id, migrated_group.name_in_account, PermissionLevel.CAN_MANAGE)
+    assert_generic_permissions_with_retry(
+        generic_permissions, "jobs", job.job_id, migrated_group.name_in_account, PermissionLevel.CAN_MANAGE
+    )
 
 
 @pytest.mark.parametrize("is_experimental", [True])
@@ -262,7 +273,9 @@ def test_models(
     else:
         apply_tasks(generic_permissions, [migrated_group])
 
-    assert_generic_permissions_with_retry(generic_permissions, "registered-models", model.id, migrated_group.name_in_account, PermissionLevel.CAN_MANAGE)
+    assert_generic_permissions_with_retry(
+        generic_permissions, "registered-models", model.id, migrated_group.name_in_account, PermissionLevel.CAN_MANAGE
+    )
 
 
 @pytest.mark.parametrize("is_experimental", [True, False])
@@ -292,7 +305,13 @@ def test_experiments(
     else:
         apply_tasks(generic_permissions, [migrated_group])
 
-    assert_generic_permissions_with_retry(generic_permissions, "experiments", experiment.experiment_id, migrated_group.name_in_account, PermissionLevel.CAN_MANAGE)
+    assert_generic_permissions_with_retry(
+        generic_permissions,
+        "experiments",
+        experiment.experiment_id,
+        migrated_group.name_in_account,
+        PermissionLevel.CAN_MANAGE,
+    )
 
 
 @pytest.mark.parametrize("is_experimental", [True, False])
@@ -334,7 +353,9 @@ def test_directories(
     else:
         apply_tasks(generic_permissions, [migrated_group])
 
-    assert_generic_permissions_with_retry(generic_permissions, "directories", str(object_id), migrated_group.name_in_account, PermissionLevel.CAN_MANAGE)
+    assert_generic_permissions_with_retry(
+        generic_permissions, "directories", str(object_id), migrated_group.name_in_account, PermissionLevel.CAN_MANAGE
+    )
 
 
 @pytest.mark.parametrize("is_experimental", [True, False])
@@ -376,7 +397,9 @@ def test_notebooks(
     else:
         apply_tasks(generic_permissions, [migrated_group])
 
-    assert_generic_permissions_with_retry(generic_permissions, "notebooks", str(object_id), migrated_group.name_in_account, PermissionLevel.CAN_MANAGE)
+    assert_generic_permissions_with_retry(
+        generic_permissions, "notebooks", str(object_id), migrated_group.name_in_account, PermissionLevel.CAN_MANAGE
+    )
 
 
 @retried(on=[BadRequest], timeout=timedelta(minutes=3))
@@ -402,7 +425,9 @@ def test_tokens(ws: WorkspaceClient, migrated_group, make_authorization_permissi
     else:
         apply_tasks(generic_permissions, [migrated_group])
 
-    assert_generic_permissions_with_retry(generic_permissions, "authorization", "tokens", migrated_group.name_in_account, PermissionLevel.CAN_USE)
+    assert_generic_permissions_with_retry(
+        generic_permissions, "authorization", "tokens", migrated_group.name_in_account, PermissionLevel.CAN_USE
+    )
 
 
 @retried(on=[BadRequest], timeout=timedelta(minutes=3))
@@ -472,7 +497,13 @@ def test_endpoints(
     else:
         apply_tasks(generic_permissions, [migrated_group])
 
-    assert_generic_permissions_with_retry(generic_permissions, "serving-endpoints", endpoint.response.id, migrated_group.name_in_account, PermissionLevel.CAN_QUERY)
+    assert_generic_permissions_with_retry(
+        generic_permissions,
+        "serving-endpoints",
+        endpoint.response.id,
+        migrated_group.name_in_account,
+        PermissionLevel.CAN_QUERY,
+    )
 
 
 # TODO: Uncomment this test when the feature store is available in the test infra again
@@ -503,7 +534,13 @@ def test_feature_tables(
     else:
         apply_tasks(generic_permissions, [migrated_group])
 
-    assert_generic_permissions_with_retry(generic_permissions, "feature-tables", feature_table["id"], migrated_group.name_in_account, PermissionLevel.CAN_EDIT_METADATA)
+    assert_generic_permissions_with_retry(
+        generic_permissions,
+        "feature-tables",
+        feature_table["id"],
+        migrated_group.name_in_account,
+        PermissionLevel.CAN_EDIT_METADATA,
+    )
 
 
 # TODO: Uncomment this test when the feature store is available in the test infra again
@@ -534,7 +571,13 @@ def test_feature_store_root_page(ws: WorkspaceClient, migrated_group, is_experim
             [migrated_group],
         )
 
-    assert_generic_permissions_with_retry(generic_permissions, "feature-tables", "/root", migrated_group.name_in_account, PermissionLevel.CAN_EDIT_METADATA)
+    assert_generic_permissions_with_retry(
+        generic_permissions,
+        "feature-tables",
+        "/root",
+        migrated_group.name_in_account,
+        PermissionLevel.CAN_EDIT_METADATA,
+    )
 
 
 @pytest.mark.parametrize("is_experimental", [True, False])
@@ -563,5 +606,10 @@ def test_models_root_page(ws: WorkspaceClient, migrated_group, is_experimental: 
             [migrated_group],
         )
 
-
-    assert_generic_permissions_with_retry(generic_permissions, "registered-models", "/root", migrated_group.name_in_account, PermissionLevel.CAN_MANAGE_PRODUCTION_VERSIONS)
+    assert_generic_permissions_with_retry(
+        generic_permissions,
+        "registered-models",
+        "/root",
+        migrated_group.name_in_account,
+        PermissionLevel.CAN_MANAGE_PRODUCTION_VERSIONS,
+    )
