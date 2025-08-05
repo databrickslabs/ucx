@@ -111,6 +111,12 @@ dbutils.library.restartPython()
 
 from databricks.labs.ucx.runtime import main
 
+force_refresh = "false"
+try:
+    force_refresh = dbutils.widgets.get("force_refresh")
+except Exception:
+    pass
+
 main(f'--config=/Workspace{config_file}',
      f'--workflow=' + dbutils.widgets.get('workflow'),
      f'--task=' + dbutils.widgets.get('task'),
@@ -118,7 +124,8 @@ main(f'--config=/Workspace{config_file}',
      f'--run_id=' + dbutils.widgets.get('run_id'),
      f'--start_time=' + dbutils.widgets.get('start_time'),
      f'--attempt=' + dbutils.widgets.get('attempt'),
-     f'--parent_run_id=' + dbutils.widgets.get('parent_run_id'))
+     f'--parent_run_id=' + dbutils.widgets.get('parent_run_id'),
+     f'--force_refresh=' + force_refresh)
 """
 
 EXPORT_TO_EXCEL_NOTEBOOK = """# Databricks notebook source
@@ -249,13 +256,20 @@ class DeployedWorkflows:
         self._ws = ws
         self._install_state = install_state
 
-    def run_workflow(self, step: str, skip_job_wait: bool = False, max_wait: timedelta = timedelta(minutes=20)) -> int:
+    def run_workflow(
+        self,
+        step: str,
+        skip_job_wait: bool = False,
+        max_wait: timedelta = timedelta(minutes=20),
+        named_parameters: dict[str, str] | None = None,
+    ) -> int:
         # this dunder variable is hiding this method from tracebacks, making it cleaner
         # for the user to see the actual error without too much noise.
         __tracebackhide__ = True  # pylint: disable=unused-variable
         job_id = int(self._install_state.jobs[step])
         logger.debug(f"starting {step} job: {self._ws.config.host}#job/{job_id}")
-        job_initial_run = self._ws.jobs.run_now(job_id)
+        logger.info(f"Named parameters for {step} job: {named_parameters}")
+        job_initial_run = self._ws.jobs.run_now(job_id, job_parameters=named_parameters)
         run_id = job_initial_run.run_id
         if not run_id:
             raise NotFound(f"job run not found for {step}")
@@ -855,6 +869,7 @@ class WorkflowsDeployment(InstallationMixin):
             "email_notifications": email_notifications,
             "schedule": workflow.schedule,
             "tasks": job_tasks,
+            "parameters": workflow.parameters,
         }
 
     def _job_task(self, task: Task, remote_wheels: list[str]) -> jobs.Task:

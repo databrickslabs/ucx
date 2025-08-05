@@ -87,7 +87,7 @@ def test_run_workflow(mock_installation) -> None:
     run_id = workflows.run_workflow("test")
 
     assert run_id == 456
-    ws.jobs.run_now.assert_called_once_with(123)
+    ws.jobs.run_now.assert_called_once_with(123, job_parameters=None)
     ws.jobs.wait_get_run_job_terminated_or_skipped.assert_called_once_with(run_id=456, timeout=timedelta(minutes=20))
 
 
@@ -101,7 +101,7 @@ def test_run_workflow_skip_job_wait(mock_installation) -> None:
     run_id = workflows.run_workflow("test", skip_job_wait=True)
 
     assert run_id == 456
-    ws.jobs.run_now.assert_called_once_with(123)
+    ws.jobs.run_now.assert_called_once_with(123, job_parameters=None)
     ws.jobs.wait_get_run_job_terminated_or_skipped.assert_not_called()
 
 
@@ -121,7 +121,7 @@ def test_run_workflow_operation_failed(mock_installation) -> None:
     with pytest.raises(NotFound, match="a_table"):
         _ = workflows.run_workflow("test")
 
-    ws.jobs.run_now.assert_called_once_with(123)
+    ws.jobs.run_now.assert_called_once_with(123, job_parameters=None)
     ws.jobs.wait_get_run_job_terminated_or_skipped.assert_called_once_with(run_id=456, timeout=timedelta(minutes=20))
     ws.jobs.get_run.assert_called_once_with(456)
     ws.workspace.list.assert_called_once_with("~/mock/logs/test")
@@ -139,6 +139,6 @@ def test_run_workflow_timeout(mock_installation) -> None:
     with pytest.raises(TimeoutError):
         _ = workflows.run_workflow("test", max_wait=timedelta(minutes=2))
 
-    ws.jobs.run_now.assert_called_once_with(123)
+    ws.jobs.run_now.assert_called_once_with(123, job_parameters=None)
     ws.jobs.wait_get_run_job_terminated_or_skipped.assert_called_once_with(run_id=456, timeout=timedelta(minutes=2))
     ws.workspace.list.assert_called_once_with("~/mock/logs/test")

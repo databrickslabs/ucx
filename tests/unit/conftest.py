@@ -175,6 +175,7 @@ def run_workflow(mocker, mock_installation, ws, spark_table_crawl_mocker):
                     get_table_mock
                 )
                 # pylint: enable=protected-access
+
             current_task(ctx)
             return ctx
 

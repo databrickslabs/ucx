@@ -6,7 +6,7 @@ from databricks.labs.blueprint.installation import Installation
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import Config
-from databricks.sdk.service.jobs import CronSchedule
+from databricks.sdk.service.jobs import CronSchedule, JobParameterDefinition
 
 from databricks.labs.ucx.config import WorkspaceConfig
 
@@ -65,8 +65,9 @@ def parse_args(*argv) -> dict[str, str]:
 
 
 class Workflow:
-    def __init__(self, name: str):
+    def __init__(self, name: str, named_parameters: list[JobParameterDefinition] | None = None):
         self._name = name
+        self._named_parameters = named_parameters
 
     @property
     def name(self):
@@ -76,6 +77,11 @@ class Workflow:
     def schedule(self) -> CronSchedule | None:
         """The default (cron) schedule for this workflow, or None if it is not scheduled."""
         return None
+
+    @property
+    def parameters(self) -> list[JobParameterDefinition] | None:
+        """Named parameters for this workflow, or None if there are no parameters."""
+        return self._named_parameters
 
     def tasks(self) -> Iterable[Task]:
         # return __task__ from every method in this class that has this attribute
