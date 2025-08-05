@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 @retried(on=[KeyError], timeout=timedelta(seconds=10))
-def assert_permissions_with_retry(
+def assert_redash_permissions_with_retry(
     permissions: RedashPermissionsSupport,
     object_type: sql.ObjectTypePlural,
     object_id: str,
@@ -72,7 +72,7 @@ def test_permissions_for_redash(
 
     group_permission_assert_mapping[migrated_group.name_in_account] = sql.PermissionLevel.CAN_EDIT
     group_permission_assert_mapping[user.display_name] = sql.PermissionLevel.CAN_EDIT
-    assert_permissions_with_retry(
+    assert_redash_permissions_with_retry(
         redash_permissions, sql.ObjectTypePlural.QUERIES, query.id, group_permission_assert_mapping
     )
 
@@ -126,7 +126,7 @@ def test_permissions_for_redash_after_group_is_renamed(
         ws_group.display_name: sql.PermissionLevel.CAN_EDIT,
         acc_group.display_name: sql.PermissionLevel.CAN_EDIT,
     }
-    assert_permissions_with_retry(
+    assert_redash_permissions_with_retry(
         redash_permissions, sql.ObjectTypePlural.QUERIES, query.id, group_permission_assert_mapping
     )
 
