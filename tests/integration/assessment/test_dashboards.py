@@ -1,11 +1,8 @@
-import pytest
-from databricks.sdk.service.sql import Dashboard as SdkRedashDashboard
 from databricks.sdk.service.dashboards import Dashboard as SdkLakeviewDashboard
 
 from databricks.labs.ucx.assessment.dashboards import (
     LakeviewDashboardCrawler,
     Dashboard,
-    RedashDashboardCrawler,
 )
 
 
