@@ -32,19 +32,6 @@ def test_redash_dashboard_crawler_crawls_dashboard(ws, make_dashboard, inventory
     assert dashboards == [Dashboard.from_sdk_redash_dashboard(dashboard)]
 
 
-@pytest.mark.skip(reason="Legacy dashboard creation is no longer supported by Databricks.")
-def test_redash_dashboard_crawler_crawls_dashboards_with_debug_listing_upper_limit(
-    ws, make_dashboard, inventory_schema, sql_backend
-) -> None:
-    for _ in range(2):  # Create two dashboards, expect one to be snapshotted due to upper limit below
-        make_dashboard()
-    crawler = RedashDashboardCrawler(ws, sql_backend, inventory_schema, debug_listing_upper_limit=1)
-
-    dashboards = list(crawler.snapshot())
-
-    assert len(dashboards) == 1
-
-
 def test_lakeview_dashboard_crawler_crawls_dashboards(
     ws, make_lakeview_dashboard, inventory_schema, sql_backend
 ) -> None:
@@ -70,7 +57,6 @@ def test_lakeview_dashboard_crawler_crawls_dashboard(
     dashboards = list(crawler.snapshot())
 
     assert dashboards == [Dashboard.from_sdk_lakeview_dashboard(dashboard)]
-
 
 
 def test_lakeview_dashboard_ownership_is_me(runtime_ctx, make_lakeview_dashboard) -> None:

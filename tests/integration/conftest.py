@@ -542,7 +542,6 @@ class MockRuntimeContext(
         self._queries.append(query)
         return query
 
-
     def make_lakeview_dashboard(self, **kwargs) -> SdkLakeviewDashboard:
         dashboard = self._make_lakeview_dashboard(**kwargs)
         self._lakeview_query_id = "query"  # Hardcoded query name in the `make_lakeview_dashboard` fixture
