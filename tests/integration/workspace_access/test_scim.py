@@ -38,17 +38,21 @@ def test_some_entitlements(
         schemas=[iam.PatchSchema.URN_IETF_PARAMS_SCIM_API_MESSAGES_2_0_PATCH_OP],
     )
 
+    @retried(on=[AssertionError], timeout=timedelta(seconds=10))
+    def assert_scim_permissions_with_retry(scim_support, group_id, entitlement) -> None:
+        _, load_permissions = scim_support.load_for_group(group_id)
+        assert entitlement in load_permissions, AssertionError
+
     scim_support = ScimSupport(ws)
-    _, before = scim_support.load_for_group(ws_group.id)
-    assert "databricks-sql-access" in before
+
+    assert_scim_permissions_with_retry(scim_support, ws_group.id, "databricks-sql-access")
 
     if use_permission_migration_api:
         MigrationState([migrated_group]).apply_to_groups_with_different_names(ws)
     else:
         apply_tasks(scim_support, [migrated_group])
 
-    _, after = scim_support.load_for_group(acc_group.id)
-    assert "databricks-sql-access" in after
+    assert_scim_permissions_with_retry(scim_support, ws_group.id, "databricks-sql-access")
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=3))

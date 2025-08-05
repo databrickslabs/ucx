@@ -33,8 +33,8 @@ def assert_generic_permissions_with_retry(
     migrated_group_name: str,
     expected_permission_level: PermissionLevel,
 ) -> None:
-    after = generic_permissions.load_as_dict(object_type, object_id)
-    assert after[migrated_group_name] == expected_permission_level
+    load_permissions = generic_permissions.load_as_dict(object_type, object_id)
+    assert load_permissions[migrated_group_name] == expected_permission_level
 
 
 @pytest.mark.parametrize("is_experimental", [True, False])
@@ -210,7 +210,11 @@ def test_cluster_policies(
         apply_tasks(generic_permissions, [migrated_group])
 
     assert_generic_permissions_with_retry(
-        generic_permissions, "cluster-policies", cluster_policy.policy_id, migrated_group.name_in_account, PermissionLevel.CAN_USE
+        generic_permissions,
+        "cluster-policies",
+        cluster_policy.policy_id,
+        migrated_group.name_in_account,
+        PermissionLevel.CAN_USE,
     )
 
 

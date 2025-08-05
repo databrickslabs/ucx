@@ -25,9 +25,9 @@ def assert_redash_permissions_with_retry(
     object_id: str,
     group_permission_assert_mapping: dict[str, sql.PermissionLevel],
 ) -> None:
-    after = permissions.load_as_dict(object_type, object_id)
+    load_permissions = permissions.load_as_dict(object_type, object_id)
     for migrated_group_name, expected_permission_level in group_permission_assert_mapping.items():
-        assert after[migrated_group_name] == expected_permission_level
+        assert load_permissions[migrated_group_name] == expected_permission_level
 
 
 @pytest.mark.parametrize("use_permission_migration_api", [True, False])
