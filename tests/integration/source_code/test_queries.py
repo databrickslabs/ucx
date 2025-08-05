@@ -1,7 +1,7 @@
-import pytest
 from databricks.labs.lsql.backends import Row
 
-from databricks.labs.ucx.source_code.base import DirectFsAccess, LineageAtom, UsedTable
+from databricks.labs.ucx.source_code.base import DirectFsAccess, LineageAtom
+
 
 def test_query_linter_lints_queries_and_stores_dfsas_and_tables(simple_ctx) -> None:
     query_with_dfsa = simple_ctx.make_query(sql_query="SELECT * from csv.`dbfs://some_folder/some_file.csv`")
@@ -33,7 +33,8 @@ def test_query_linter_lints_queries_and_stores_dfsas_and_tables(simple_ctx) -> N
                     object_type="QUERY",
                     object_id=f"no-dashboard-id/{query_with_dfsa.id}",
                     other={"name": query_with_dfsa.name},
-                )],
+                )
+            ],
             path="dbfs://some_folder/some_file.csv",
             is_read=True,
             is_write=False,
