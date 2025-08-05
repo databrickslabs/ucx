@@ -27,8 +27,12 @@ from . import apply_tasks
 
 @retried(on=[KeyError], timeout=timedelta(seconds=10))
 def assert_generic_permissions_with_retry(
-    generic_permissions, object_type, object_id, migrated_group_name, expected_permission_level
-):
+    generic_permissions: GenericPermissionsSupport,
+    object_type: str,
+    object_id: str,
+    migrated_group_name: str,
+    expected_permission_level: PermissionLevel,
+) -> None:
     after = generic_permissions.load_as_dict(object_type, object_id)
     assert after[migrated_group_name] == expected_permission_level
 
