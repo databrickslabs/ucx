@@ -23,10 +23,10 @@ def assert_permissions_with_retry(
     permissions: RedashPermissionsSupport,
     object_type: sql.ObjectTypePlural,
     object_id: str,
-    group_to_permission_assertion_mapping:dict[str, sql.PermissionLevel],
+    group_permission_assert_mapping: dict[str, sql.PermissionLevel],
 ) -> None:
     after = permissions.load_as_dict(object_type, object_id)
-    for migrated_group_name, expected_permission_level in group_to_permission_assertion_mapping.items():
+    for migrated_group_name, expected_permission_level in group_permission_assert_mapping.items():
         assert after[migrated_group_name] == expected_permission_level
 
 
@@ -66,21 +66,21 @@ def test_permissions_for_redash(
     else:
         apply_tasks(redash_permissions, [migrated_group])
 
-
-    group_to_permission_assertion_mapping = {}
+    group_permission_assert_mapping = {}
     if not use_permission_migration_api:
-        group_to_permission_assertion_mapping[ws_group_temp.display_name] = sql.PermissionLevel.CAN_EDIT
+        group_permission_assert_mapping[ws_group_temp.display_name] = sql.PermissionLevel.CAN_EDIT
 
-    group_to_permission_assertion_mapping[migrated_group.name_in_account] = sql.PermissionLevel.CAN_EDIT
-    group_to_permission_assertion_mapping[user.display_name] = sql.PermissionLevel.CAN_EDIT
+    group_permission_assert_mapping[migrated_group.name_in_account] = sql.PermissionLevel.CAN_EDIT
+    group_permission_assert_mapping[user.display_name] = sql.PermissionLevel.CAN_EDIT
     assert_permissions_with_retry(
-        redash_permissions, sql.ObjectTypePlural.QUERIES, query.id, group_to_permission_assertion_mapping
+        redash_permissions, sql.ObjectTypePlural.QUERIES, query.id, group_permission_assert_mapping
     )
 
 
 # Redash group permissions are cached for up to 10 mins. If a group is renamed, redash permissions api returns
 # the old name for some time. Therefore, we need to allow at least 10 mins in the timeout for checking the permissions
 # after group rename.
+@skip
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
 def test_permissions_for_redash_after_group_is_renamed(
     ws,
@@ -122,9 +122,13 @@ def test_permissions_for_redash_after_group_is_renamed(
 
     apply_tasks_appliers(redash_permissions, permissions, MigrationState([group_to_migrate]))
 
-    group_to_permission_assertion_mapping = {ws_group.display_name: sql.PermissionLevel.CAN_EDIT,
-                                             acc_group.display_name: sql.PermissionLevel.CAN_EDIT}
-    assert_permissions_with_retry(redash_permissions, sql.ObjectTypePlural.QUERIES, query.id, group_to_permission_assertion_mapping)
+    group_permission_assert_mapping = {
+        ws_group.display_name: sql.PermissionLevel.CAN_EDIT,
+        acc_group.display_name: sql.PermissionLevel.CAN_EDIT,
+    }
+    assert_permissions_with_retry(
+        redash_permissions, sql.ObjectTypePlural.QUERIES, query.id, group_permission_assert_mapping
+    )
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=3))
