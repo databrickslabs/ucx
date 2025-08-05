@@ -209,8 +209,9 @@ def test_cluster_policies(
     else:
         apply_tasks(generic_permissions, [migrated_group])
 
-    after = generic_permissions.load_as_dict("cluster-policies", cluster_policy.policy_id)
-    assert after[migrated_group.name_in_account] == PermissionLevel.CAN_USE
+    assert_generic_permissions_with_retry(
+        generic_permissions, "cluster-policies", cluster_policy.policy_id, migrated_group.name_in_account, PermissionLevel.CAN_USE
+    )
 
 
 @pytest.mark.parametrize("is_experimental", [True, False])
