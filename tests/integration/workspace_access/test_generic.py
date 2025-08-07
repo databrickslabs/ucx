@@ -172,12 +172,13 @@ def test_pipelines(
     else:
         apply_tasks(generic_permissions, [migrated_group])
 
-    @retried(on=[KeyError], timeout=timedelta(seconds=10))
-    def get_permissions():
-        after = generic_permissions.load_as_dict("pipelines", pipeline.pipeline_id)
-        assert after[migrated_group.name_in_account] == PermissionLevel.CAN_MANAGE
-
-    get_permissions()
+    assert_generic_permissions_with_retry(
+        generic_permissions,
+        "pipelines",
+        pipeline.pipeline_id,
+        migrated_group.name_in_account,
+        PermissionLevel.CAN_MANAGE,
+    )
 
 
 @pytest.mark.parametrize("is_experimental", [True, False])
