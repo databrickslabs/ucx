@@ -8,6 +8,13 @@ from databricks.sdk.service.iam import Group, User
 
 from databricks.labs.ucx.account.workspaces import AccountWorkspaces
 
+@retried(on=[KeyError], timeout=timedelta(minutes=2))
+def get_group(acc: AccountClient, display_name: str) -> Group:
+    for grp in acc.groups.list():
+        if grp.display_name == display_name:
+            return grp
+    raise KeyError(f"Group not found {display_name}")
+
 
 @pytest.mark.skip(reason="Test tests interferes with other tests")
 def test_clean_test_users_in_account(acc: AccountClient) -> None:
@@ -62,14 +69,8 @@ def test_create_account_level_groups(
     )
     AccountWorkspaces(acc, [ws.get_workspace_id()]).create_account_level_groups(MockPrompts({}))
 
-    @retried(on=[KeyError], timeout=timedelta(minutes=2))
-    def get_group(display_name: str) -> Group:
-        for grp in acc.groups.list():
-            if grp.display_name == display_name:
-                return grp
-        raise KeyError(f"Group not found {display_name}")
 
-    group = get_group(group_display_name)
+    group = get_group(acc, group_display_name)
     assert group
     assert len(group.members) == 2  # 2 members: user and service principal
 
@@ -104,16 +105,9 @@ def test_create_account_level_groups_nested_groups(
 
     AccountWorkspaces(acc, [ws.get_workspace_id()]).create_account_level_groups(MockPrompts({}))
 
-    @retried(on=[KeyError], timeout=timedelta(minutes=2))
-    def get_group(display_name: str) -> Group:
-        for grp in acc.groups.list():
-            if grp.display_name == display_name:
-                return grp
-        raise KeyError(f"Group not found {display_name}")
-
     for ws_group in ws_groups:
         group_display_name = ws_group.display_name
-        group = get_group(group_display_name)
+        group = get_group(acc, group_display_name)
         assert group
         assert len(group.members) == len(ws_group.members)
 
