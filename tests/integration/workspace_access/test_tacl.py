@@ -109,7 +109,7 @@ def test_permission_for_udfs_migration_api(ws, sql_backend, runtime_ctx, migrate
             for grant in grants_crawler.grants(catalog=catalog_name, database=schema_name, udf=udf_name):
                 actual_grants[grant.principal].add(grant.action_type)
                 # Note: the following assert is the source of the KeyError (and why we might need to re-load the permissions).
-                assert expected_grants == actual_grants[migrated_group.name_in_account]
+            assert expected_grants == actual_grants[migrated_group.name_in_account]
 
     assert_udf_grants_with_retry(
         grants,
