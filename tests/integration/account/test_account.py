@@ -53,7 +53,10 @@ def test_create_account_level_groups(
     make_ucx_group(f"test_ucx_migrate_invalid-{suffix}", f"test_ucx_migrate_invalid-{suffix}")
 
     group_display_name = f"created_by_ucx_regular_group-{suffix}"
-    make_group(display_name=group_display_name, members=[make_user().id, make_run_as()._service_principal.id])
+    # Create a group with a user and a service principal as members
+    # to test the account level groups creation.
+    #TODO: remove protected access to service principal id once added in pytester
+    make_group(display_name=group_display_name, members=[make_user().id, make_run_as()._service_principal.id]) # pylint: disable=W0212
     AccountWorkspaces(acc, [ws.get_workspace_id()]).create_account_level_groups(MockPrompts({}))
 
     @retried(on=[KeyError], timeout=timedelta(minutes=2))
