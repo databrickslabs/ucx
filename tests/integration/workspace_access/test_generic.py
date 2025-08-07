@@ -34,6 +34,7 @@ def assert_generic_permissions_with_retry(
     expected_permission_level: PermissionLevel,
 ) -> None:
     load_permissions = generic_permissions.load_as_dict(object_type, object_id)
+    # Note: the following assert is the source of the KeyError (and why we might need to re-load the permissions).
     assert load_permissions[migrated_group_name] == expected_permission_level
 
 

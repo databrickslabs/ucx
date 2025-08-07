@@ -41,7 +41,8 @@ def test_some_entitlements(
     @retried(on=[AssertionError], timeout=timedelta(seconds=10))
     def assert_scim_permissions_with_retry(scim_support, group_id, entitlement) -> None:
         _, load_permissions = scim_support.load_for_group(group_id)
-        assert entitlement in load_permissions, AssertionError
+        # Note: the following assert is the source of the KeyError (and why we might need to re-load the permissions).
+        assert entitlement in load_permissions
 
     scim_support = ScimSupport(ws)
 
