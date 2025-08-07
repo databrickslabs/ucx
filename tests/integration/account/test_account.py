@@ -42,6 +42,7 @@ def test_create_account_level_groups(
     make_ucx_group,
     make_group,
     make_user,
+    make_run_as,
     acc,
     ws,
     make_random,
@@ -52,7 +53,7 @@ def test_create_account_level_groups(
     make_ucx_group(f"test_ucx_migrate_invalid-{suffix}", f"test_ucx_migrate_invalid-{suffix}")
 
     group_display_name = f"created_by_ucx_regular_group-{suffix}"
-    make_group(display_name=group_display_name, members=[make_user().id])
+    make_group(display_name=group_display_name, members=[make_user().id, make_run_as()._service_principal.id])
     AccountWorkspaces(acc, [ws.get_workspace_id()]).create_account_level_groups(MockPrompts({}))
 
     @retried(on=[KeyError], timeout=timedelta(minutes=2))
@@ -64,6 +65,7 @@ def test_create_account_level_groups(
 
     group = get_group(group_display_name)
     assert group
+    assert len(group.members) == 2  # 2 members: user and service principal
 
 
 def test_create_account_level_groups_nested_groups(
