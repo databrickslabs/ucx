@@ -7,7 +7,7 @@ from functools import partial
 
 from databricks.sdk.retries import retried
 
-from databricks.labs.ucx.hive_metastore.grants import Grant
+from databricks.labs.ucx.hive_metastore.grants import Grant, GrantsCrawler
 from databricks.labs.ucx.workspace_access.base import Permissions
 from databricks.labs.ucx.workspace_access.groups import MigratedGroup, MigrationState
 from databricks.labs.ucx.workspace_access.tacl import TableAclSupport
@@ -97,15 +97,29 @@ def test_permission_for_udfs_migration_api(ws, sql_backend, runtime_ctx, migrate
 
     MigrationState([migrated_group]).apply_to_groups_with_different_names(ws)
 
-    actual_udf_a_grants = defaultdict(set)
-    for grant in grants.grants(catalog=schema.catalog_name, database=schema.name, udf=udf_a.name):
-        actual_udf_a_grants[grant.principal].add(grant.action_type)
-    assert {"SELECT", "OWN"} == actual_udf_a_grants[migrated_group.name_in_account]
+    @retried(on=[AssertionError], timeout=dt.timedelta(seconds=10))
+    def assert_udf_grants_with_retry(
+        grants_crawler: GrantsCrawler,
+        catalog_name: str,
+        schema_name: str,
+        udf_names_grants_mapping: dict[str, set[str]],
+    ) -> None:
+        for udf_name, expected_grants in udf_names_grants_mapping.items():
+            actual_grants = defaultdict(set)
+            for grant in grants_crawler.grants(catalog=catalog_name, database=schema_name, udf=udf_name):
+                actual_grants[grant.principal].add(grant.action_type)
+                # Note: the following assert is the source of the KeyError (and why we might need to re-load the permissions).
+            assert expected_grants == actual_grants[migrated_group.name_in_account]
 
-    actual_udf_b_grants = defaultdict(set)
-    for grant in grants.grants(catalog=schema.catalog_name, database=schema.name, udf=udf_b.name):
-        actual_udf_b_grants[grant.principal].add(grant.action_type)
-    assert {"READ_METADATA"} == actual_udf_b_grants[migrated_group.name_in_account]
+    assert_udf_grants_with_retry(
+        grants,
+        schema.catalog_name,
+        schema.name,
+        {
+            udf_a.name: {"SELECT", "OWN"},
+            udf_b.name: {"READ_METADATA"},
+        },
+    )
 
 
 def test_permission_for_files_anonymous_func(sql_backend, runtime_ctx, make_group):

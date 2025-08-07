@@ -18,6 +18,19 @@ from . import apply_tasks, apply_tasks_appliers, apply_tasks_crawlers
 logger = logging.getLogger(__name__)
 
 
+@retried(on=[KeyError], timeout=timedelta(seconds=10))
+def assert_redash_permissions_with_retry(
+    permissions: RedashPermissionsSupport,
+    object_type: sql.ObjectTypePlural,
+    object_id: str,
+    group_permission_assert_mapping: dict[str, sql.PermissionLevel],
+) -> None:
+    load_permissions = permissions.load_as_dict(object_type, object_id)
+    for migrated_group_name, expected_permission_level in group_permission_assert_mapping.items():
+        # Note: the following assert is the source of the KeyError (and why we might need to re-load the permissions).
+        assert load_permissions[migrated_group_name] == expected_permission_level
+
+
 @pytest.mark.parametrize("use_permission_migration_api", [True, False])
 @retried(on=[NotFound], timeout=timedelta(minutes=3))
 def test_permissions_for_redash(
@@ -54,20 +67,21 @@ def test_permissions_for_redash(
     else:
         apply_tasks(redash_permissions, [migrated_group])
 
-    query_permissions = redash_permissions.load_as_dict(sql.ObjectTypePlural.QUERIES, query.id)
+    group_permission_assert_mapping = {}
     if not use_permission_migration_api:
-        # Note that we don't validate the original group permissions here because Redash support apply the permissions
-        # on the temp/backup group instead of the original group.
-        # Permission migration API skips this step
-        assert sql.PermissionLevel.CAN_EDIT == query_permissions[ws_group_temp.display_name]
-    assert sql.PermissionLevel.CAN_EDIT == query_permissions[migrated_group.name_in_account]
-    assert sql.PermissionLevel.CAN_EDIT == query_permissions[user.display_name]
+        group_permission_assert_mapping[ws_group_temp.display_name] = sql.PermissionLevel.CAN_EDIT
+
+    group_permission_assert_mapping[migrated_group.name_in_account] = sql.PermissionLevel.CAN_EDIT
+    group_permission_assert_mapping[user.display_name] = sql.PermissionLevel.CAN_EDIT
+    assert_redash_permissions_with_retry(
+        redash_permissions, sql.ObjectTypePlural.QUERIES, query.id, group_permission_assert_mapping
+    )
 
 
 # Redash group permissions are cached for up to 10 mins. If a group is renamed, redash permissions api returns
 # the old name for some time. Therefore, we need to allow at least 10 mins in the timeout for checking the permissions
 # after group rename.
-@skip  # skipping as it takes 5-10 mins to execute
+@skip
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
 def test_permissions_for_redash_after_group_is_renamed(
     ws,
@@ -109,9 +123,13 @@ def test_permissions_for_redash_after_group_is_renamed(
 
     apply_tasks_appliers(redash_permissions, permissions, MigrationState([group_to_migrate]))
 
-    query_permissions = redash_permissions.load_as_dict(sql.ObjectTypePlural.QUERIES, query.id)
-    assert sql.PermissionLevel.CAN_EDIT == query_permissions[ws_group.display_name]
-    assert sql.PermissionLevel.CAN_EDIT == query_permissions[acc_group.display_name]
+    group_permission_assert_mapping = {
+        ws_group.display_name: sql.PermissionLevel.CAN_EDIT,
+        acc_group.display_name: sql.PermissionLevel.CAN_EDIT,
+    }
+    assert_redash_permissions_with_retry(
+        redash_permissions, sql.ObjectTypePlural.QUERIES, query.id, group_permission_assert_mapping
+    )
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=3))
