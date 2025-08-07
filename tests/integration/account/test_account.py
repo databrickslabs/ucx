@@ -9,6 +9,14 @@ from databricks.sdk.service.iam import Group, User
 from databricks.labs.ucx.account.workspaces import AccountWorkspaces
 
 
+@retried(on=[KeyError], timeout=timedelta(minutes=2))
+def get_group(acc: AccountClient, display_name: str) -> Group:
+    for grp in acc.groups.list():
+        if grp.display_name == display_name:
+            return grp
+    raise KeyError(f"Group not found {display_name}")
+
+
 @pytest.mark.skip(reason="Test tests interferes with other tests")
 def test_clean_test_users_in_account(acc: AccountClient) -> None:
     """Run this test to clean up the account from test users.
@@ -42,6 +50,7 @@ def test_create_account_level_groups(
     make_ucx_group,
     make_group,
     make_user,
+    make_run_as,
     acc,
     ws,
     make_random,
@@ -52,18 +61,17 @@ def test_create_account_level_groups(
     make_ucx_group(f"test_ucx_migrate_invalid-{suffix}", f"test_ucx_migrate_invalid-{suffix}")
 
     group_display_name = f"created_by_ucx_regular_group-{suffix}"
-    make_group(display_name=group_display_name, members=[make_user().id])
+    # Create a group with a user and a service principal as members
+    # to test the account level groups creation.
+    # TODO: remove protected access to service principal id once added in pytester
+    ws_group = make_group(
+        display_name=group_display_name,
+        members=[make_user().id, make_run_as()._service_principal.id],  # pylint: disable=protected-access
+    )
     AccountWorkspaces(acc, [ws.get_workspace_id()]).create_account_level_groups(MockPrompts({}))
 
-    @retried(on=[KeyError], timeout=timedelta(minutes=2))
-    def get_group(display_name: str) -> Group:
-        for grp in acc.groups.list():
-            if grp.display_name == display_name:
-                return grp
-        raise KeyError(f"Group not found {display_name}")
-
-    group = get_group(group_display_name)
-    assert group
+    acc_group = get_group(acc, group_display_name)
+    assert sorted(acc_group.members, key=lambda m: m.ref) == sorted(ws_group.members, key=lambda m: m.ref)
 
 
 def test_create_account_level_groups_nested_groups(
@@ -96,16 +104,9 @@ def test_create_account_level_groups_nested_groups(
 
     AccountWorkspaces(acc, [ws.get_workspace_id()]).create_account_level_groups(MockPrompts({}))
 
-    @retried(on=[KeyError], timeout=timedelta(minutes=2))
-    def get_group(display_name: str) -> Group:
-        for grp in acc.groups.list():
-            if grp.display_name == display_name:
-                return grp
-        raise KeyError(f"Group not found {display_name}")
-
     for ws_group in ws_groups:
         group_display_name = ws_group.display_name
-        group = get_group(group_display_name)
+        group = get_group(acc, group_display_name)
         assert group
         assert len(group.members) == len(ws_group.members)
 
