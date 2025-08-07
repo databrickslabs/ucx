@@ -127,7 +127,7 @@ class AccountWorkspaces:
         members_to_add = []
         assert valid_group.members is not None, "group members undefined"
         for member in valid_group.members:
-            if member.ref and member.ref.startswith("Users"):
+            if member.ref and (member.ref.startswith("Users") or member.ref.startswith("ServicePrincipals")):
                 members_to_add.append(member)
             elif member.ref and member.ref.startswith("Groups"):
                 assert member.display is not None, "group name undefined"
@@ -135,7 +135,7 @@ class AccountWorkspaces:
                 if members_to_append:
                     members_to_add.append(members_to_append)
             else:
-                logger.warning(f"Member {member.ref} is not a user or group, skipping")
+                logger.warning(f"Member {member.ref} is not a user, service principal or a group, skipping")
 
         acc_group = self._try_create_account_groups(group_name, context.preexisting_account_groups)
         if acc_group:
