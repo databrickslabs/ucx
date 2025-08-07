@@ -8,6 +8,7 @@ from databricks.sdk.service.iam import Group, User
 
 from databricks.labs.ucx.account.workspaces import AccountWorkspaces
 
+
 @retried(on=[KeyError], timeout=timedelta(minutes=2))
 def get_group(acc: AccountClient, display_name: str) -> Group:
     for grp in acc.groups.list():
@@ -63,16 +64,14 @@ def test_create_account_level_groups(
     # Create a group with a user and a service principal as members
     # to test the account level groups creation.
     # TODO: remove protected access to service principal id once added in pytester
-    make_group(
+    ws_group = make_group(
         display_name=group_display_name,
         members=[make_user().id, make_run_as()._service_principal.id],  # pylint: disable=protected-access
     )
     AccountWorkspaces(acc, [ws.get_workspace_id()]).create_account_level_groups(MockPrompts({}))
 
-
-    group = get_group(acc, group_display_name)
-    assert group
-    assert len(group.members) == 2  # 2 members: user and service principal
+    acc_group = get_group(acc, group_display_name)
+    assert sorted(acc_group.members, key=lambda m: m.ref) == sorted(ws_group.members, key=lambda m: m.ref)
 
 
 def test_create_account_level_groups_nested_groups(
