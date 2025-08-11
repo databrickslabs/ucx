@@ -5,7 +5,9 @@ from collections import defaultdict
 from collections.abc import Callable, Iterable
 from functools import partial
 
+import pytest
 from databricks.sdk.retries import retried
+from databricks.sdk.service.catalog import TableInfo, SchemaInfo
 
 from databricks.labs.ucx.hive_metastore.grants import Grant, GrantsCrawler
 from databricks.labs.ucx.workspace_access.base import Permissions
@@ -16,6 +18,31 @@ from . import apply_tasks
 
 logger = logging.getLogger(__name__)
 
+@retried(on=[AssertionError], timeout=dt.timedelta(seconds=10))
+def assert_grants_with_retry(
+    grants_crawler: GrantsCrawler,
+    object_type: str,
+    migrated_group: MigratedGroup,
+    table_info: TableInfo | None = None,
+    schema_info: SchemaInfo | None = None,
+    catalog_name: str | None = None,
+    schema_name: str | None = None,
+    expected_grants: set[str] | None = None,
+    udf_names_grants_mapping: dict[str, set[str]] | None = None,
+) -> None:
+    if object_type == "UDF":
+        for udf_name, expected_grants in udf_names_grants_mapping.items():
+            actual_grants = defaultdict(set)
+            for grant in grants_crawler.grants(catalog=catalog_name, database=schema_name, udf=udf_name):
+                actual_grants[grant.principal].add(grant.action_type)
+                # Note: the following assert is the source of the KeyError (and why we might need to re-load the permissions).
+            assert expected_grants == actual_grants[migrated_group.name_in_account]
+    elif object_type == "TABLE":
+        actual_grants = grants_crawler.for_table_info(table_info)
+        assert expected_grants == actual_grants[migrated_group.name_in_account]
+    elif object_type == "SCHEMA":
+        actual_grants = grants_crawler.for_schema_info(schema_info)
+        assert expected_grants == actual_grants[migrated_group.name_in_account]
 
 def test_grants_with_permission_migration_api(runtime_ctx, ws, migrated_group, sql_backend):
     schema_a = runtime_ctx.make_schema()
@@ -34,11 +61,21 @@ def test_grants_with_permission_migration_api(runtime_ctx, ws, migrated_group, s
 
     MigrationState([migrated_group]).apply_to_groups_with_different_names(ws)
 
-    new_table_grants = {"a": grants.for_table_info(table_a)}
-    assert {"SELECT"} == new_table_grants["a"][migrated_group.name_in_account]
+    assert_grants_with_retry(
+        grants_crawler=grants,
+        migrated_group=migrated_group,
+        table_info=table_a,
+        object_type="TABLE",
+        expected_grants = {"SELECT"},
+    )
 
-    new_schema_grants = {"a": grants.for_schema_info(schema_a)}
-    assert {"USAGE", "OWN"} == new_schema_grants["a"][migrated_group.name_in_account]
+    assert_grants_with_retry(
+        grants_crawler=grants,
+        migrated_group=migrated_group,
+        schema_info=schema_a,
+        object_type="SCHEMA",
+        expected_grants = {"USAGE", "OWN"},
+    )
 
 
 def test_permission_for_files_anonymous_func_migration_api(runtime_ctx, migrated_group) -> None:
@@ -97,25 +134,13 @@ def test_permission_for_udfs_migration_api(ws, sql_backend, runtime_ctx, migrate
 
     MigrationState([migrated_group]).apply_to_groups_with_different_names(ws)
 
-    @retried(on=[AssertionError], timeout=dt.timedelta(seconds=10))
-    def assert_udf_grants_with_retry(
-        grants_crawler: GrantsCrawler,
-        catalog_name: str,
-        schema_name: str,
-        udf_names_grants_mapping: dict[str, set[str]],
-    ) -> None:
-        for udf_name, expected_grants in udf_names_grants_mapping.items():
-            actual_grants = defaultdict(set)
-            for grant in grants_crawler.grants(catalog=catalog_name, database=schema_name, udf=udf_name):
-                actual_grants[grant.principal].add(grant.action_type)
-                # Note: the following assert is the source of the KeyError (and why we might need to re-load the permissions).
-            assert expected_grants == actual_grants[migrated_group.name_in_account]
-
-    assert_udf_grants_with_retry(
-        grants,
-        schema.catalog_name,
-        schema.name,
-        {
+    assert_grants_with_retry(
+        grants_crawler=grants,
+        object_type="UDF",
+        catalog_name=schema.catalog_name,
+        schema_name=schema.name,
+        migrated_group=migrated_group,
+        udf_names_grants_mapping={
             udf_a.name: {"SELECT", "OWN"},
             udf_b.name: {"READ_METADATA"},
         },
