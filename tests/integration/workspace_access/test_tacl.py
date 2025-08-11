@@ -5,7 +5,6 @@ from collections import defaultdict
 from collections.abc import Callable, Iterable
 from functools import partial
 
-import pytest
 from databricks.sdk.retries import retried
 from databricks.sdk.service.catalog import TableInfo, SchemaInfo
 
@@ -17,6 +16,7 @@ from databricks.labs.ucx.workspace_access.tacl import TableAclSupport
 from . import apply_tasks
 
 logger = logging.getLogger(__name__)
+
 
 @retried(on=[AssertionError], timeout=dt.timedelta(seconds=10))
 def assert_grants_with_retry(
@@ -30,19 +30,22 @@ def assert_grants_with_retry(
     expected_grants: set[str] | None = None,
     udf_names_grants_mapping: dict[str, set[str]] | None = None,
 ) -> None:
-    if object_type == "UDF":
-        for udf_name, expected_grants in udf_names_grants_mapping.items():
+    if object_type == "UDF" and udf_names_grants_mapping is not None:
+        for udf_name, expected_udf_grants in udf_names_grants_mapping.items():
             actual_grants = defaultdict(set)
             for grant in grants_crawler.grants(catalog=catalog_name, database=schema_name, udf=udf_name):
                 actual_grants[grant.principal].add(grant.action_type)
                 # Note: the following assert is the source of the KeyError (and why we might need to re-load the permissions).
-            assert expected_grants == actual_grants[migrated_group.name_in_account]
-    elif object_type == "TABLE":
+            assert expected_udf_grants == actual_grants[migrated_group.name_in_account]
+    elif object_type == "TABLE" and table_info is not None:
         actual_grants = grants_crawler.for_table_info(table_info)
+        # Note: the following assert is the source of the KeyError (and why we might need to re-load the permissions).
         assert expected_grants == actual_grants[migrated_group.name_in_account]
-    elif object_type == "SCHEMA":
+    elif object_type == "SCHEMA" and schema_info is not None:
         actual_grants = grants_crawler.for_schema_info(schema_info)
+        # Note: the following assert is the source of the KeyError (and why we might need to re-load the permissions).
         assert expected_grants == actual_grants[migrated_group.name_in_account]
+
 
 def test_grants_with_permission_migration_api(runtime_ctx, ws, migrated_group, sql_backend):
     schema_a = runtime_ctx.make_schema()
@@ -66,7 +69,7 @@ def test_grants_with_permission_migration_api(runtime_ctx, ws, migrated_group, s
         migrated_group=migrated_group,
         table_info=table_a,
         object_type="TABLE",
-        expected_grants = {"SELECT"},
+        expected_grants={"SELECT"},
     )
 
     assert_grants_with_retry(
@@ -74,7 +77,7 @@ def test_grants_with_permission_migration_api(runtime_ctx, ws, migrated_group, s
         migrated_group=migrated_group,
         schema_info=schema_a,
         object_type="SCHEMA",
-        expected_grants = {"USAGE", "OWN"},
+        expected_grants={"USAGE", "OWN"},
     )
 
 
