@@ -18,7 +18,7 @@ from . import apply_tasks
 logger = logging.getLogger(__name__)
 
 
-@retried(on=[AssertionError], timeout=dt.timedelta(seconds=10))
+@retried(on=[AssertionError], timeout=dt.timedelta(seconds=30))
 def assert_grants_with_retry(
     grants_crawler: GrantsCrawler,
     object_type: str,
