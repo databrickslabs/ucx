@@ -1466,7 +1466,7 @@ def pytest_ignore_collect(path):
         logger.debug(f"pytest_ignore_collect: error: {err}")
         return False
 
-@retried(on=[AssertionError], timeout=timedelta(seconds=30))
+@retried(on=[AssertionError], timeout=timedelta(minutes=1))
 def get_group(group_manager: GroupManager, group_name: str) -> NoReturn:
     """
     # Group deletion is eventually consistent. Although the group manager tries to wait for convergence, parts of the
