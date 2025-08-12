@@ -9,7 +9,7 @@ from collections.abc import Callable, Generator
 from dataclasses import replace
 from datetime import timedelta
 from functools import cached_property
-from typing import Literal
+from typing import Literal, NoReturn
 
 import pytest  # pylint: disable=wrong-import-order
 from databricks.labs.blueprint.commands import CommandExecutor
@@ -1465,3 +1465,16 @@ def pytest_ignore_collect(path):
     except ValueError as err:
         logger.debug(f"pytest_ignore_collect: error: {err}")
         return False
+
+@retried(on=[KeyError], timeout=timedelta(minutes=2))
+def get_group(group_manager: GroupManager, group_name: str) -> NoReturn:
+    """
+    # Group deletion is eventually consistent. Although the group manager tries to wait for convergence, parts of the
+    # API internals have a 60s timeout. As such we should wait at least that long before concluding deletion has not
+    # happened.
+    """
+    deleted_group = group_manager.has_workspace_group(group_name)
+    if deleted_group:
+        logger.info(f"Group {group_name} was not deleted. Retrying...")
+        raise AssertionError(f"Group is not deleted: {group_name}")
+    raise NotFound(f"Group not found: {group_name}")
