@@ -10,7 +10,7 @@ from databricks.sdk.retries import retried
 from databricks.sdk.service.iam import Group, ResourceMeta
 
 from databricks.labs.ucx.workspace_access.groups import GroupManager, MigratedGroup
-
+from tests.integration.conftest import get_group
 
 logger = logging.getLogger(__name__)
 
@@ -128,8 +128,7 @@ def test_reflect_account_groups_on_workspace(ws, make_ucx_group, sql_backend, in
     check_group_renamed(ws, ws_group)
     # At this time previous ws level groups aren't deleted
 
-
-@retried(on=[NotFound], timeout=timedelta(minutes=5))
+@retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_delete_ws_groups_should_delete_renamed_and_reflected_groups_only(
     ws, make_ucx_group, sql_backend, inventory_schema
 ):
@@ -142,24 +141,16 @@ def test_delete_ws_groups_should_delete_renamed_and_reflected_groups_only(
         [ws_group.display_name],
         "ucx-temp-",
     )
+    assert group_manager.has_workspace_group(ws_group.display_name)
     group_manager.rename_groups()
     group_manager.reflect_account_groups_on_workspace()
     group_manager.delete_original_workspace_groups()
 
-    # Group deletion is eventually consistent. Although the group manager tries to wait for convergence, parts of the
-    # API internals have a 60s timeout. As such we should wait at least that long before concluding deletion has not
-    # happened.
-    # Note: If you are adjusting this, also look at: test_running_real_remove_backup_groups_job
-    @retried(on=[KeyError], timeout=timedelta(minutes=5))
-    def get_group(group_id: str) -> NoReturn:
-        ws.groups.get(group_id)
-        raise KeyError(f"Group is not deleted: {group_id}")
-
     with pytest.raises(NotFound):
-        get_group(ws_group.id)
+        get_group(group_manager, ws_group.display_name)
 
 
-@retried(on=[NotFound], timeout=timedelta(minutes=3))
+@retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_delete_ws_groups_should_not_delete_current_ws_groups(ws, make_ucx_group, sql_backend, inventory_schema):
     ws_group, _ = make_ucx_group()
 

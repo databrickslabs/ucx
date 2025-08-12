@@ -28,7 +28,7 @@ from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.install import WorkspaceInstaller
 
-from ..conftest import MockInstallationContext
+from ..conftest import MockInstallationContext, get_group
 
 logger = logging.getLogger(__name__)
 
@@ -160,22 +160,14 @@ def test_running_real_remove_backup_groups_job(ws: WorkspaceClient, installation
     installation_ctx.group_manager.rename_groups()
     installation_ctx.group_manager.reflect_account_groups_on_workspace()
 
+    assert installation_ctx.group_manager.has_workspace_group(ws_group_a.display_name)
     workflow = "remove-workspace-local-backup-groups"
     installation_ctx.deployed_workflows.run_workflow(workflow)
 
     assert installation_ctx.deployed_workflows.validate_step(workflow), f"Workflow failed: {workflow}"
 
-    # Group deletion is eventually consistent. Although the group manager tries to wait for convergence, parts of the
-    # API internals have a 60s timeout. As such we should wait at least that long before concluding deletion has not
-    # happened.
-    # Note: If you are adjusting this, also look at: test_delete_ws_groups_should_delete_renamed_and_reflected_groups_only
-    @retried(on=[KeyError], timeout=timedelta(minutes=5))
-    def get_group(group_id: str) -> NoReturn:
-        ws.groups.get(group_id)
-        raise KeyError(f"Group is not deleted: {group_id}")
-
     with pytest.raises(NotFound):
-        get_group(ws_group_a.id)
+        get_group(installation_ctx.group_manager, ws_group_a.display_name)
 
 
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))
