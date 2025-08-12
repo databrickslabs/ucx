@@ -2,7 +2,6 @@ import json
 import logging
 import re
 from datetime import timedelta
-from typing import NoReturn
 
 import pytest
 from databricks.sdk.errors import NotFound, ResourceConflict
@@ -127,6 +126,7 @@ def test_reflect_account_groups_on_workspace(ws, make_ucx_group, sql_backend, in
 
     check_group_renamed(ws, ws_group)
     # At this time previous ws level groups aren't deleted
+
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_delete_ws_groups_should_delete_renamed_and_reflected_groups_only(

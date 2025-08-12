@@ -1466,6 +1466,7 @@ def pytest_ignore_collect(path):
         logger.debug(f"pytest_ignore_collect: error: {err}")
         return False
 
+
 @retried(on=[AssertionError], timeout=timedelta(minutes=1))
 def get_group(group_manager: GroupManager, group_name: str) -> NoReturn:
     """
