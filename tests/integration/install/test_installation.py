@@ -154,12 +154,13 @@ def test_job_cluster_on_uc_enabled_workpace(ws, installation_ctx) -> None:
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))
 def test_running_real_remove_backup_groups_job(ws: WorkspaceClient, installation_ctx: MockInstallationContext) -> None:
     ws_group_a, _ = installation_ctx.make_ucx_group(wait_for_provisioning=True)
+    assert installation_ctx.group_manager.has_workspace_group(ws_group_a.display_name)
+
     installation_ctx.workspace_installation.run()
     installation_ctx.group_manager.snapshot()
     installation_ctx.group_manager.rename_groups()
     installation_ctx.group_manager.reflect_account_groups_on_workspace()
 
-    assert installation_ctx.group_manager.has_workspace_group(ws_group_a.display_name)
     workflow = "remove-workspace-local-backup-groups"
     installation_ctx.deployed_workflows.run_workflow(workflow)
 
