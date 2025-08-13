@@ -236,7 +236,11 @@ class AWSResourcePermissions:
 
     def _identify_missing_paths(self):
         external_locations = self._locations.external_locations_with_root()
-        compatible_roles = self.load_uc_compatible_roles()
+        try:
+            compatible_roles = self.load_uc_compatible_roles()
+        except ResourceDoesNotExist:
+            logger.warning(f"{self.UC_ROLES_FILE_NAME} not found.")
+            compatible_roles = []
         missing_paths = set()
         for external_location in external_locations:
             matching_role = False
