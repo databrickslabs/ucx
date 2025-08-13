@@ -131,7 +131,7 @@ def installation_multiple_roles():
 
 @pytest.fixture
 def installation_no_roles():
-    return MockInstallation(DEFAULT_CONFIG | {"uc_roles_access.csv": []})
+    return MockInstallation(DEFAULT_CONFIG | {})
 
 
 @pytest.fixture
