@@ -362,7 +362,7 @@ class GlobalContext(abc.ABC):
 
     @cached_property
     def assessment_exporter(self):
-        return AssessmentExporter(self.sql_backend, self.config)
+        return AssessmentExporter(self.workspace_client, self.sql_backend, self.config)
 
     @cached_property
     def acl_migrator(self):
