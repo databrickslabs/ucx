@@ -918,7 +918,8 @@ def export_assessment(w: WorkspaceClient, prompts: Prompts):
     """Export the UCX assessment queries to a zip file."""
     ctx = WorkspaceContext(w)
     exporter = ctx.assessment_exporter
-    exporter.export_results(prompts)
+    results_path = exporter.cli_export_results(prompts)
+    logger.info(f"Results exported to {results_path}")
 
 
 @ucx.command

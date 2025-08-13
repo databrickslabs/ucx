@@ -1,8 +1,15 @@
+import base64
 import logging
+from datetime import timedelta
 from pathlib import Path
+from typing import Any
 
+from databricks.sdk.errors import NotFound, ResourceDoesNotExist
+from databricks.sdk.retries import retried
+from databricks.sdk import WorkspaceClient
+
+from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.tui import Prompts
-
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.labs.lsql.dashboards import DashboardMetadata
@@ -12,15 +19,107 @@ logger = logging.getLogger(__name__)
 
 class AssessmentExporter:
 
-    def __init__(self, sql_backend: SqlBackend, config: WorkspaceConfig):
+    def __init__(self, ws: WorkspaceClient, sql_backend: SqlBackend, config: WorkspaceConfig):
+        self._ws = ws
         self._sql_backend = sql_backend
         self._config = config
+        self._install_folder = f"/Workspace/{Installation.assume_global(ws, 'ucx')}/"
+        self._base_path = Path(__file__).resolve().parents[3] / "labs/ucx/queries/assessment"
 
-    def export_results(self, prompts: Prompts):
+    @staticmethod
+    def _export_to_excel(
+        assessment_metadata: DashboardMetadata, sql_backend: SqlBackend, export_path: Path, writter: Any
+    ):
+        """Export Assessment to Excel"""
+        with writter.ExcelWriter(export_path, engine='xlsxwriter') as writer:
+            for tile in assessment_metadata.tiles:
+                if not tile.metadata.is_query():
+                    continue
+
+                try:
+                    rows = list(sql_backend.fetch(tile.content))
+                    if not rows:
+                        continue
+
+                    data = [row.asDict() for row in rows]
+                    df = writter.DataFrame(data)
+
+                    sheet_name = str(tile.metadata.id)[:31]
+                    df.to_excel(writer, sheet_name=sheet_name, index=False)
+
+                except NotFound as e:
+                    msg = (
+                        str(e).split(" Verify", maxsplit=1)[0] + f" Export will continue without {tile.metadata.title}"
+                    )
+                    logging.warning(msg)
+                    continue
+
+    @retried(on=[ResourceDoesNotExist], timeout=timedelta(minutes=1))
+    def _render_export(self, export_file_path: Path) -> str:
+        """Render an HTML link for downloading the results."""
+        binary_data = self._ws.workspace.download(export_file_path.as_posix()).read()
+        b64_data = base64.b64encode(binary_data).decode('utf-8')
+
+        html = f"""
+            <style>
+                @font-face {{
+                    font-family: 'DM Sans';
+                    src: url(https://cdn.bfldr.com/9AYANS2F/at/p9qfs3vgsvnp5c7txz583vgs/dm-sans-regular.ttf?auto=webp&format=ttf) format('truetype');
+                }}
+                body {{ font-family: 'DM Sans', Arial, sans-serif; }}
+                .export-container {{ text-align: center; margin-top: 20px; }}
+                .export-container h2 {{ color: #1B3139; font-size: 24px; margin-bottom: 20px; }}
+                .export-container button {{
+                    display: inline-block; padding: 12px 25px; background-color: #1B3139;
+                    color: #fff; border: none; border-radius: 4px; font-size: 18px;
+                    font-weight: 500; cursor: pointer; transition: background-color 0.3s, transform 0.3s;
+                }}
+                .export-container button:hover {{ background-color: #FF3621; transform: translateY(-2px); }}
+            </style>
+
+            <div class="export-container">
+                <h2>Export Results</h2>
+                <button onclick="downloadExcel()">Download Results</button>
+            </div>
+
+            <script>
+                function downloadExcel() {{
+                    const b64Data = '{b64_data}';
+                    const filename = '{export_file_path.name}';
+
+                    // Convert base64 to blob
+                    const byteCharacters = atob(b64Data);
+                    const byteNumbers = new Array(byteCharacters.length);
+                    for (let i = 0; i < byteCharacters.length; i++) {{
+                        byteNumbers[i] = byteCharacters.charCodeAt(i);
+                    }}
+                    const byteArray = new Uint8Array(byteNumbers);
+                    const blob = new Blob([byteArray], {{
+                        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                    }});
+
+                    // Create download link and click it
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = filename;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                }}
+            </script>
+            """
+
+        return html
+
+    def _get_queries(self, assessment: str) -> DashboardMetadata:
+        """Get UCX queries to export"""
+        queries_path = self._base_path / assessment if assessment else self._base_path
+        return DashboardMetadata.from_path(queries_path).replace_database(
+            database=self._config.inventory_database, database_to_replace="inventory"
+        )
+
+    def cli_export_results(self, prompts: Prompts):
         """Main method to export results to CSV files inside a ZIP archive."""
-        project_root = Path(__file__).resolve().parents[3]
-        queries_path_root = project_root / "labs/ucx/queries/assessment"
-
         results_directory = Path(
             prompts.question(
                 "Choose a path to save the UCX Assessment results",
@@ -31,18 +130,18 @@ class AssessmentExporter:
 
         query_choice = prompts.choice(
             "Choose which assessment results to export",
-            [subdir.name for subdir in queries_path_root.iterdir() if subdir.is_dir()],
+            [subdir.name for subdir in self._base_path.iterdir() if subdir.is_dir()],
         )
 
-        export_path = results_directory / f"export_{query_choice}_results.zip"
-        queries_path = queries_path_root / query_choice
-
-        assessment_results = DashboardMetadata.from_path(queries_path).replace_database(
-            database=self._config.inventory_database, database_to_replace="inventory"
+        results_path = self._get_queries(query_choice).export_to_zipped_csv(
+            self._sql_backend, results_directory / f"export_{query_choice}_results.zip"
         )
-
-        logger.info("Exporting assessment results....")
-        results_path = assessment_results.export_to_zipped_csv(self._sql_backend, export_path)
-        logger.info(f"Results exported to {results_path}")
 
         return results_path
+
+    def web_export_results(self, writer: Any) -> str:
+        """Alternative method to export results from the UI."""
+        export_file_name = Path(f"{self._install_folder}/ucx_assessment_main.xlsx")
+        assessment_main = self._get_queries("main")
+        self._export_to_excel(assessment_main, self._sql_backend, export_file_name, writer)
+        return self._render_export(export_file_name)
