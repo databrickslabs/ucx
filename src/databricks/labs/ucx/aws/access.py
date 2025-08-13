@@ -9,7 +9,7 @@ from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import NotFound, ResourceDoesNotExist, PermissionDenied
+from databricks.sdk.errors import NotFound, PermissionDenied
 from databricks.sdk.service.catalog import Privilege
 from databricks.sdk.service.compute import Policy
 from databricks.sdk.service.sql import SetWorkspaceWarehouseConfigRequestSecurityPolicy
@@ -155,7 +155,7 @@ class AWSResourcePermissions:
     def load_uc_compatible_roles(self, *, resource_type: AWSResourceType | None = None) -> list[AWSRoleAction]:
         try:
             role_actions = self._installation.load(list[AWSRoleAction], filename=self.UC_ROLES_FILE_NAME)
-        except ResourceDoesNotExist:
+        except NotFound:
             self.save_uc_compatible_roles()
             role_actions = self._installation.load(list[AWSRoleAction], filename=self.UC_ROLES_FILE_NAME)
         if resource_type:
@@ -238,7 +238,7 @@ class AWSResourcePermissions:
         external_locations = self._locations.external_locations_with_root()
         try:
             compatible_roles = self.load_uc_compatible_roles()
-        except ResourceDoesNotExist:
+        except NotFound:
             logger.warning(f"{self.UC_ROLES_FILE_NAME} not found.")
             compatible_roles = []
         missing_paths = set()
