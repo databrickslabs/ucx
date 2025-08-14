@@ -62,7 +62,7 @@ class AWSExternalLocationsMigration:
                     fallback=self._enable_hms_federation,
                 )
             except BadRequest as e:
-                logger.error(f"Failed to create external location for path {path} with error: {e}")
+                logger.warning(f"Failed to create external location for path {path} with error: {e}")
                 continue
         self._principal_acl.apply_location_acl()
 
