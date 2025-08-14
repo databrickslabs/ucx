@@ -61,7 +61,6 @@ class CredentialManager:
         # list existed service credentials that are using iam roles, capturing the arns and names
         try:
              credential_response = self._ws.credentials.list_credentials()
-             logger.info(credential_response)
         except NotFound:
             logger.info('Could not retrieve credentials for Glue access. ')
             return {}
