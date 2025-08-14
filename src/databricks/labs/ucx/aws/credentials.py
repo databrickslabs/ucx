@@ -78,7 +78,7 @@ class CredentialManager:
         # }
         credentials = {}
         for credential in credential_response:
-            if credential.purpose == "SERVICE" and credential.aws_iam_role:
+            if credential.purpose in ("SERVICE", "STORAGE") and credential.aws_iam_role:
                 credentials[credential.name] = credential.aws_iam_role.role_arn
 
         logger.info(f"Found {len(credentials)} distinct IAM roles used in UC service credentials")
