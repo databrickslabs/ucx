@@ -60,23 +60,27 @@ class CredentialManager:
     def list_glue(self) -> dict[str, str]:
         # list existed service credentials that are using iam roles, capturing the arns and names
         try:
-            credential_response = self._ws.credentials.list_credentials()
-            logger.info(credential_response)
+             credential_response = self._ws.credentials.list_credentials()
+             logger.info(credential_response)
         except NotFound:
             logger.info('Could not retrieve credentials for Glue access. ')
             return {}
-        if not credential_response or not isinstance(credential_response, dict):
-            logger.info('Could not retrieve credentials for Glue access. ')
-            return {}
-        credential_list = credential_response.get("credentials")
-        if not credential_list or not isinstance(credential_list, list):
-            logger.info('Could not retrieve credentials for Glue access. ')
-            return {}
-        credentials = {
-            credential.get("name"): credential.get("aws_iam_role").get("role_arn")
-            for credential in credential_list
-            if credential.get("purpose") == "SERVICE"
-        }
+        # if not credential_response or not isinstance(credential_response, dict):
+        #     logger.info('Could not retrieve credentials for Glue access. ')
+        #     return {}
+        # credential_list = credential_response.get("credentials")
+        # if not credential_list or not isinstance(credential_list, list):
+        #     logger.info('Could not retrieve credentials for Glue access. ')
+        #     return {}
+        # credentials = {
+        #     credential.get("name"): credential.get("aws_iam_role").get("role_arn")
+        #     for credential in credential_list
+        #     if credential.get("purpose") == "SERVICE"
+        # }
+        credentials = {}
+        for credential in credential_response:
+            if credential.purpose == "SERVICE" and credential.aws_iam_role:
+                credentials[credential.name] = credential.aws_iam_role.role_arn
 
         logger.info(f"Found {len(credentials)} distinct IAM roles used in UC service credentials")
         return credentials
