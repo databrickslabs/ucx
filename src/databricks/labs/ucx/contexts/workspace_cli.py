@@ -6,7 +6,6 @@ from functools import cached_property
 
 from databricks.labs.lsql.backends import SqlBackend, StatementExecutionBackend
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import NotFound
 
 from databricks.labs.ucx.assessment.aws import AWSResources
 from databricks.labs.ucx.framework.utils import run_command
@@ -19,7 +18,6 @@ from databricks.labs.ucx.azure.locations import ExternalLocationsMigration
 from databricks.labs.ucx.azure.resources import AzureAPIClient, AzureResources
 from databricks.labs.ucx.contexts.application import CliContext
 from databricks.labs.ucx.hive_metastore.federation import HiveMetastoreFederation, HiveMetastoreFederationEnabler
-from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 from databricks.labs.ucx.progress.install import ProgressTrackingInstallation
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.linters.folders import LocalCodeLinter
@@ -213,15 +211,6 @@ class LocalCheckoutContext(WorkspaceContext):
     for running local operations."""
 
     @cached_property
-    def _migration_index(self) -> TableMigrationIndex:
-        try:
-            index = self.tables_migrator.index()
-        except NotFound:
-            logger.warning("Metastore does not seem to exist yet. Skipping loading of migration status.")
-            index = TableMigrationIndex([])
-        return index
-
-    @cached_property
     def local_code_linter(self) -> LocalCodeLinter:
         return LocalCodeLinter(
             self.notebook_loader,
@@ -229,5 +218,5 @@ class LocalCheckoutContext(WorkspaceContext):
             self.folder_loader,
             self.path_lookup,
             self.dependency_resolver,
-            lambda: LinterContext(self._migration_index),
+            lambda: LinterContext(self.table_migration_index),
         )
