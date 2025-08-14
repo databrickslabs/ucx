@@ -9,6 +9,7 @@ from databricks.labs.ucx.hive_metastore.grants import PrincipalACL
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocation
 
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.errors.platform import BadRequest
 
 logger = logging.getLogger(__name__)
 
@@ -52,18 +53,22 @@ class AWSExternalLocationsMigration:
                 logger.error(f"Missing credential for role {role_arn} for path {path}")
                 continue
             location_name = self._generate_external_location_name(path)
-            self._ws.external_locations.create(
-                location_name,
-                path,
-                credential_dict[role_arn],
-                skip_validation=True,
-                fallback=self._enable_hms_federation,
-            )
+            try:
+                self._ws.external_locations.create(
+                    location_name,
+                    path,
+                    credential_dict[role_arn],
+                    skip_validation=True,
+                    fallback=self._enable_hms_federation,
+                )
+            except BadRequest as e:
+                logger.error(f"Failed to create external location for path {path} with error: {e}")
+                continue
         self._principal_acl.apply_location_acl()
 
     @staticmethod
     def _generate_external_location_name(path: str) -> str:
-        return "_".join(Path(path.lower()).parts[1:])
+        return "_".join(Path(path.lower().replace(".", "_")).parts[1:])
 
     @staticmethod
     def _identify_missing_external_locations(
