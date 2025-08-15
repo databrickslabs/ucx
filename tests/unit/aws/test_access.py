@@ -38,6 +38,7 @@ from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.hive_metastore import ExternalLocations, TablesCrawler
 from databricks.labs.ucx.hive_metastore.grants import PrincipalACL
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocation, MountsCrawler
+from databricks.sdk.errors.platform import BadRequest
 from tests.unit import DEFAULT_CONFIG
 
 
@@ -142,6 +143,7 @@ def backend():
             ["s3://BUCKET2/FOLDER2", 1],
             ["s3://BUCKET4", 2],
             ["s3://BUCKETX/FOLDERX", 1],
+            ["s3://BUCKETX/FOLDER.COM", 1],
         ]
     }
     return MockBackend(rows=rows, fails_on_first={})
@@ -183,6 +185,7 @@ def test_create_external_locations(mock_ws, installation_multiple_roles, backend
         call('bucket1_folder1', 's3://BUCKET1/FOLDER1', 'cred1', skip_validation=True, fallback=False),
         call('bucket2_folder2', 's3://BUCKET2/FOLDER2', 'cred1', skip_validation=True, fallback=False),
         call('bucketx_folderx', 's3://BUCKETX/FOLDERX', 'credx', skip_validation=True, fallback=False),
+        call('bucketx_folder_com', 's3://BUCKETX/FOLDER.COM', 'credx', skip_validation=True, fallback=False),
     ]
     mock_ws.external_locations.create.assert_has_calls(calls, any_order=True)
     aws.get_role_policy.assert_not_called()
@@ -224,6 +227,10 @@ def test_create_external_locations_skip_existing(mock_ws, backend, locations):
     mock_ws.external_locations.list.return_value = [
         ExternalLocationInfo(name="UCX_FOO_1", url="s3://BUCKETX/FOLDERX", credential_name="credx"),
     ]
+
+    mock_ws.external_locations.create.side_effect = [None, BadRequest("Location already exists"), None, None]
+    # Check that the existing location is skipped without breaking the migration
+
     aws = create_autospec(AWSResources)
     principal_acl = create_autospec(PrincipalACL)
     config = install.load(WorkspaceConfig)
@@ -235,6 +242,7 @@ def test_create_external_locations_skip_existing(mock_ws, backend, locations):
         principal_acl,
     )
     external_locations_migration.run()
+
     calls = [
         call("bucket1_folder1", 's3://BUCKET1/FOLDER1', 'cred1', skip_validation=True, fallback=False),
     ]
@@ -293,7 +301,13 @@ def test_create_uber_principal_existing_role_in_policy(mock_ws, mock_installatio
         'UCX_MIGRATION_ROLE_ucx',
         'UCX_MIGRATION_POLICY_ucx',
         AWSResourceType.S3,
-        {'s3://BUCKET1/FOLDER1', 's3://BUCKET2/FOLDER2', 's3://BUCKET4', 's3://BUCKETX/FOLDERX'},
+        {
+            's3://BUCKET1/FOLDER1',
+            's3://BUCKET2/FOLDER2',
+            's3://BUCKET4',
+            's3://BUCKETX/FOLDERX',
+            's3://BUCKETX/FOLDER.COM',
+        },
         None,
         None,
     )
