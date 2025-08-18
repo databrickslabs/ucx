@@ -12,6 +12,9 @@ from databricks.sdk.service.catalog import (
     AzureServicePrincipal,
     Privilege,
     StorageCredentialInfo,
+    CredentialInfo,
+    AwsIamRole,
+    CredentialPurpose,
 )
 
 from databricks.labs.ucx.assessment.aws import AWSRoleAction, AWSCredentialCandidate, AWSResourceType
@@ -48,6 +51,20 @@ def credential_manager():
 
     ws.storage_credentials.create.side_effect = side_effect_create_aws_storage_credential
     ws.storage_credentials.validate.side_effect = side_effect_validate_storage_credential
+
+    credentials = [
+        CredentialInfo(
+            name="storage-credential-1",
+            aws_iam_role=AwsIamRole(role_arn="arn:aws:iam::123456789012:role/example-role-name"),
+            purpose=CredentialPurpose.STORAGE,
+        ),
+        CredentialInfo(
+            name="glue-credential-1",
+            aws_iam_role=AwsIamRole(role_arn="arn:aws:iam::123456789012:role/glue-role"),
+            purpose=CredentialPurpose.SERVICE,
+        ),
+    ]
+    ws.credentials.list_credentials.return_value = credentials
 
     return CredentialManager(ws)
 
@@ -220,3 +237,9 @@ def test_validate_storage_credentials_failed_operation(credential_manager):
 
     validation = credential_manager.validate(permission_mapping)
     assert validation.failures == ["LIST validation failed with message: fail"]
+
+
+def test_list_glue_credentials(credential_manager):
+    glue_credentials = credential_manager.list_glue()
+    assert len(glue_credentials) == 1
+    assert glue_credentials['glue-credential-1'] == "arn:aws:iam::123456789012:role/glue-role"
