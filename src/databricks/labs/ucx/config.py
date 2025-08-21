@@ -93,6 +93,9 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
     # Skip TACL migration during table migration
     skip_tacl_migration: bool = False
 
+    # Skip assess_workflows task during assessment
+    skip_assess_workflows: bool = False
+
     # Select SQL query statement disposition
     query_statement_disposition: Disposition = Disposition.INLINE
 

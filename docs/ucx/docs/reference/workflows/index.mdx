@@ -89,6 +89,7 @@ the [assessment report](/docs/reference/assessment).
 19. `assess_workflows`(experimnetal): This task retrieves the jobs to analyze their notebooks and files for
     [migration problems](/docs/reference/linter_codes). This will run for workflows that ran within the last 30 days.
     To analyze all workflows run the ["migration-progress-experimental"] workflow](/docs/reference/workflows#migration-progress-experimental).
+    The assess_workflows task can be skipped during installation by responding to the prompt, or by setting the 'skip_assess_workflows' flag in config.yml. This allows you to control whether workflow analysis is performed as part of the assessment workflow.
 
 After UCX assessment workflow finished, see the assessment dashboard for findings and recommendations.
 See [this guide](/docs/reference/assessment) for more details.
