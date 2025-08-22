@@ -864,9 +864,9 @@ databricks labs ucx report-account-compatibility --profile labs-azure-account
 ### `export-assessment`
 
 ```commandline
-databricks labs ucx export-assessment
+databricks labs ucx export-assessment [--export-format excel]
 ```
-The export-assessment command is used to export UCX assessment results to a specified location. When you run this command, you will be prompted to provide details on the destination path and the type of report you wish to generate. If you do not specify these details, the command will default to exporting the main results to the current directory. The exported file will be named based on the selection made in the format. Eg: `export_{query_choice}_results.zip`
+The export-assessment command is used to export UCX assessment results to a specified location. When you run this command without any arguments, you will be prompted to provide details on the destination path and the type of report you wish to generate. By default, this will create a zip file containing CSV files in the format `export_{query_choice}_results.zip`.
 - **Choose a path to save the UCX Assessment results:**
     - **Description:** Specify the path where the results should be saved. If not provided, results will be saved in the current directory.
 
@@ -877,3 +877,23 @@ The export-assessment command is used to export UCX assessment results to a spec
         - `interactive`
         - `main`
     - **Default:** `main`
+
+Alternatively, you can run the command with argument `--export-format excel`, which will prompt for the destination to store the file and generate an Excel (.xlsx) format file named `ucx_assessment_main.xlsx`.
+- **Choose a path to save the UCX Assessment results:**
+    - **Description:** Specify the path where the results should be saved. If not provided, results will be saved in the current directory.
+
+```text
+databricks labs ucx export-assessment
+Choose a path to save the UCX Assessment results (default: /Users/user.name/ucx):
+Choose which assessment results to export
+[0] azure
+[1] estimates
+[2] interactive
+[3] main
+Enter a number between 0 and 3:
+```
+
+```text
+databricks labs ucx export-assessment --export-format excel
+Choose a path to save the UCX Assessment results (default: /Users/user.name/ucx):
+```
