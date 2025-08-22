@@ -365,6 +365,9 @@ commands:
 
   - name: export-assessment
     description: Export UCX results to a specified location
+    flags:
+      - name: export-format
+        description: Specifies the file format for data export (ZIP with CSV files or Excel)
 
   - name: create-federated-catalog
     description: (EXPERIMENTAL) Create a federated catalog in the workspace
