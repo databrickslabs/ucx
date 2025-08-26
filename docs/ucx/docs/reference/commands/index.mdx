@@ -878,10 +878,6 @@ The export-assessment command is used to export UCX assessment results to a spec
         - `main`
     - **Default:** `main`
 
-Alternatively, you can run the command with argument `--export-format excel`, which will prompt for the destination to store the file and generate an Excel (.xlsx) format file named `ucx_assessment_main.xlsx`.
-- **Choose a path to save the UCX Assessment results:**
-    - **Description:** Specify the path where the results should be saved. If not provided, results will be saved in the current directory.
-
 ```text
 databricks labs ucx export-assessment
 Choose a path to save the UCX Assessment results (default: /Users/user.name/ucx):
@@ -893,7 +889,14 @@ Choose which assessment results to export
 Enter a number between 0 and 3:
 ```
 
+Alternatively, you can run the command with argument `--export-format excel`, which will prompt for the destination to store the file and generate an Excel (.xlsx) format file named `ucx_assessment_main.xlsx`.
+- **Choose a path to save the UCX Assessment results:**
+    - **Description:** Specify the path where the results should be saved. If not provided, results will be saved in the current directory.
+
 ```text
 databricks labs ucx export-assessment --export-format excel
 Choose a path to save the UCX Assessment results (default: /Users/user.name/ucx):
 ```
+
+**Note:**
+Both export commands need compute resources (either a Warehouse or Job cluster) to run and typically take about 10 minutes to complete.
