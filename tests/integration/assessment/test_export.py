@@ -34,7 +34,7 @@ def test_cli_export_xlsx_results(ws, env_or_skip):
             jobs.SubmitTask(
                 notebook_task=jobs.NotebookTask(notebook_path=f"{directory}/{notebook}"),
                 task_key="export-assessment",
-                existing_cluster_id=cluster_id
+                existing_cluster_id=cluster_id,
             )
         ],
     )
@@ -44,4 +44,3 @@ def test_cli_export_xlsx_results(ws, env_or_skip):
     if run.state and run.state.result_state == RunResultState.SUCCESS:
         binary_resp = ws.workspace.download(path=export_file_name, format=ExportFormat.SOURCE)
         assert binary_resp.startswith(expected_excel_signature)
-
