@@ -12,10 +12,10 @@ def test_cli_export_xlsx_results(ws, env_or_skip):
     # MAGIC %pip install xlsxwriter -qqq
     # MAGIC dbutils.library.restartPython()
     # COMMAND ----------
-    import xlsxwriter
-    with xlsxwriter.Workbook("ucx_assessment_main.xlsx") as workbook:
-            # Create dummy export file
-            worksheet = workbook.add_worksheet()
+import xlsxwriter
+with xlsxwriter.Workbook("/Workspace/tmp/ucx/ucx_assessment_main.xlsx") as workbook:
+    # Create dummy export file
+    worksheet = workbook.add_worksheet()
     """
 
     directory = "/tmp/ucx"
@@ -25,8 +25,6 @@ def test_cli_export_xlsx_results(ws, env_or_skip):
     ws.workspace.upload(
         f"{directory}/{notebook}.py", dummy_notebook.encode("utf8"), format=ImportFormat.AUTO, overwrite=True
     )
-
-    export_file_name = f"{directory}/ucx_assessment_main.xlsx"
 
     run = ws.jobs.submit_and_wait(
         run_name="export-assessment-to-excel-experimental",
@@ -41,8 +39,9 @@ def test_cli_export_xlsx_results(ws, env_or_skip):
 
     assert run
 
-    expected_excel_signature = b'\x50\x4B\x03\x04'
+    export_file_name = f"{directory}/ucx_assessment_main.xlsx"
+    expected_excel_signature = b'PK\x03\x04\x14\x00\x00\x00\x08\x00\x00\x00?\x008\x9d\x86\xd8'
 
     if run.state and run.state.result_state == RunResultState.SUCCESS:
         binary_resp = ws.workspace.download(path=export_file_name, format=ExportFormat.SOURCE)
-        assert binary_resp.startswith(expected_excel_signature)
+        assert binary_resp.read().startswith(expected_excel_signature)
