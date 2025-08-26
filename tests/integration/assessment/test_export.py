@@ -26,7 +26,7 @@ def test_cli_export_xlsx_results(ws, env_or_skip):
         f"{directory}/{notebook}.py", dummy_notebook.encode("utf8"), format=ImportFormat.AUTO, overwrite=True
     )
 
-    export_file_name = "ucx_assessment_main.xlsx"
+    export_file_name = f"{directory}/ucx_assessment_main.xlsx"
 
     run = ws.jobs.submit_and_wait(
         run_name="export-assessment-to-excel-experimental",
@@ -38,6 +38,8 @@ def test_cli_export_xlsx_results(ws, env_or_skip):
             )
         ],
     )
+
+    assert run
 
     expected_excel_signature = b'\x50\x4B\x03\x04'
 
