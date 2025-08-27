@@ -272,9 +272,18 @@ class HiveMetastoreFederation(SecretsMixin):
 
     def _get_authorized_paths(self) -> str:
         authorized_paths = []
+        current_user = self._ws.current_user.me()
         for external_location in self._ws.external_locations.list():
-            if external_location.url:
-                authorized_paths.append(external_location.url)
+            if not external_location.url:
+                logger.warning("Location with no URL.")
+                continue
+            location_name = external_location.name
+            if not location_name:
+                logger.warning("Location with no name.")
+                continue
+            authorized_paths.append(external_location.url)
+            if current_user and current_user.user_name:
+                self._add_missing_permissions_if_needed(location_name, current_user.user_name)
         return ",".join(authorized_paths)
 
     def _add_missing_permissions_if_needed(self, location_name: str, current_user: str):
