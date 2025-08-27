@@ -914,11 +914,18 @@ def migrate_local_code(
 
 
 @ucx.command
-def export_assessment(w: WorkspaceClient, prompts: Prompts):
+def export_assessment(w: WorkspaceClient, prompts: Prompts, export_format: str = "csv"):
     """Export the UCX assessment queries to a zip file."""
+    results_path = Path()
     ctx = WorkspaceContext(w)
     exporter = ctx.assessment_exporter
-    exporter.export_results(prompts)
+
+    export_method = (
+        exporter.cli_export_xlsx_results if export_format.lower() == "excel" else exporter.cli_export_csv_results
+    )
+
+    results_path = export_method(prompts)
+    logger.info(f"Results exported to {results_path}")
 
 
 @ucx.command
