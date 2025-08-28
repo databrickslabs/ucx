@@ -271,28 +271,19 @@ class HiveMetastoreFederation(SecretsMixin):
             return self._get_existing_connection(name)
 
     def _get_authorized_paths(self) -> str:
-        existing = {}
-        for external_location in self._ws.external_locations.list():
-            existing[external_location.url] = external_location
         authorized_paths = []
         current_user = self._ws.current_user.me()
-        if not current_user.user_name:
-            raise NotFound('Current user not found')
-        # Get the external locations. If not using external HMS, include the root DBFS location.
-        external_locations = self._external_locations.external_locations_with_root()
-
-        for external_location_info in external_locations:
-            location = ExternalLocations.clean_location(external_location_info.location)
-            existing_location = existing.get(location)
-            if not existing_location:
-                logger.warning(f'External location {location} not found')
+        for external_location in self._ws.external_locations.list():
+            if not external_location.url:
+                logger.warning("Location with no URL.")
                 continue
-            location_name = existing_location.name
+            location_name = external_location.name
             if not location_name:
-                logger.warning(f'External location {location} has no name')
+                logger.warning("Location with no name.")
                 continue
-            self._add_missing_permissions_if_needed(location_name, current_user.user_name)
-            authorized_paths.append(location)
+            authorized_paths.append(external_location.url)
+            if current_user and current_user.user_name:
+                self._add_missing_permissions_if_needed(location_name, current_user.user_name)
         return ",".join(authorized_paths)
 
     def _add_missing_permissions_if_needed(self, location_name: str, current_user: str):
