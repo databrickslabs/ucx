@@ -1,2 +1,2 @@
 # DO NOT MODIFY THIS FILE
-__version__ = "0.59.2"
+__version__ = "0.60.0"
