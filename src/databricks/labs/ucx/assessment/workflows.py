@@ -231,6 +231,21 @@ class Assessment(Workflow):  # pylint: disable=too-many-public-methods
         ctx.workflow_linter.refresh_report(ctx.sql_backend, ctx.inventory_database)
 
 
+class AssessWorkflow(Workflow):
+    def __init__(self):
+        super().__init__('assess_workflows', [JobParameterDefinition(name="force_refresh", default=False)])
+
+    @job_task
+    def assess_workflows(self, ctx: RuntimeContext):
+        """Scans all jobs for migration issues in notebooks jobs.
+
+        Also, stores direct filesystem accesses for display in the migration dashboard.
+        """
+        if ctx.config.skip_assess_workflows:
+            logger.info("Skipping assess_workflows as skip_assess_workflows is enabled.")
+            return
+        ctx.workflow_linter.refresh_report(ctx.sql_backend, ctx.inventory_database)
+
 class Failing(Workflow):
     def __init__(self):
         super().__init__('failing')
