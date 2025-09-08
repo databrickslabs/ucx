@@ -175,6 +175,20 @@ When using `UCX_FORCE_INSTALL=account`, additional prompts appear:
 **Install on remaining workspaces with same config?**
 - **Purpose**: Allows reusing configuration across multiple workspaces
 
+**Join existing collection?**
+- **Purpose**: Groups workspaces into collections for centralized management
+- **Requirement**: Account admin privileges needed
+
+### Advanced installation scenarios
+
+**Force installation prompts**
+When using `UCX_FORCE_INSTALL=user` or `UCX_FORCE_INSTALL=global`:
+
+**Create a new installation?**
+- **Purpose**: Confirms overriding existing installations with different scope
+
+**Update existing installation?**
+- **Purpose**: Confirms updating when the same version is already installed
 
 The `WorkspaceInstaller` class orchestrates this entire configuration process, validating inputs and creating the appropriate cluster policies and configurations. The [`WorkspaceInstallation`](https://github.com/databrickslabs/ucx/blob/main/src/databricks/labs/ucx/install.py) class then manages the actual deployment of databases, dashboards, and workflows based on your configuration choices.
 
