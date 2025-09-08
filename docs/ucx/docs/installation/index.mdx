@@ -106,6 +106,27 @@ Choose from the following options:
 - **Purpose**: Specifies which workspace groups to include in migration
 - **Format**: Comma-separated list of group names, or `<ALL>` for all groups
 
+### Database and table migration
+
+**Databases to migrate**
+- **Default**: `<ALL>`
+- **Purpose**: Specifies which databases to include in the migration assessment and process
+- **Format**: Comma-separated list of database names, or `<ALL>` for all databases
+
+**Skip TACL migration when migrating tables?**
+- **Default**: No (TACL migration will be performed)
+- **Purpose**: Table Access Control Lists (TACLs) can be skipped if you prefer to manage permissions manually
+
+**Managed table migration strategy**
+UCX will present three options for handling managed tables with external storage locations:
+1. **Migrate as EXTERNAL UC table**: Keeps data in original location, requires manual conversion later
+2. **Copy data to MANAGED UC table**: Creates new managed tables with copied data
+3. **Convert to EXTERNAL HMS then migrate**: Converts managed tables to external before migration
+
+**Table migration cluster configuration**
+- **Parallelism for migrating dbfs root delta tables**: Controls parallel processing (default: `200`)
+- **Min workers for auto-scale job cluster**: Minimum cluster size (default: `1`)
+- **Max workers for auto-scale job cluster**: Maximum cluster size (default: `10`)
 
 
 The `WorkspaceInstaller` class orchestrates this entire configuration process, validating inputs and creating the appropriate cluster policies and configurations. The [`WorkspaceInstallation`](https://github.com/databrickslabs/ucx/blob/main/src/databricks/labs/ucx/install.py) class then manages the actual deployment of databases, dashboards, and workflows based on your configuration choices.
