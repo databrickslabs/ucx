@@ -230,9 +230,6 @@ class AssessWorkflow(Workflow):
 
         Also, stores direct filesystem accesses for display in the migration dashboard.
         """
-        if ctx.config.skip_assess_workflows:
-            logger.info("Skipping assess_workflows as skip_assess_workflows is enabled.")
-            return
         ctx.workflow_linter.refresh_report(ctx.sql_backend, ctx.inventory_database)
 
 
