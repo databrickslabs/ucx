@@ -83,16 +83,32 @@ When you run `databricks labs install ucx` for the first time, UCX will guide yo
 - **Purpose**: Controls parallel processing during assessments and migrations
 - **Validation**: Must be a positive integer
 
-The [`WorkspaceInstallation`](https://github.com/databrickslabs/ucx/blob/main/src/databricks/labs/ucx/install.py) manages the installation and uninstallation of UCX in a workspace. It handles
-the configuration and exception management during the installation process. The installation process creates dashboards, databases, and jobs.
-It also includes the creation of a database with given configuration and the deployment of workflows with specific settings. The installation
-process can handle exceptions and infer errors from job runs and task runs. The workspace installation uploads wheels, creates cluster policies,
-and wheel runners to the workspace. It can also handle the creation of job tasks for a given task, such as job dashboard tasks, job notebook tasks,
-and job wheel tasks. The class handles the installation of UCX, including configuring the workspace, installing necessary libraries, and verifying
-the installation, making it easier for users to migrate their workspaces to UCX.
-At the end of the installation, the user will be prompted if the current installation needs to join an existing collection (create new collection if none present).
-For large organization with many workspaces, grouping workspaces into collection helps in managing UCX migration at collection level (instead of workspaces level)
-User should be an account admin to be able to join a collection.
+### Group migration strategy
+
+UCX will prompt you to configure how workspace groups should be mapped to account groups. This is crucial for maintaining proper access controls after migration.
+
+**Backup prefix**
+- **Default**: `db-temp-`
+- **Purpose**: Prefix for backup workspace groups created during migration
+- **Validation**: Cannot contain spaces, hash, comma, plus, backslash, less-than, greater-than, semicolon
+
+**Group mapping strategy**
+Choose from the following options:
+1. **Match by Name**: Maps groups with identical names between workspace and account
+2. **Apply a Prefix**: Adds a prefix to workspace group names when creating account groups
+3. **Apply a Suffix**: Adds a suffix to workspace group names when creating account groups
+4. **Match by External ID**: Maps groups based on their external ID attribute
+5. **Regex Substitution**: Uses regular expressions to transform group names
+6. **Regex Matching**: Uses regex patterns to match workspace groups to account groups
+
+**Workspace group names to migrate**
+- **Default**: `<ALL>`
+- **Purpose**: Specifies which workspace groups to include in migration
+- **Format**: Comma-separated list of group names, or `<ALL>` for all groups
+
+
+
+The `WorkspaceInstaller` class orchestrates this entire configuration process, validating inputs and creating the appropriate cluster policies and configurations. The [`WorkspaceInstallation`](https://github.com/databrickslabs/ucx/blob/main/src/databricks/labs/ucx/install.py) class then manages the actual deployment of databases, dashboards, and workflows based on your configuration choices.
 
 After this, UCX will be installed locally and a number of assets will be deployed in the selected workspace.
 These assets are available under the installation folder, i.e. `/Applications/ucx` is the default installation folder. Please check [here](#force-install-over-existing-ucx) for more details.
