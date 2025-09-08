@@ -128,6 +128,22 @@ UCX will present three options for handling managed tables with external storage
 - **Min workers for auto-scale job cluster**: Minimum cluster size (default: `1`)
 - **Max workers for auto-scale job cluster**: Maximum cluster size (default: `10`)
 
+### Assessment and ownership configuration
+
+**Skip workflow assessment?**
+- **Default**: No (workflows will be assessed)
+- **Purpose**: Workflow assessment identifies code that needs updates for Unity Catalog compatibility
+
+**Default owner group for tables and schemas**
+- **Purpose**: Optionally set a default owner group for all migrated objects
+- **Selection**: Choose from account groups where the current user is a member
+
+**Reconciliation threshold, in percentage**
+- **Default**: `5`
+- **Purpose**: Tolerance level for data reconciliation validation after migration
+- **Validation**: Must be a positive number
+
+
 
 The `WorkspaceInstaller` class orchestrates this entire configuration process, validating inputs and creating the appropriate cluster policies and configurations. The [`WorkspaceInstallation`](https://github.com/databrickslabs/ucx/blob/main/src/databricks/labs/ucx/install.py) class then manages the actual deployment of databases, dashboards, and workflows based on your configuration choices.
 
