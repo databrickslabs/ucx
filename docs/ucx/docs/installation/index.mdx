@@ -150,6 +150,17 @@ UCX will show available warehouses and allow you to:
 - Select an existing PRO or Serverless SQL warehouse
 - Create a new PRO SQL warehouse automatically
 
+### Network and dependency configuration
+
+**Does given workspace block Internet access?**
+- **Purpose**: Determines if UCX should upload dependencies locally
+- **Impact**: If yes, UCX will bundle and upload all required dependencies
+
+**Trigger assessment job after installation?**
+- **Default**: Depends on user preference
+- **Purpose**: Automatically starts the assessment workflow after installation completes
+
+
 
 
 The `WorkspaceInstaller` class orchestrates this entire configuration process, validating inputs and creating the appropriate cluster policies and configurations. The [`WorkspaceInstallation`](https://github.com/databrickslabs/ucx/blob/main/src/databricks/labs/ucx/install.py) class then manages the actual deployment of databases, dashboards, and workflows based on your configuration choices.
