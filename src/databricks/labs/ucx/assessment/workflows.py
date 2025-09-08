@@ -222,7 +222,7 @@ class Assessment(Workflow):
 
 class AssessWorkflow(Workflow):
     def __init__(self):
-        super().__init__('assess-workflows', [JobParameterDefinition(name="force_refresh", default=False)])
+        super().__init__('assess-workflows')
 
     @job_task
     def assess_workflows(self, ctx: RuntimeContext):
@@ -230,7 +230,7 @@ class AssessWorkflow(Workflow):
 
         Also, stores direct filesystem accesses for display in the migration dashboard.
         """
-        ctx.workflow_linter.refresh_report(ctx.sql_backend, ctx.inventory_database)
+        ctx.workflow_linter.refresh_report(ctx.sql_backend, ctx.inventory_database, last_run_days=30)
 
 
 class Failing(Workflow):
