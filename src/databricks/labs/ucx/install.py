@@ -270,7 +270,6 @@ class WorkspaceInstaller(WorkspaceContext):
             include_group_names=configure_groups.include_group_names,
             renamed_group_prefix=configure_groups.renamed_group_prefix,
             skip_tacl_migration=skip_tacl_migration,
-            skip_assess_workflows=skip_assess_workflows,
             log_level=log_level,
             num_threads=num_threads,
             include_databases=include_databases,
