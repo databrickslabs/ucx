@@ -143,6 +143,13 @@ UCX will present three options for handling managed tables with external storage
 - **Purpose**: Tolerance level for data reconciliation validation after migration
 - **Validation**: Must be a positive number
 
+### SQL Warehouse selection
+
+**Select PRO or SERVERLESS SQL warehouse**
+UCX will show available warehouses and allow you to:
+- Select an existing PRO or Serverless SQL warehouse
+- Create a new PRO SQL warehouse automatically
+
 
 
 The `WorkspaceInstaller` class orchestrates this entire configuration process, validating inputs and creating the appropriate cluster policies and configurations. The [`WorkspaceInstallation`](https://github.com/databrickslabs/ucx/blob/main/src/databricks/labs/ucx/install.py) class then manages the actual deployment of databases, dashboards, and workflows based on your configuration choices.
