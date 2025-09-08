@@ -157,6 +157,14 @@ UCX will show available warehouses and allow you to:
 - **Purpose**: Automatically starts the assessment workflow after installation completes
 
 
+### Post-installation prompts
+
+**Open config file in the browser and continue installing?**
+- **Purpose**: Allows you to review the generated configuration before proceeding
+
+**Open job overview in your browser?**
+- **Purpose**: Shows the UCX workflows and dashboards after installation
+
 
 
 The `WorkspaceInstaller` class orchestrates this entire configuration process, validating inputs and creating the appropriate cluster policies and configurations. The [`WorkspaceInstallation`](https://github.com/databrickslabs/ucx/blob/main/src/databricks/labs/ucx/install.py) class then manages the actual deployment of databases, dashboards, and workflows based on your configuration choices.
