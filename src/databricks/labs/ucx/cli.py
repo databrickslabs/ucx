@@ -243,6 +243,21 @@ def ensure_assessment_run(
 
 
 @ucx.command
+def run_assess_workflows(
+    w: WorkspaceClient,
+    run_as_collection: bool = False,
+    a: AccountClient | None = None,
+):
+    """Manually trigger the assess-workflows job.""" ""
+    workspace_contexts = _get_workspace_contexts(w, a, run_as_collection)
+    for ctx in workspace_contexts:
+        workspace_id = ctx.workspace_client.get_workspace_id()
+        deployed_workflows = ctx.deployed_workflows
+        logger.info(f"Starting 'assess-workflow' workflow in workspace: {workspace_id}")
+        deployed_workflows.run_workflow("assess-workflows", skip_job_wait=run_as_collection)
+
+
+@ucx.command
 def update_migration_progress(
     w: WorkspaceClient,
     run_as_collection: bool = False,

@@ -220,7 +220,7 @@ class Assessment(Workflow):
         ctx.query_linter.refresh_report()
 
 
-class AssessWorkflow(Workflow):
+class AssessWorkflows(Workflow):
     def __init__(self):
         super().__init__('assess-workflows')
 
