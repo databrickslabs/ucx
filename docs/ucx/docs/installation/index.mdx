@@ -57,12 +57,31 @@ You'll be prompted to select a [configuration profile](https://docs.databricks.c
 
 Once you install, proceed to the [assessment workflow](/docs/reference/workflows#assessment-workflow) to ensure the compatibility of your workspace with UCX.
 
-The `WorkspaceInstaller` class is used to create a new configuration for Unity Catalog migration in a Databricks workspace.
-It guides the user through a series of prompts to gather necessary information, such as selecting an inventory database, choosing
-a PRO or SERVERLESS SQL warehouse, specifying a log level and number of threads, and setting up an external Hive Metastore if necessary.
-Upon the first installation, you're prompted for a workspace local [group migration strategy](/docs/reference/group_name_conflict).
-Based on user input, the class creates a new cluster policy with the specified configuration. The user can review and confirm the configuration,
-which is saved to the workspace and can be opened in a web browser.
+## Installation prompts
+
+When you run `databricks labs install ucx` for the first time, UCX will guide you through a series of interactive prompts to configure your Unity Catalog migration. This section documents all the prompts you'll encounter and their purpose.
+
+### Basic configuration
+
+**Inventory Database stored in hive_metastore**
+- **Default**: `ucx` (or `ucx_{workspace_id}` if using external Hive Metastore)
+- **Purpose**: Specifies the database name where UCX will store its inventory tables
+- **Validation**: Must contain only alphanumeric characters and underscores
+
+**Catalog to store UCX artifacts in**
+- **Default**: `ucx`
+- **Purpose**: Unity Catalog name where UCX will store migration artifacts
+- **Validation**: Must contain only alphanumeric characters and underscores
+
+**Log level**
+- **Default**: `INFO`
+- **Purpose**: Controls the verbosity of UCX logging
+- **Options**: `DEBUG`, `INFO`, `WARNING`, `ERROR`
+
+**Number of threads**
+- **Default**: `8`
+- **Purpose**: Controls parallel processing during assessments and migrations
+- **Validation**: Must be a positive integer
 
 The [`WorkspaceInstallation`](https://github.com/databrickslabs/ucx/blob/main/src/databricks/labs/ucx/install.py) manages the installation and uninstallation of UCX in a workspace. It handles
 the configuration and exception management during the installation process. The installation process creates dashboards, databases, and jobs.
