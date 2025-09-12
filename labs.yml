@@ -92,7 +92,7 @@ commands:
           Default is false.
 
   - name: run-assess-workflows
-    description: trigger the `assess-workflows` job to refresh the assessment results.
+    description: trigger the `assess-workflows` job to assess the current jobs for potential UC compatibility issues.
     flags:
       - name: run-as-collection
         description: (Optional) Whether to run the assess-workflows for the collection of workspaces with ucx
