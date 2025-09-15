@@ -9,7 +9,7 @@ from databricks.labs.ucx.framework.tasks import Workflow, job_task
 logger = logging.getLogger(__name__)
 
 
-class Assessment(Workflow):  # pylint: disable=too-many-public-methods
+class Assessment(Workflow):
     def __init__(self):
         super().__init__('assessment', [JobParameterDefinition(name="force_refresh", default=False)])
 
@@ -219,16 +219,18 @@ class Assessment(Workflow):  # pylint: disable=too-many-public-methods
         """
         ctx.query_linter.refresh_report()
 
-    @job_task(depends_on=[assess_jobs])
+
+class AssessWorkflows(Workflow):
+    def __init__(self):
+        super().__init__('assess-workflows')
+
+    @job_task
     def assess_workflows(self, ctx: RuntimeContext):
         """Scans all jobs for migration issues in notebooks jobs.
 
         Also, stores direct filesystem accesses for display in the migration dashboard.
         """
-        if ctx.config.skip_assess_workflows:
-            logger.info("Skipping assess_workflows as skip_assess_workflows is enabled.")
-            return
-        ctx.workflow_linter.refresh_report(ctx.sql_backend, ctx.inventory_database)
+        ctx.workflow_linter.refresh_report(ctx.sql_backend, ctx.inventory_database, last_run_days=30)
 
 
 class Failing(Workflow):

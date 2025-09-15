@@ -245,7 +245,6 @@ class WorkspaceInstaller(WorkspaceContext):
         include_databases = self._select_databases()
 
         skip_tacl_migration = self.prompts.confirm("Do you want to skip TACL migration when migrating tables?")
-        skip_assess_workflows = self.prompts.confirm("Do you want to skip workflow assessment?")
 
         # Checking if the user wants to define a default owner group.
         default_owner_group = None
@@ -270,7 +269,6 @@ class WorkspaceInstaller(WorkspaceContext):
             include_group_names=configure_groups.include_group_names,
             renamed_group_prefix=configure_groups.renamed_group_prefix,
             skip_tacl_migration=skip_tacl_migration,
-            skip_assess_workflows=skip_assess_workflows,
             log_level=log_level,
             num_threads=num_threads,
             include_databases=include_databases,
