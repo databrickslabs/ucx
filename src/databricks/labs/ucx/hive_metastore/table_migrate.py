@@ -404,6 +404,7 @@ class TablesMigrator:
                 table_location.compressed(),
                 table_location.properties(),
             )
+            logger.info(f"Updating table {src_table.name} location from {src_table.location} to {new_table_location}")
             if 'collation' in dir(old_table):
                 new_table = self._catalog_table(
                     old_table.identifier(),
