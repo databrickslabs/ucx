@@ -393,7 +393,6 @@ class TablesMigrator:
             return False
         try:
             old_table = self._catalog.getTableMetadata(table_identifier)
-            collation = old_table.collation() if 'collation' in dir(old_table) else None
             table_location = old_table.storage()
             new_location = self._catalog_storage(
                 self._spark._jvm.scala.Some(  # pylint: disable=protected-access
@@ -405,7 +404,7 @@ class TablesMigrator:
                 table_location.compressed(),
                 table_location.properties(),
             )
-            if collation:
+            if 'collation' in dir(old_table):
                 new_table = self._catalog_table(
                     old_table.identifier(),
                     old_table.tableType(),
