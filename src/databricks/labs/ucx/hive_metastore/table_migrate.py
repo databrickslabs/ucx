@@ -393,7 +393,7 @@ class TablesMigrator:
             return False
         try:
             old_table = self._catalog.getTableMetadata(table_identifier)
-            entity_storage_locations = self._get_entity_storage_locations(old_table)
+            collation = old_table.collation() if 'collation' in dir(old_table) else None
             table_location = old_table.storage()
             new_location = self._catalog_storage(
                 self._spark._jvm.scala.Some(  # pylint: disable=protected-access
@@ -405,33 +405,53 @@ class TablesMigrator:
                 table_location.compressed(),
                 table_location.properties(),
             )
-            new_table = self._catalog_table(
-                old_table.identifier(),
-                old_table.tableType(),
-                new_location,
-                old_table.schema(),
-                old_table.provider(),
-                old_table.partitionColumnNames(),
-                old_table.bucketSpec(),
-                old_table.owner(),
-                old_table.createTime(),
-                old_table.lastAccessTime(),
-                old_table.createVersion(),
-                old_table.properties(),
-                old_table.stats(),
-                old_table.viewText(),
-                old_table.comment(),
-                old_table.collation(),
-                old_table.unsupportedFeatures(),
-                old_table.tracksPartitionsInCatalog(),
-                old_table.schemaPreservesCase(),
-                old_table.ignoredProperties(),
-                old_table.viewOriginalText(),
-                # From DBR 16, there's a new constructor argument: entityStorageLocations (Seq[EntityStorageLocation])
-                # (We can't detect whether the argument is needed by the constructor, but assume that if the accessor
-                # is present on the source table then the argument is needed.)
-                # *([entity_storage_locations] if entity_storage_locations is not None else []),
-            )
+            if collation:
+                new_table = self._catalog_table(
+                    old_table.identifier(),
+                    old_table.tableType(),
+                    new_location,
+                    old_table.schema(),
+                    old_table.provider(),
+                    old_table.partitionColumnNames(),
+                    old_table.bucketSpec(),
+                    old_table.owner(),
+                    old_table.createTime(),
+                    old_table.lastAccessTime(),
+                    old_table.createVersion(),
+                    old_table.properties(),
+                    old_table.stats(),
+                    old_table.viewText(),
+                    old_table.comment(),
+                    old_table.collation(),
+                    old_table.unsupportedFeatures(),
+                    old_table.tracksPartitionsInCatalog(),
+                    old_table.schemaPreservesCase(),
+                    old_table.ignoredProperties(),
+                    old_table.viewOriginalText(),
+                )
+            else:
+                new_table = self._catalog_table(
+                    old_table.identifier(),
+                    old_table.tableType(),
+                    new_location,
+                    old_table.schema(),
+                    old_table.provider(),
+                    old_table.partitionColumnNames(),
+                    old_table.bucketSpec(),
+                    old_table.owner(),
+                    old_table.createTime(),
+                    old_table.lastAccessTime(),
+                    old_table.createVersion(),
+                    old_table.properties(),
+                    old_table.stats(),
+                    old_table.viewText(),
+                    old_table.comment(),
+                    old_table.unsupportedFeatures(),
+                    old_table.tracksPartitionsInCatalog(),
+                    old_table.schemaPreservesCase(),
+                    old_table.ignoredProperties(),
+                    old_table.viewOriginalText(),
+                )
             self._catalog.alterTable(new_table)
         except Exception as e:  # pylint: disable=broad-exception-caught
             logger.warning(f"Error converting HMS table {src_table.name} to abfss: {e}", exc_info=True)
