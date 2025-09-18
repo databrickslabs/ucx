@@ -381,6 +381,7 @@ class TablesMigrator:
     def _convert_wasbs_table_to_abfss(self, src_table: Table) -> bool:
         """
         Converts a Hive metastore azure wasbs table to abfss using alter table command.
+        This command and workflow requires a single user cluster with DB16 or newer.
         """
         logger.info(f"Changing HMS managed table {src_table.name} to External Table type.")
         inventory_table = self._tables_crawler.full_name
@@ -420,6 +421,7 @@ class TablesMigrator:
                 old_table.stats(),
                 old_table.viewText(),
                 old_table.comment(),
+                old_table.collation(),
                 old_table.unsupportedFeatures(),
                 old_table.tracksPartitionsInCatalog(),
                 old_table.schemaPreservesCase(),
@@ -428,7 +430,7 @@ class TablesMigrator:
                 # From DBR 16, there's a new constructor argument: entityStorageLocations (Seq[EntityStorageLocation])
                 # (We can't detect whether the argument is needed by the constructor, but assume that if the accessor
                 # is present on the source table then the argument is needed.)
-                *([entity_storage_locations] if entity_storage_locations is not None else []),
+                # *([entity_storage_locations] if entity_storage_locations is not None else []),
             )
             self._catalog.alterTable(new_table)
         except Exception as e:  # pylint: disable=broad-exception-caught
