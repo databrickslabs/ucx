@@ -457,7 +457,7 @@ class TablesMigrator:
                     old_table.parentTableUuid(),
                     old_table.isArclightTableCreation(),
                     old_table.resourceName(),
-                    old_table.governanceMetadata()
+                    old_table.governanceMetadata(),
                 )
             else:
                 new_table = self._catalog_table(
