@@ -17,13 +17,13 @@ EXPORT_HTML_TEMPLATE = """
 
 <div class="export-container">
     <h2>Export Results</h2>
-    <button onclick="downloadExcel()">Download Results</button>
+    <button onclick="downloadZip()">Download Results</button>
 </div>
 
 <script>
-    function downloadExcel() {{
+    function downloadZip() {{
         const b64Data = '{b64_data}';
-        const filename = '{export_file_path_name}';
+        const filename = '{export_file_path_name}.zip';
 
         // Convert base64 to blob
         const byteCharacters = atob(b64Data);
@@ -33,7 +33,7 @@ EXPORT_HTML_TEMPLATE = """
         }}
         const byteArray = new Uint8Array(byteNumbers);
         const blob = new Blob([byteArray], {{
-            type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            type: 'application/zip'
         }});
 
         // Create download link and click it
