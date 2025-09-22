@@ -27,7 +27,7 @@ jobs:
 
       - name: Build wheels
         run: |
-          pip install hatch==1.9.4
+          pip install hatch==1.9.4 'click<8.3.0' # https://github.com/pallets/click/issues/3065
           hatch build
 
       - name: Draft release
