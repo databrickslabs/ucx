@@ -57,23 +57,140 @@ You'll be prompted to select a [configuration profile](https://docs.databricks.c
 
 Once you install, proceed to the [assessment workflow](/docs/reference/workflows#assessment-workflow) to ensure the compatibility of your workspace with UCX.
 
-The `WorkspaceInstaller` class is used to create a new configuration for Unity Catalog migration in a Databricks workspace.
-It guides the user through a series of prompts to gather necessary information, such as selecting an inventory database, choosing
-a PRO or SERVERLESS SQL warehouse, specifying a log level and number of threads, and setting up an external Hive Metastore if necessary.
-Upon the first installation, you're prompted for a workspace local [group migration strategy](/docs/reference/group_name_conflict).
-Based on user input, the class creates a new cluster policy with the specified configuration. The user can review and confirm the configuration,
-which is saved to the workspace and can be opened in a web browser.
+## Installation prompts
 
-The [`WorkspaceInstallation`](https://github.com/databrickslabs/ucx/blob/main/src/databricks/labs/ucx/install.py) manages the installation and uninstallation of UCX in a workspace. It handles
-the configuration and exception management during the installation process. The installation process creates dashboards, databases, and jobs.
-It also includes the creation of a database with given configuration and the deployment of workflows with specific settings. The installation
-process can handle exceptions and infer errors from job runs and task runs. The workspace installation uploads wheels, creates cluster policies,
-and wheel runners to the workspace. It can also handle the creation of job tasks for a given task, such as job dashboard tasks, job notebook tasks,
-and job wheel tasks. The class handles the installation of UCX, including configuring the workspace, installing necessary libraries, and verifying
-the installation, making it easier for users to migrate their workspaces to UCX.
-At the end of the installation, the user will be prompted if the current installation needs to join an existing collection (create new collection if none present).
-For large organization with many workspaces, grouping workspaces into collection helps in managing UCX migration at collection level (instead of workspaces level)
-User should be an account admin to be able to join a collection.
+When you run `databricks labs install ucx` for the first time, UCX will guide you through a series of interactive prompts to configure your Unity Catalog migration. This section documents all the prompts you'll encounter and their purpose.
+
+### Basic configuration
+
+**Inventory Database stored in hive_metastore**
+- **Default**: `ucx` (or `ucx_{workspace_id}` if using external Hive Metastore)
+- **Purpose**: Specifies the database name where UCX will store its inventory tables
+- **Validation**: Must contain only alphanumeric characters and underscores
+
+**Catalog to store UCX artifacts in**
+- **Default**: `ucx`
+- **Purpose**: Unity Catalog name where UCX will store migration artifacts
+- **Validation**: Must contain only alphanumeric characters and underscores
+
+**Log level**
+- **Default**: `INFO`
+- **Purpose**: Controls the verbosity of UCX logging
+- **Options**: `DEBUG`, `INFO`, `WARNING`, `ERROR`
+
+**Number of threads**
+- **Default**: `8`
+- **Purpose**: Controls parallel processing during assessments and migrations
+- **Validation**: Must be a positive integer
+
+### Group migration strategy
+
+UCX will prompt you to configure how workspace groups should be mapped to account groups. This is crucial for maintaining proper access controls after migration.
+
+**Backup prefix**
+- **Default**: `db-temp-`
+- **Purpose**: Prefix for backup workspace groups created during migration
+- **Validation**: Cannot contain spaces, hash, comma, plus, backslash, less-than, greater-than, semicolon
+
+**Group mapping strategy**
+Choose from the following options:
+1. **Match by Name**: Maps groups with identical names between workspace and account
+2. **Apply a Prefix**: Adds a prefix to workspace group names when creating account groups
+3. **Apply a Suffix**: Adds a suffix to workspace group names when creating account groups
+4. **Match by External ID**: Maps groups based on their external ID attribute
+5. **Regex Substitution**: Uses regular expressions to transform group names
+6. **Regex Matching**: Uses regex patterns to match workspace groups to account groups
+
+**Workspace group names to migrate**
+- **Default**: `<ALL>`
+- **Purpose**: Specifies which workspace groups to include in migration
+- **Format**: Comma-separated list of group names, or `<ALL>` for all groups
+
+### Database and table migration
+
+**Databases to migrate**
+- **Default**: `<ALL>`
+- **Purpose**: Specifies which databases to include in the migration assessment and process
+- **Format**: Comma-separated list of database names, or `<ALL>` for all databases
+
+**Skip TACL migration when migrating tables?**
+- **Default**: No (TACL migration will be performed)
+- **Purpose**: Table Access Control Lists (TACLs) can be skipped if you prefer to manage permissions manually
+
+**Managed table migration strategy**
+UCX will present three options for handling managed tables with external storage locations:
+1. **Migrate as EXTERNAL UC table**: Keeps data in original location, requires manual conversion later
+2. **Copy data to MANAGED UC table**: Creates new managed tables with copied data
+3. **Convert to EXTERNAL HMS then migrate**: Converts managed tables to external before migration
+
+**Table migration cluster configuration**
+- **Parallelism for migrating dbfs root delta tables**: Controls parallel processing (default: `200`)
+- **Min workers for auto-scale job cluster**: Minimum cluster size (default: `1`)
+- **Max workers for auto-scale job cluster**: Maximum cluster size (default: `10`)
+
+### Ownership and validation reconciliation configuration
+
+**Default owner group for tables and schemas**
+- **Purpose**: Optionally set a default owner group for all migrated objects
+- **Selection**: Choose from account groups where the current user is a member
+
+**Reconciliation threshold, in percentage**
+- **Default**: `5`
+- **Purpose**: Tolerance level for data reconciliation validation after migration
+- **Validation**: Must be a positive number
+
+### SQL Warehouse selection
+
+**Select PRO or SERVERLESS SQL warehouse**
+UCX will show available warehouses and allow you to:
+- Select an existing PRO or Serverless SQL warehouse
+- Create a new PRO SQL warehouse automatically
+
+### Network and dependency configuration
+
+**Does given workspace block Internet access?**
+- **Purpose**: Determines if UCX should upload dependencies locally
+- **Impact**: If yes, UCX will bundle and upload all required dependencies
+
+**Trigger assessment job after installation?**
+- **Default**: Depends on user preference
+- **Purpose**: Automatically starts the assessment workflow after installation completes
+
+
+### Post-installation prompts
+
+**Open config file in the browser and continue installing?**
+- **Purpose**: Allows you to review the generated configuration before proceeding
+
+**Open job overview in your browser?**
+- **Purpose**: Shows the UCX workflows and dashboards after installation
+
+### Account-level installation prompts
+
+When using `UCX_FORCE_INSTALL=account`, additional prompts appear:
+
+**Continue with detected workspaces?**
+- **Purpose**: Confirms installation on all accessible workspaces in the account
+
+**Install on remaining workspaces with same config?**
+- **Purpose**: Allows reusing configuration across multiple workspaces
+
+**Join existing collection?**
+- **Purpose**: Groups workspaces into collections for centralized management
+- **Requirement**: Account admin privileges needed
+
+### Advanced installation scenarios
+
+**Force installation prompts**
+When using `UCX_FORCE_INSTALL=user` or `UCX_FORCE_INSTALL=global`:
+
+**Create a new installation?**
+- **Purpose**: Confirms overriding existing installations with different scope
+
+**Update existing installation?**
+- **Purpose**: Confirms updating when the same version is already installed
+
+The `WorkspaceInstaller` class orchestrates this entire configuration process, validating inputs and creating the appropriate cluster policies and configurations. The [`WorkspaceInstallation`](https://github.com/databrickslabs/ucx/blob/main/src/databricks/labs/ucx/install.py) class then manages the actual deployment of databases, dashboards, and workflows based on your configuration choices.
 
 After this, UCX will be installed locally and a number of assets will be deployed in the selected workspace.
 These assets are available under the installation folder, i.e. `/Applications/ucx` is the default installation folder. Please check [here](#force-install-over-existing-ucx) for more details.
