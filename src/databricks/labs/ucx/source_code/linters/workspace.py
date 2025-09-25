@@ -63,3 +63,23 @@ class WorkspaceTablesLinter:
         self._used_tables_crawler = used_tables_crawler
         self._max_workers = max_workers
 
+    def _get_language_from_path(self, path: str) -> Language | None:
+        """Determine language from file path extension.
+
+        Args:
+            path: File path
+
+        Returns:
+            Language enum or None if not supported
+        """
+
+        extension = path.lower().split('.')[-1] if '.' in path else ''
+
+        language_map = {
+            'py': Language.PYTHON,
+            'sql': Language.SQL,
+            'scala': Language.SCALA,
+            'r': Language.R,
+        }
+
+        return language_map.get(extension)
