@@ -141,6 +141,7 @@ class WorkspaceTablesLinter:
         if errors:
             logger.warning(f"Encountered {len(errors)} errors during processing")
             for error in errors[:5]:  # Log first 5 errors
+                logger.warning("Logging first 5 errors:")
                 logger.warning(f"Processing error: {error}")
 
         all_tables = []
