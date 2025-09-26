@@ -164,8 +164,154 @@ class WorkspaceTablesLinter:
         Returns:
             List of used tables found in the object
         """
-        logger.info(f"Processing {obj.path}...")
-        return []
+        try:
+            if not obj.path:
+                return []
+
+            # Create a source lineage for the object
+            source_lineage = [
+                LineageAtom(
+                    object_type=obj.object_type or "UNKNOWN",
+                    object_id=obj.path or "UNKNOWN",
+                    other={
+                        "language": obj.language or "UNKNOWN",
+                    }
+                )
+            ]
+
+            if obj.object_type == ("NOTEBOOK"):
+                return self._extract_tables_from_notebook(obj, source_lineage)
+            elif obj.object_type == ("FILE"):
+                return self._extract_tables_from_file(obj, source_lineage)
+            else:
+                logger.warning(f"Unsupported object type: {obj.object_type}")
+                return []
+        except Exception as e:
+            logger.warning(f"Failed to process {obj.path}: {e}")
+            return []
+
+    def _extract_tables_from_notebook(
+        self, obj: WorkspaceObjectInfo, source_lineage: list[LineageAtom]
+    ) -> list[UsedTable]:
+        """Extract table usage from a notebook.
+
+
+        Args:
+            obj: Notebook object
+            source_lineage: Source lineage for tracking
+
+        Returns:
+            List of used tables found in the notebook
+        """
+        try:
+            # Download notebook content
+            export_response = self._ws.workspace.export(obj.path)
+            if isinstance(export_response.content, bytes):
+                content = export_response.content.decode('utf-8')
+            else:
+                content = export_response.content or ""
+
+            # Parse the notebook
+            from pathlib import Path
+            from databricks.sdk.service.workspace import Language
+
+            # Convert language string to Language enum if needed
+            language = Language.PYTHON  # Default fallback
+            if obj.language:
+                try:
+                    language = Language(obj.language.upper())
+                except (ValueError, AttributeError):
+                    pass  # Keep default
+
+            if not obj.path:
+                logger.warning(f"No path available for notebook object")
+                return []
+
+            # At this point obj.path is guaranteed to be not None
+            assert obj.path is not None
+            notebook = Notebook.parse(Path(str(obj.path)), content, language)
+
+            # Create linter context in discovery mode (no migration index needed)
+            linter_context = LinterContext(None, CurrentSessionState())
+
+            # Use NotebookLinter to process the notebook
+            notebook_linter = NotebookLinter(notebook, self._path_lookup, linter_context)
+
+            # Extract tables from each cell in the notebook
+            tables = []
+            try:
+                for cell in notebook.cells:
+                    if hasattr(cell, 'language') and cell.language and hasattr(cell, 'original_code') and cell.original_code:
+                        # Get the appropriate collector for the cell language
+                        collector = linter_context.tables_collector(cell.language.language)
+                        cell_tables = list(collector.collect_tables(cell.original_code))
+
+                        # Add source lineage to each table
+                        for table in cell_tables:
+                            tables.append(table.replace_source(
+                                source_id=obj.path,
+                                source_lineage=source_lineage,
+                            ))
+
+            except Exception as e:
+                logger.debug(f"Failed to extract tables from notebook {obj.path}: {e}")
+
+            return tables
+        except Exception as e:
+            logger.warning(f"Failed to process notebook {obj.path}: {e}")
+            return []
+
+    def _extract_tables_from_file(
+        self, obj: WorkspaceObjectInfo, source_lineage: list[LineageAtom]
+    ) -> list[UsedTable]:
+        """Extract table usage from a file.
+
+        Args:
+            obj: File object
+            source_lineage: Source lineage for tracking
+
+        Returns:
+            List of used tables found in the file
+        """
+        try:
+            # Download file content
+            export_response = self._ws.workspace.export(obj.path)
+            if isinstance(export_response.content, bytes):
+                content = export_response.content.decode('utf-8')
+            else:
+                content = export_response.content
+
+            # Determine language from file extension
+            language = self._get_language_from_path(obj.path)
+            if not language:
+                logger.debug(f"Unsupported file type: {obj.path}")
+                return []
+
+            # Create linter context in discovery mode
+            linter_context = LinterContext(None, CurrentSessionState())
+
+            # Get appropriate collector for the language
+            # At this point language is guaranteed to be not None
+            assert language is not None
+            collector = linter_context.tables_collector(language)
+            tables = list(collector.collect_tables(str(content)))
+
+            # Add source lineage to each table
+            result_tables = []
+            for table in tables:
+                if hasattr(table, 'replace_source'):
+                    result_tables.append(table.replace_source(
+                        source_id=obj.path,
+                        source_lineage=source_lineage,
+                    ))
+                else:
+                    result_tables.append(table)
+
+            return result_tables
+
+        except Exception as e:
+            logger.warning(f"Failed to process file {obj.path}: {e}")
+            return []
 
 
     def scan_workspace_for_tables(
