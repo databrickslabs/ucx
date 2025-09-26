@@ -26,6 +26,7 @@ from databricks.labs.ucx.source_code.notebooks.sources import Notebook
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
 from databricks.labs.ucx.workspace_access.generic import WorkspaceObjectInfo
+from databricks.labs.ucx.workspace_access.listing import WorkspaceListing
 
 logger = logging.getLogger(__name__)
 
@@ -84,6 +85,37 @@ class WorkspaceTablesLinter:
 
         return language_map.get(extension)
 
+    def _discover_workspace_objects(self, workspace_path: str) -> list[WorkspaceObjectInfo]:
+        """Discover all relevant workspace objects in the given path.
+
+        Args:
+            workspace_path: Workspace path to scan
+
+        Returns:
+            List of workspace objects (notebooks and files)
+        """
+        ws_listing = WorkspaceListing(self._ws, num_threads=self._max_workers, with_directories=False)
+        workspace_objects = []
+
+        for obj in ws_listing.walk(workspace_path):
+            if obj is None or obj.object_type is None:
+                continue
+
+            # Only process notebooks and files that can contain code
+            if obj.object_type in (ObjectType.NOTEBOOK, ObjectType.FILE):
+                raw = obj.as_dict()
+                obj_path = raw.get("path")
+                if obj_path:  # Only include objects with valid paths
+                    workspace_objects.append(WorkspaceObjectInfo(
+                        object_type=raw.get("object_type", None),
+                        object_id=str(raw.get("object_id", None)),
+                        path=obj_path,
+                        language=raw.get("language", None),
+                    ))
+
+        logger.info(f"Discovered {len(workspace_objects)} workspace objects in {workspace_path}")
+        return workspace_objects
+
     def scan_workspace_for_tables(
         self,
         workspace_paths: list[str] | None = None
@@ -98,3 +130,5 @@ class WorkspaceTablesLinter:
 
         for workspace_path in workspace_paths:
             logger.info(f"Scanning workspace path: {workspace_path}")
+            workspace_objects = self._discover_workspace_objects(workspace_path)
+            logger.info(f"Found {len(workspace_objects)} workspace objects in {workspace_path}")
