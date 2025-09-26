@@ -116,6 +116,52 @@ class WorkspaceTablesLinter:
         logger.info(f"Discovered {len(workspace_objects)} workspace objects in {workspace_path}")
         return workspace_objects
 
+    def _extract_tables_from_objects(
+        self, workspace_objects: list[WorkspaceObjectInfo]
+    ) -> list[UsedTable]:
+        """Extract table usage from workspace objects using parallel processing.
+
+        Args:
+            workspace_objects: List of workspace objects to process
+
+        Returns:
+            List of used tables found in the objects
+        """
+        if not workspace_objects:
+            return []
+
+        tasks = []
+        for obj in workspace_objects:
+            if obj.path:
+                tasks.append(partial(self._extract_tables_from_object, obj))
+
+        logger.info(f"Processing {len(tasks)} workspace objects in parallel...")
+        results, errors = Threads.gather('extracting tables from workspace objects', tasks)
+
+        if errors:
+            logger.warning(f"Encountered {len(errors)} errors during processing")
+            for error in errors[:5]:  # Log first 5 errors
+                logger.warning(f"Processing error: {error}")
+
+        all_tables = []
+        for tables in results:
+            all_tables.extend(tables)
+
+        return all_tables
+
+    def _extract_tables_from_object(self, obj: WorkspaceObjectInfo) -> list[UsedTable]:
+        """Extract table usage from a single workspace object.
+
+        Args:
+            obj: Workspace object to process
+
+        Returns:
+            List of used tables found in the object
+        """
+        logger.info(f"Processing {obj.path}...")
+        return []
+
+
     def scan_workspace_for_tables(
         self,
         workspace_paths: list[str] | None = None
@@ -132,3 +178,12 @@ class WorkspaceTablesLinter:
             logger.info(f"Scanning workspace path: {workspace_path}")
             workspace_objects = self._discover_workspace_objects(workspace_path)
             logger.info(f"Found {len(workspace_objects)} workspace objects in {workspace_path}")
+            tables_from_path = self._extract_tables_from_objects(workspace_objects)
+            logger.info(f"Extracted {len(tables_from_path)} used tables from {workspace_path}")
+
+
+
+
+
+
+
