@@ -379,6 +379,12 @@ def test_configure_sets_expected_workspace_configuration_values(
         'query_statement_disposition': 'INLINE',
         "recon_tolerance_percent": 5,
         "managed_table_external_storage": "CLONE",
+        "is_terraform_used": False,
+        "trigger_job": False,
+        "upload_dependencies": False,
+        "enable_hms_federation": False,
+        "use_legacy_permission_migration": False,
+        "skip_tacl_migration": False
     }
     prompts = MockPrompts(
         {
@@ -419,6 +425,12 @@ def test_configure_with_default_owner_group(
         "num_days_submit_runs_history": 30,
         "recon_tolerance_percent": 5,
         "managed_table_external_storage": "CLONE",
+        "is_terraform_used": False,
+        "trigger_job": False,
+        "upload_dependencies": False,
+        "enable_hms_federation": False,
+        "use_legacy_permission_migration": False,
+        "skip_tacl_migration": False
     }
     prompts = MockPrompts(
         {
@@ -509,6 +521,12 @@ def test_create_cluster_policy(ws, mock_installation) -> None:
             'query_statement_disposition': 'INLINE',
             'recon_tolerance_percent': 5,
             'managed_table_external_storage': "CLONE",
+            'is_terraform_used': False,
+            'trigger_job': False,
+            'upload_dependencies': False,
+            'enable_hms_federation': False,
+            'use_legacy_permission_migration': False,
+            'skip_tacl_migration': False
         },
     )
 
@@ -1753,6 +1771,12 @@ def test_save_config_ext_hms(ws, mock_installation) -> None:
             'query_statement_disposition': 'INLINE',
             'recon_tolerance_percent': 5,
             'managed_table_external_storage': "CLONE",
+            'is_terraform_used': False,
+            'trigger_job': False,
+            'upload_dependencies': False,
+            'enable_hms_federation': False,
+            'use_legacy_permission_migration': False,
+            'skip_tacl_migration': False
         },
     )
 

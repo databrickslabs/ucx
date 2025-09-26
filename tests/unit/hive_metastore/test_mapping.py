@@ -137,6 +137,7 @@ def test_save_mapping():
         [
             {
                 'catalog_name': 'foo_bar',
+                'compare_rows': False,
                 'dst_schema': 'foo',
                 'dst_table': 'bar',
                 'src_schema': 'foo',
