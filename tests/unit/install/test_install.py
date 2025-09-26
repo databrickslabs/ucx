@@ -384,7 +384,7 @@ def test_configure_sets_expected_workspace_configuration_values(
         "upload_dependencies": False,
         "enable_hms_federation": False,
         "use_legacy_permission_migration": False,
-        "skip_tacl_migration": False
+        "skip_tacl_migration": False,
     }
     prompts = MockPrompts(
         {
@@ -430,7 +430,7 @@ def test_configure_with_default_owner_group(
         "upload_dependencies": False,
         "enable_hms_federation": False,
         "use_legacy_permission_migration": False,
-        "skip_tacl_migration": False
+        "skip_tacl_migration": False,
     }
     prompts = MockPrompts(
         {
@@ -526,7 +526,7 @@ def test_create_cluster_policy(ws, mock_installation) -> None:
             'upload_dependencies': False,
             'enable_hms_federation': False,
             'use_legacy_permission_migration': False,
-            'skip_tacl_migration': False
+            'skip_tacl_migration': False,
         },
     )
 
@@ -1776,7 +1776,7 @@ def test_save_config_ext_hms(ws, mock_installation) -> None:
             'upload_dependencies': False,
             'enable_hms_federation': False,
             'use_legacy_permission_migration': False,
-            'skip_tacl_migration': False
+            'skip_tacl_migration': False,
         },
     )
 
