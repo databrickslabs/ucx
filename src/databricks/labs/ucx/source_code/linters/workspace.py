@@ -83,3 +83,18 @@ class WorkspaceTablesLinter:
         }
 
         return language_map.get(extension)
+
+    def scan_workspace_for_tables(
+        self,
+        workspace_paths: list[str] | None = None
+    ) -> None:
+        """Scan workspace paths for table usage and store results.
+
+        Args:
+            workspace_paths: List of workspace paths to scan. If None, scans entire workspace.
+        """
+        if workspace_paths is None:
+            workspace_paths = ["/"]
+
+        for workspace_path in workspace_paths:
+            logger.info(f"Scanning workspace path: {workspace_path}")
