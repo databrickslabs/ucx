@@ -5,16 +5,13 @@ path and collect table usage information using the UCX linting framework.
 """
 
 import logging
-from collections.abc import Iterable
 from functools import partial
-from datetime import datetime, timezone
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.workspace import ObjectType, Language
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend
 
-from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.source_code.base import (
     UsedTable,
     CurrentSessionState,
