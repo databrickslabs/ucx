@@ -41,3 +41,6 @@ spark.read.table("warehouse.products").createOrReplaceTempView("temp_products")
         language=Language.PYTHON,
         overwrite=True
     )
+
+    workspace_linter = simple_ctx.workspace_tables_linter
+    workspace_linter.scan_workspace_for_tables(["/tmp"])
