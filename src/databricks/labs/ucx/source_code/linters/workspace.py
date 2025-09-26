@@ -106,12 +106,17 @@ class WorkspaceTablesLinter:
                 raw = obj.as_dict()
                 obj_path = raw.get("path")
                 if obj_path:  # Only include objects with valid paths
-                    workspace_objects.append(WorkspaceObjectInfo(
-                        object_type=raw.get("object_type", None),
-                        object_id=str(raw.get("object_id", None)),
-                        path=obj_path,
-                        language=raw.get("language", None),
-                    ))
+                    object_type = raw.get("object_type")
+                    object_id = raw.get("object_id")
+                    language = raw.get("language")
+
+                    if object_type and object_id:
+                        workspace_objects.append(WorkspaceObjectInfo(
+                            path=obj_path,
+                            object_type=object_type,
+                            object_id=str(object_id),
+                            language=language,
+                        ))
 
         logger.info(f"Discovered {len(workspace_objects)} workspace objects in {workspace_path}")
         return workspace_objects
