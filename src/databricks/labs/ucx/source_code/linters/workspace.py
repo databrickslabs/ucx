@@ -8,7 +8,7 @@ import logging
 from functools import partial
 
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.service.workspace import ObjectType, Language
+from databricks.sdk.service.workspace import ObjectType, Language, ExportFormat
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend
 
@@ -81,6 +81,45 @@ class WorkspaceTablesLinter:
         }
 
         return language_map.get(extension)
+
+    def _is_notebook(self, obj: WorkspaceObjectInfo) -> bool:
+        """Determine if an object is a Databricks notebook based on content.
+
+        Args:
+            obj: Workspace object to check
+
+        Returns:
+            True if the object appears to be a Databricks notebook
+        """
+        try:
+            if not obj.path:
+                return False
+
+            # Download content to check if it's a notebook
+            export_response = self._ws.workspace.export(obj.path)
+            if isinstance(export_response.content, bytes):
+                content = export_response.content.decode('utf-8')
+            else:
+                # If content is a string representation of bytes, convert it back to bytes
+                import ast
+                import base64
+                try:
+                    # Try to evaluate the string as a bytes literal
+                    content_bytes = ast.literal_eval(str(export_response.content))
+                    content = content_bytes.decode('utf-8')
+                except (ValueError, SyntaxError):
+                    # If that fails, try base64 decoding
+                    try:
+                        content = base64.b64decode(str(export_response.content)).decode('utf-8')
+                    except Exception:
+                        # If that also fails, treat it as a regular string
+                        content = str(export_response.content)
+
+            # Check for Databricks notebook markers
+            return "# Databricks notebook source" in content
+        except Exception as e:
+            logger.debug(f"Failed to check if {obj.path} is a notebook: {e}")
+            return False
 
     def _discover_workspace_objects(self, workspace_path: str) -> list[WorkspaceObjectInfo]:
         """Discover all relevant workspace objects in the given path.
@@ -176,7 +215,13 @@ class WorkspaceTablesLinter:
                 )
             ]
 
-            if obj.object_type == ("NOTEBOOK"):
+            # Determine if this is a notebook or file based on object type and path
+            # For now, let's be more conservative and only treat explicit NOTEBOOK types as notebooks
+            # We can enhance this later with content-based detection if needed
+            is_notebook = obj.object_type == ("NOTEBOOK")
+            logger.info(f"Processing {obj.path}: object_type={obj.object_type}, is_notebook={is_notebook}")
+
+            if is_notebook:
                 return self._extract_tables_from_notebook(obj, source_lineage)
             elif obj.object_type == ("FILE"):
                 return self._extract_tables_from_file(obj, source_lineage)
@@ -206,7 +251,20 @@ class WorkspaceTablesLinter:
             if isinstance(export_response.content, bytes):
                 content = export_response.content.decode('utf-8')
             else:
-                content = export_response.content or ""
+                # If content is a string representation of bytes, convert it back to bytes
+                import ast
+                import base64
+                try:
+                    # Try to evaluate the string as a bytes literal
+                    content_bytes = ast.literal_eval(str(export_response.content))
+                    content = content_bytes.decode('utf-8')
+                except (ValueError, SyntaxError):
+                    # If that fails, try base64 decoding
+                    try:
+                        content = base64.b64decode(str(export_response.content)).decode('utf-8')
+                    except Exception:
+                        # If that also fails, treat it as a regular string
+                        content = str(export_response.content)
 
             # Parse the notebook
             from pathlib import Path
@@ -238,17 +296,32 @@ class WorkspaceTablesLinter:
             tables = []
             try:
                 for cell in notebook.cells:
-                    if hasattr(cell, 'language') and cell.language and hasattr(cell, 'original_code') and cell.original_code:
-                        # Get the appropriate collector for the cell language
-                        collector = linter_context.tables_collector(cell.language.language)
-                        cell_tables = list(collector.collect_tables(cell.original_code))
+                    if hasattr(cell, 'original_code') and cell.original_code:
+                        # Determine cell language with fallback
+                        cell_language = Language.PYTHON  # Default fallback
+                        if hasattr(cell, 'language') and cell.language:
+                            try:
+                                cell_language = cell.language.language
+                            except AttributeError:
+                                # If cell.language doesn't have .language attribute, use the language directly
+                                cell_language = cell.language
 
-                        # Add source lineage to each table
-                        for table in cell_tables:
-                            tables.append(table.replace_source(
-                                source_id=obj.path,
-                                source_lineage=source_lineage,
-                            ))
+                        logger.info(f"Processing cell with language: {cell_language}")
+
+                        try:
+                            # Get the appropriate collector for the cell language
+                            collector = linter_context.tables_collector(cell_language)
+                            cell_tables = list(collector.collect_tables(cell.original_code))
+
+                            # Add source lineage to each table
+                            for table in cell_tables:
+                                tables.append(table.replace_source(
+                                    source_id=obj.path,
+                                    source_lineage=source_lineage,
+                                ))
+                        except Exception as e:
+                            logger.debug(f"Failed to process cell with language {cell_language}: {e}")
+                            continue
 
             except Exception as e:
                 logger.debug(f"Failed to extract tables from notebook {obj.path}: {e}")
@@ -276,7 +349,25 @@ class WorkspaceTablesLinter:
             if isinstance(export_response.content, bytes):
                 content = export_response.content.decode('utf-8')
             else:
-                content = export_response.content
+                # If content is a string representation of bytes, convert it back to bytes
+                import ast
+                import base64
+                try:
+                    # Try to evaluate the string as a bytes literal
+                    content_bytes = ast.literal_eval(str(export_response.content))
+                    content = content_bytes.decode('utf-8')
+                except (ValueError, SyntaxError):
+                    # If that fails, try base64 decoding
+                    try:
+                        content = base64.b64decode(str(export_response.content)).decode('utf-8')
+                    except Exception:
+                        # If that also fails, treat it as a regular string
+                        content = str(export_response.content)
+
+            # Check if this is actually a Databricks notebook stored as a file
+            if "# Databricks notebook source" in content:
+                logger.info(f"Detected notebook content in file {obj.path}, treating as notebook")
+                return self._extract_tables_from_notebook_content(obj, content, source_lineage)
 
             # Determine language from file extension
             language = self._get_language_from_path(obj.path)
@@ -308,6 +399,109 @@ class WorkspaceTablesLinter:
 
         except Exception as e:
             logger.warning(f"Failed to process file {obj.path}: {e}")
+            return []
+
+    def _extract_tables_from_notebook_content(
+        self, obj: WorkspaceObjectInfo, content: str, source_lineage: list[LineageAtom]
+    ) -> list[UsedTable]:
+        """Extract table usage from notebook content without using Notebook.parse().
+
+        This method handles notebook content that might not parse correctly with Notebook.parse()
+        by manually extracting Python/SQL code from the notebook cells.
+
+        Args:
+            obj: Workspace object
+            content: Notebook content as string
+            source_lineage: Source lineage for tracking
+
+        Returns:
+            List of used tables found in the notebook
+        """
+        try:
+            # Split content into lines and extract cells manually
+            lines = content.split('\n')
+            if not lines[0].startswith("# Databricks notebook source"):
+                logger.warning(f"Content doesn't start with notebook header: {obj.path}")
+                return []
+
+            # Extract cells by looking for # COMMAND ---------- separators
+            cells = []
+            current_cell = []
+
+            for line in lines[1:]:  # Skip the header line
+                if line.strip() == "# COMMAND ----------":
+                    if current_cell:
+                        cells.append('\n'.join(current_cell))
+                        current_cell = []
+                else:
+                    current_cell.append(line)
+
+            # Add the last cell if it exists
+            if current_cell:
+                cells.append('\n'.join(current_cell))
+
+            logger.info(f"Extracted {len(cells)} cells from notebook {obj.path}")
+
+            # Process each cell to extract tables
+            all_tables = []
+            linter_context = LinterContext(None, CurrentSessionState())
+
+            for i, cell_content in enumerate(cells):
+                if not cell_content.strip():
+                    continue
+
+                # Determine cell language (default to Python for now)
+                cell_language = Language.PYTHON
+
+                # Check if cell has magic commands that indicate language
+                if cell_content.strip().startswith('# MAGIC %sql'):
+                    cell_language = Language.SQL
+                elif cell_content.strip().startswith('# MAGIC %scala'):
+                    cell_language = Language.SCALA
+                elif cell_content.strip().startswith('# MAGIC %r'):
+                    cell_language = Language.R
+
+                logger.info(f"Processing cell {i} with language: {cell_language}")
+
+                # Get appropriate collector for the cell language
+                try:
+                    collector = linter_context.tables_collector(cell_language)
+                except Exception as e:
+                    logger.warning(f"Failed to get collector for language {cell_language}: {e}")
+                    continue
+
+                # Clean up the cell content (remove MAGIC prefixes)
+                clean_content = cell_content
+                if cell_content.strip().startswith('# MAGIC'):
+                    # Remove MAGIC prefixes and clean up
+                    clean_lines = []
+                    for line in cell_content.split('\n'):
+                        if line.strip().startswith('# MAGIC'):
+                            # Remove the # MAGIC prefix
+                            clean_line = line.replace('# MAGIC ', '')
+                            clean_lines.append(clean_line)
+                        else:
+                            clean_lines.append(line)
+                    clean_content = '\n'.join(clean_lines)
+
+                try:
+                    cell_tables = list(collector.collect_tables(clean_content))
+
+                    # Add source lineage to each table
+                    for table in cell_tables:
+                        all_tables.append(table.replace_source(
+                            source_id=obj.path,
+                            source_lineage=source_lineage,
+                        ))
+
+                except Exception as e:
+                    logger.debug(f"Failed to process cell {i} in {obj.path}: {e}")
+                    continue
+
+            return all_tables
+
+        except Exception as e:
+            logger.warning(f"Failed to process notebook content {obj.path}: {e}")
             return []
 
 
