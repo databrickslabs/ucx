@@ -31,16 +31,24 @@ df1.write.mode("overwrite").saveAsTable("analytics.customer_analysis")
 spark.read.table("warehouse.products").createOrReplaceTempView("temp_products")
 '''
 
-    # Upload the notebook to workspace
-    ws.workspace.mkdirs("/tmp")
-    notebook_path = f"/tmp/test_workspace_linting_{make_random()}.py"
-    ws.workspace.upload(
-        path=notebook_path,
-        content=python_content.encode('utf-8'),
-        format=ImportFormat.SOURCE,
-        language=Language.PYTHON,
-        overwrite=True
-    )
 
-    workspace_linter = simple_ctx.workspace_tables_linter
-    workspace_linter.scan_workspace_for_tables(["/tmp"])
+    try:
+        # Upload the notebook to workspace
+        ws.workspace.mkdirs("/tmp")
+        notebook_path = f"/tmp/test_workspace_linting_{make_random()}.py"
+        ws.workspace.upload(
+            path=notebook_path,
+            content=python_content.encode('utf-8'),
+            format=ImportFormat.SOURCE,
+            language=Language.PYTHON,
+            overwrite=True
+        )
+
+        workspace_linter = simple_ctx.workspace_tables_linter
+        workspace_linter.scan_workspace_for_tables(["/tmp"])
+    finally:
+        # Clean up the uploaded notebook
+        try:
+            ws.workspace.delete(notebook_path, recursive=False)
+        except NotFound:
+            pass
