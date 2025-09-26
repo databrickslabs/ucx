@@ -66,6 +66,7 @@ from databricks.labs.ucx.installer.workflows import DeployedWorkflows
 from databricks.labs.ucx.progress.install import VerifyProgressTracking
 from databricks.labs.ucx.source_code.graph import DependencyResolver
 from databricks.labs.ucx.source_code.linters.jobs import WorkflowLinter
+from databricks.labs.ucx.source_code.linters.workspace import WorkspaceTablesLinter
 from databricks.labs.ucx.source_code.known import KnownList
 from databricks.labs.ucx.source_code.folders import FolderLoader
 from databricks.labs.ucx.source_code.files import FileLoader, ImportFileResolver
@@ -611,6 +612,16 @@ class GlobalContext(abc.ABC):
         )
 
     @cached_property
+    def workspace_tables_linter(self) -> WorkspaceTablesLinter:
+        return WorkspaceTablesLinter(
+            self.workspace_client,
+            self.sql_backend,
+            self.inventory_database,
+            self.path_lookup,
+            self.used_tables_crawler_for_workspace,
+        )
+
+    @cached_property
     def directfs_access_crawler_for_paths(self) -> DirectFsAccessCrawler:
         return DirectFsAccessCrawler.for_paths(self.sql_backend, self.inventory_database)
 
@@ -625,6 +636,10 @@ class GlobalContext(abc.ABC):
     @cached_property
     def used_tables_crawler_for_queries(self):
         return UsedTablesCrawler.for_queries(self.sql_backend, self.inventory_database)
+
+    @cached_property
+    def used_tables_crawler_for_workspace(self):
+        return UsedTablesCrawler.for_workspace(self.sql_backend, self.inventory_database)
 
     @cached_property
     def redash(self) -> Redash:
