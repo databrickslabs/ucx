@@ -45,7 +45,9 @@ spark.read.table("warehouse.products").createOrReplaceTempView("temp_products")
         )
 
         workspace_linter = simple_ctx.workspace_tables_linter
+        logger.info(f"Starting workspace scan for path: /tmp")
         workspace_linter.scan_workspace_for_tables(["/tmp"])
+        logger.info(f"Workspace scan completed")
     finally:
         # Clean up the uploaded notebook
         try:
