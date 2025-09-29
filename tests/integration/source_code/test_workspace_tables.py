@@ -1,12 +1,8 @@
 """Integration tests for WorkspaceTablesLinter functionality."""
 
 import logging
-from datetime import timedelta
-from pathlib import Path
 
-import pytest
 from databricks.sdk.errors import NotFound
-from databricks.sdk.retries import retried
 from databricks.sdk.service.workspace import ImportFormat, Language
 
 logger = logging.getLogger(__name__)
@@ -42,7 +38,6 @@ spark.read.table("warehouse.products").createOrReplaceTempView("temp_products")
 # COMMAND ----------
 '''
 
-
     try:
         # Upload the Databricks notebook to workspace
         ws.workspace.mkdirs("/tmp")
@@ -52,14 +47,14 @@ spark.read.table("warehouse.products").createOrReplaceTempView("temp_products")
             content=notebook_content,
             format=ImportFormat.SOURCE,
             language=Language.PYTHON,
-            overwrite=True
+            overwrite=True,
         )
 
         # Run the workspace tables linter on the uploaded notebook
         workspace_linter = simple_ctx.workspace_tables_linter
-        logger.info(f"Starting workspace scan for path: /tmp")
+        logger.info("Starting workspace scan for path: /tmp")
         workspace_linter.scan_workspace_for_tables(["/tmp"])
-        logger.info(f"Workspace scan completed")
+        logger.info("Workspace scan completed")
 
         # Verify results in used_tables_in_workspace table
         cursor = simple_ctx.sql_backend.fetch(
@@ -77,15 +72,16 @@ spark.read.table("warehouse.products").createOrReplaceTempView("temp_products")
 
         # Expected tables to be found
         expected_tables = {
-            ('sales', 'customers', False),          # spark.table("sales.customers")
-            ('marketing', 'campaigns', False),     # FROM marketing.campaigns
-            ('warehouse', 'products', False),     # spark.read.table
-            ('analytics', 'customer_analysis', True)  # saveAsTable("analytics.customer_analysis")
+            ('sales', 'customers', False),  # spark.table("sales.customers")
+            ('marketing', 'campaigns', False),  # FROM marketing.campaigns
+            ('warehouse', 'products', False),  # spark.read.table
+            ('analytics', 'customer_analysis', True),  # saveAsTable("analytics.customer_analysis")
         }
 
         # Verify we found the expected tables
-        assert len(results) == len(expected_tables), (f"Expected at least "
-                                                      f"{expected_tables} table references, got {len(results)}")
+        assert len(results) == len(expected_tables), (
+            f"Expected at least " f"{expected_tables} table references, got {len(results)}"
+        )
 
         # Convert to a set for easier checking
         found_tables = {(r['schema_name'], r['table_name'], r['is_write']) for r in results}
