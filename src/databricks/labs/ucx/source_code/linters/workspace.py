@@ -520,12 +520,22 @@ class WorkspaceTablesLinter:
         if workspace_paths is None:
             workspace_paths = ["/"]
 
+        all_tables = []
         for workspace_path in workspace_paths:
             logger.info(f"Scanning workspace path: {workspace_path}")
             workspace_objects = self._discover_workspace_objects(workspace_path)
             logger.info(f"Found {len(workspace_objects)} workspace objects in {workspace_path}")
             tables_from_path = self._extract_tables_from_objects(workspace_objects)
             logger.info(f"Extracted {len(tables_from_path)} used tables from {workspace_path}")
+            all_tables.extend(tables_from_path)
+
+        # Store all discovered tables in the database
+        if all_tables:
+            logger.info(f"Storing {len(all_tables)} discovered tables in database")
+            self._used_tables_crawler.dump_all(all_tables)
+            logger.info(f"Successfully stored {len(all_tables)} tables")
+        else:
+            logger.info("No tables found to store")
 
 
 
