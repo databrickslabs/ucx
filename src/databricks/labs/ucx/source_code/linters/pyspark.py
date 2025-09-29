@@ -131,10 +131,10 @@ class _TableNameMatcher(ABC):
             # This is a chained call like df.write.mode().saveAsTable()
             if isinstance(expr.func, Attribute):
                 # Check if the intermediate call is a DataFrameWriter method
-                if expr.func.attrname in ['mode', 'format', 'option', 'partitionBy', 'bucketBy']:
+                if expr.func.attrname in {'mode', 'format', 'option', 'partitionBy', 'bucketBy'}:
                     # This is likely a DataFrameWriter method chain
                     return True
-        elif isinstance(expr, Attribute):
+        if isinstance(expr, Attribute):
             # This is a direct call like df.write.saveAsTable()
             if expr.attrname == 'write':
                 # This is likely a DataFrameWriter method
