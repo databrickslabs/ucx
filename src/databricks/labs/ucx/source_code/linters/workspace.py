@@ -253,50 +253,7 @@ class WorkspaceTablesLinter:
             # At this point obj.path is guaranteed to be not None
             assert obj.path is not None
             assert language is not None
-            notebook = Notebook.parse(Path(str(obj.path)), content, language)
-
-            # Use a dummy migration index to enable full collectors
-            # since we only care about table extraction here
-            # and not actual migration status
-            linter_context = LinterContext(TableMigrationIndex([]), CurrentSessionState())
-
-            # Extract tables from each cell in the notebook
-            tables = []
-            try:
-                for cell in notebook.cells:
-                    if hasattr(cell, 'original_code') and cell.original_code:
-                        # Determine cell language with fallback
-                        cell_language = Language.PYTHON  # Default fallback
-                        if hasattr(cell, 'language') and cell.language:
-                            try:
-                                cell_language = cell.language.language
-                            except AttributeError:
-                                logger.warning(f"Cell language {cell.language} is not supported")
-
-                        logger.info(f"Processing cell with language: {cell_language}")
-
-                        try:
-                            # Get the appropriate collector for the cell language
-                            collector = linter_context.tables_collector(cell_language)
-                            cell_tables = list(collector.collect_tables(cell.original_code))
-                            logger.info(f"Found {len(cell_tables)} tables in cell")
-
-                            # Add source lineage to each table
-                            for table in cell_tables:
-                                tables.append(
-                                    table.replace_source(
-                                        source_id=obj.path,
-                                        source_lineage=source_lineage,
-                                    )
-                                )
-                        except Exception as e:
-                            logger.debug(f"Failed to process cell with language {cell_language}: {e}")
-                            continue
-
-            except Exception as e:
-                logger.debug(f"Failed to extract tables from notebook {obj.path}: {e}")
-
-            return tables
+            return self._extract_tables_from_notebook_content(obj, content, source_lineage)
         except Exception as e:
             logger.warning(f"Failed to process notebook {obj.path}: {e}")
             return []
