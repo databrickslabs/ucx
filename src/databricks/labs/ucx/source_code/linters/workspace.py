@@ -3,10 +3,12 @@
 This module provides functionality to scan all notebooks and files in a workspace
 path and collect table usage information using the UCX linting framework.
 """
+
 import ast
 import base64
 import logging
 from functools import partial
+from pathlib import Path
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.workspace import ObjectType, Language
@@ -20,7 +22,6 @@ from databricks.labs.ucx.source_code.base import (
     LineageAtom,
 )
 from databricks.labs.ucx.source_code.linters.context import LinterContext
-from databricks.labs.ucx.source_code.linters.files import NotebookLinter
 from databricks.labs.ucx.source_code.notebooks.sources import Notebook
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
@@ -83,45 +84,6 @@ class WorkspaceTablesLinter:
         }
 
         return language_map.get(extension)
-
-    def _is_notebook(self, obj: WorkspaceObjectInfo) -> bool:
-        """Determine if an object is a Databricks notebook based on content.
-
-        Args:
-            obj: Workspace object to check
-
-        Returns:
-            True if the object appears to be a Databricks notebook
-        """
-        try:
-            if not obj.path:
-                return False
-
-            # Download content to check if it's a notebook
-            export_response = self._ws.workspace.export(obj.path)
-            if isinstance(export_response.content, bytes):
-                content = export_response.content.decode('utf-8')
-            else:
-                # If content is a string representation of bytes, convert it back to bytes
-                import ast
-                import base64
-                try:
-                    # Try to evaluate the string as a bytes literal
-                    content_bytes = ast.literal_eval(str(export_response.content))
-                    content = content_bytes.decode('utf-8')
-                except (ValueError, SyntaxError):
-                    # If that fails, try base64 decoding
-                    try:
-                        content = base64.b64decode(str(export_response.content)).decode('utf-8')
-                    except Exception:
-                        # If that also fails, treat it as a regular string
-                        content = str(export_response.content)
-
-            # Check for Databricks notebook markers
-            return "# Databricks notebook source" in content
-        except Exception as e:
-            logger.debug(f"Failed to check if {obj.path} is a notebook: {e}")
-            return False
 
     def _discover_workspace_objects(self, workspace_path: str) -> list[WorkspaceObjectInfo]:
         """Discover all relevant workspace objects in the given path.
@@ -225,14 +187,40 @@ class WorkspaceTablesLinter:
 
             if is_notebook:
                 return self._extract_tables_from_notebook(obj, source_lineage)
-            elif obj.object_type == ("FILE"):
+            if obj.object_type == ("FILE"):
                 return self._extract_tables_from_file(obj, source_lineage)
-            else:
-                logger.warning(f"Unsupported object type: {obj.object_type}")
-                return []
+            logger.warning(f"Unsupported object type: {obj.object_type}")
+            return []
         except Exception as e:
             logger.warning(f"Failed to process {obj.path}: {e}")
             return []
+
+    def _get_str_content_from_path(self, path: str) -> str:
+        """Download and decode content from a workspace path.
+
+        Args:
+            path: Path to the workspace path
+
+        Returns:
+                Decoded content as string
+        """
+        # Download file content
+        export_response = self._ws.workspace.export(path)
+        if isinstance(export_response.content, bytes):
+            return export_response.content.decode('utf-8')
+        else:
+            try:
+                # If content is a string representation of bytes, convert it back to bytes
+                    # Try to evaluate the string as a bytes literal
+                content_bytes = ast.literal_eval(str(export_response.content))
+                return content_bytes.decode('utf-8')
+            except (ValueError, SyntaxError):
+                # If that fails, try base64 decoding
+                try:
+                    return base64.b64decode(str(export_response.content)).decode('utf-8')
+                except Exception:
+                    # If that also fails, treat it as a regular string
+                    return str(export_response.content)
 
     def _extract_tables_from_notebook(
         self, obj: WorkspaceObjectInfo, source_lineage: list[LineageAtom]
@@ -249,27 +237,9 @@ class WorkspaceTablesLinter:
         """
         try:
             # Download notebook content
-            export_response = self._ws.workspace.export(obj.path)
-            if isinstance(export_response.content, bytes):
-                content = export_response.content.decode('utf-8')
-            else:
-                # If content is a string representation of bytes, convert it back to bytes
-                try:
-                    # Try to evaluate the string as a bytes literal
-                    content_bytes = ast.literal_eval(str(export_response.content))
-                    content = content_bytes.decode('utf-8')
-                except (ValueError, SyntaxError):
-                    # If that fails, try base64 decoding
-                    try:
-                        content = base64.b64decode(str(export_response.content)).decode('utf-8')
-                    except Exception:
-                        # If that also fails, treat it as a regular string
-                        content = str(export_response.content)
+            content = self._get_str_content_from_path(obj.path)
 
             # Parse the notebook
-            from pathlib import Path
-            from databricks.sdk.service.workspace import Language
-
             # Convert language string to Language enum if needed
             language = Language.PYTHON  # Default fallback
             if obj.language:
@@ -289,9 +259,6 @@ class WorkspaceTablesLinter:
             dummy_index = TableMigrationIndex([])
             linter_context = LinterContext(dummy_index, CurrentSessionState())
 
-            # Use NotebookLinter to process the notebook
-            notebook_linter = NotebookLinter(notebook, self._path_lookup, linter_context)
-
             # Extract tables from each cell in the notebook
             tables = []
             try:
@@ -303,8 +270,7 @@ class WorkspaceTablesLinter:
                             try:
                                 cell_language = cell.language.language
                             except AttributeError:
-                                # If cell.language doesn't have .language attribute, use the language directly
-                                cell_language = cell.language
+                                logger.warning(f"Cell language {cell.language} is not supported")
 
                         logger.info(f"Processing cell with language: {cell_language}")
 
@@ -345,23 +311,9 @@ class WorkspaceTablesLinter:
             List of used tables found in the file
         """
         try:
-            # Download file content
-            export_response = self._ws.workspace.export(obj.path)
-            if isinstance(export_response.content, bytes):
-                content = export_response.content.decode('utf-8')
-            else:
-                # If content is a string representation of bytes, convert it back to bytes
-                try:
-                    # Try to evaluate the string as a bytes literal
-                    content_bytes = ast.literal_eval(str(export_response.content))
-                    content = content_bytes.decode('utf-8')
-                except (ValueError, SyntaxError):
-                    # If that fails, try base64 decoding
-                    try:
-                        content = base64.b64decode(str(export_response.content)).decode('utf-8')
-                    except Exception:
-                        # If that also fails, treat it as a regular string
-                        content = str(export_response.content)
+            if not obj.path:
+                    return []
+            content = self._get_str_content_from_path(obj.path)
 
             # Check if this is actually a Databricks notebook stored as a file
             if "# Databricks notebook source" in content:
@@ -428,7 +380,7 @@ class WorkspaceTablesLinter:
 
             # Extract cells by looking for # COMMAND ---------- separators
             cells = []
-            current_cell = []
+            current_cell: list[str] = []
 
             for line in lines[1:]:  # Skip the header line
                 if line.strip() == "# COMMAND ----------":
@@ -454,8 +406,6 @@ class WorkspaceTablesLinter:
                     continue
 
                 # Determine cell language (default to Python for now)
-                cell_language = Language.PYTHON
-
                 # Check if cell has magic commands that indicate language
                 if cell_content.strip().startswith('# MAGIC %sql'):
                     cell_language = Language.SQL
@@ -463,6 +413,8 @@ class WorkspaceTablesLinter:
                     cell_language = Language.SCALA
                 elif cell_content.strip().startswith('# MAGIC %r'):
                     cell_language = Language.R
+                else:
+                    cell_language = Language.PYTHON
 
                 logger.info(f"Processing cell {i} with language: {cell_language}")
 
