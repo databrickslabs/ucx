@@ -31,7 +31,7 @@ df2 = spark.sql("SELECT * FROM marketing.campaigns")
 
 # COMMAND ----------
 
-# Write to a table
+# Write to a table using DataFrame method chaining
 df1.write.mode("overwrite").saveAsTable("analytics.customer_analysis")
 
 # COMMAND ----------
