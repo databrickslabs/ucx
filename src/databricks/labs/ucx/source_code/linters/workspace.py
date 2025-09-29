@@ -377,8 +377,9 @@ class WorkspaceTablesLinter:
                 logger.debug(f"Unsupported file type: {obj.path}")
                 return []
 
-            # Create linter context in discovery mode
-            linter_context = LinterContext(None, CurrentSessionState())
+            # Create linter context with dummy migration index to use full collectors
+            dummy_index = TableMigrationIndex([])
+            linter_context = LinterContext(dummy_index, CurrentSessionState())
 
             # Get appropriate collector for the language
             # At this point language is guaranteed to be not None
