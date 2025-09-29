@@ -3,12 +3,13 @@
 This module provides functionality to scan all notebooks and files in a workspace
 path and collect table usage information using the UCX linting framework.
 """
-
+import ast
+import base64
 import logging
 from functools import partial
 
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.service.workspace import ObjectType, Language, ExportFormat
+from databricks.sdk.service.workspace import ObjectType, Language
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
@@ -148,19 +149,19 @@ class WorkspaceTablesLinter:
                     language = raw.get("language")
 
                     if object_type and object_id:
-                        workspace_objects.append(WorkspaceObjectInfo(
-                            path=obj_path,
-                            object_type=object_type,
-                            object_id=str(object_id),
-                            language=language,
-                        ))
+                        workspace_objects.append(
+                            WorkspaceObjectInfo(
+                                path=obj_path,
+                                object_type=object_type,
+                                object_id=str(object_id),
+                                language=language,
+                            )
+                        )
 
         logger.info(f"Discovered {len(workspace_objects)} workspace objects in {workspace_path}")
         return workspace_objects
 
-    def _extract_tables_from_objects(
-        self, workspace_objects: list[WorkspaceObjectInfo]
-    ) -> list[UsedTable]:
+    def _extract_tables_from_objects(self, workspace_objects: list[WorkspaceObjectInfo]) -> list[UsedTable]:
         """Extract table usage from workspace objects using parallel processing.
 
         Args:
@@ -212,7 +213,7 @@ class WorkspaceTablesLinter:
                     object_id=obj.path or "UNKNOWN",
                     other={
                         "language": obj.language or "UNKNOWN",
-                    }
+                    },
                 )
             ]
 
@@ -253,8 +254,6 @@ class WorkspaceTablesLinter:
                 content = export_response.content.decode('utf-8')
             else:
                 # If content is a string representation of bytes, convert it back to bytes
-                import ast
-                import base64
                 try:
                     # Try to evaluate the string as a bytes literal
                     content_bytes = ast.literal_eval(str(export_response.content))
@@ -280,7 +279,7 @@ class WorkspaceTablesLinter:
                     pass  # Keep default
 
             if not obj.path:
-                logger.warning(f"No path available for notebook object")
+                logger.warning("No path available for notebook object")
                 return []
 
             # At this point obj.path is guaranteed to be not None
@@ -317,10 +316,12 @@ class WorkspaceTablesLinter:
 
                             # Add source lineage to each table
                             for table in cell_tables:
-                                tables.append(table.replace_source(
-                                    source_id=obj.path,
-                                    source_lineage=source_lineage,
-                                ))
+                                tables.append(
+                                    table.replace_source(
+                                        source_id=obj.path,
+                                        source_lineage=source_lineage,
+                                    )
+                                )
                         except Exception as e:
                             logger.debug(f"Failed to process cell with language {cell_language}: {e}")
                             continue
@@ -333,9 +334,7 @@ class WorkspaceTablesLinter:
             logger.warning(f"Failed to process notebook {obj.path}: {e}")
             return []
 
-    def _extract_tables_from_file(
-        self, obj: WorkspaceObjectInfo, source_lineage: list[LineageAtom]
-    ) -> list[UsedTable]:
+    def _extract_tables_from_file(self, obj: WorkspaceObjectInfo, source_lineage: list[LineageAtom]) -> list[UsedTable]:
         """Extract table usage from a file.
 
         Args:
@@ -352,8 +351,6 @@ class WorkspaceTablesLinter:
                 content = export_response.content.decode('utf-8')
             else:
                 # If content is a string representation of bytes, convert it back to bytes
-                import ast
-                import base64
                 try:
                     # Try to evaluate the string as a bytes literal
                     content_bytes = ast.literal_eval(str(export_response.content))
@@ -391,10 +388,12 @@ class WorkspaceTablesLinter:
             result_tables = []
             for table in tables:
                 if hasattr(table, 'replace_source'):
-                    result_tables.append(table.replace_source(
-                        source_id=obj.path,
-                        source_lineage=source_lineage,
-                    ))
+                    result_tables.append(
+                        table.replace_source(
+                            source_id=obj.path,
+                            source_lineage=source_lineage,
+                        )
+                    )
                 else:
                     result_tables.append(table)
 
@@ -494,10 +493,12 @@ class WorkspaceTablesLinter:
 
                     # Add source lineage to each table
                     for table in cell_tables:
-                        all_tables.append(table.replace_source(
-                            source_id=obj.path,
-                            source_lineage=source_lineage,
-                        ))
+                        all_tables.append(
+                            table.replace_source(
+                                source_id=obj.path,
+                                source_lineage=source_lineage,
+                            )
+                        )
                 except Exception as e:
                     logger.debug(f"Failed to process cell {i} in {obj.path}: {e}")
                     continue
@@ -508,11 +509,7 @@ class WorkspaceTablesLinter:
             logger.warning(f"Failed to process notebook content {obj.path}: {e}")
             return []
 
-
-    def scan_workspace_for_tables(
-        self,
-        workspace_paths: list[str] | None = None
-    ) -> None:
+    def scan_workspace_for_tables(self, workspace_paths: list[str] | None = None) -> None:
         """Scan workspace paths for table usage and store results.
 
         Args:
@@ -537,10 +534,3 @@ class WorkspaceTablesLinter:
             logger.info(f"Successfully stored {len(all_tables)} tables")
         else:
             logger.info("No tables found to store")
-
-
-
-
-
-
-
