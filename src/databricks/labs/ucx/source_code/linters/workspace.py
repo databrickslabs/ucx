@@ -11,6 +11,7 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.workspace import ObjectType, Language, ExportFormat
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend
+from databricks.labs.ucx.hive_metastore.table_migration_status import TableMigrationIndex
 
 from databricks.labs.ucx.source_code.base import (
     UsedTable,
@@ -286,8 +287,8 @@ class WorkspaceTablesLinter:
             assert obj.path is not None
             notebook = Notebook.parse(Path(str(obj.path)), content, language)
 
-            # Create linter context in discovery mode (no migration index needed)
-            linter_context = LinterContext(None, CurrentSessionState())
+            dummy_index = TableMigrationIndex([])
+            linter_context = LinterContext(dummy_index, CurrentSessionState())
 
             # Use NotebookLinter to process the notebook
             notebook_linter = NotebookLinter(notebook, self._path_lookup, linter_context)
@@ -312,6 +313,7 @@ class WorkspaceTablesLinter:
                             # Get the appropriate collector for the cell language
                             collector = linter_context.tables_collector(cell_language)
                             cell_tables = list(collector.collect_tables(cell.original_code))
+                            logger.info(f"Found {len(cell_tables)} tables in cell")
 
                             # Add source lineage to each table
                             for table in cell_tables:
@@ -444,7 +446,8 @@ class WorkspaceTablesLinter:
 
             # Process each cell to extract tables
             all_tables = []
-            linter_context = LinterContext(None, CurrentSessionState())
+            dummy_index = TableMigrationIndex([])
+            linter_context = LinterContext(dummy_index, CurrentSessionState())
 
             for i, cell_content in enumerate(cells):
                 if not cell_content.strip():
@@ -486,6 +489,7 @@ class WorkspaceTablesLinter:
 
                 try:
                     cell_tables = list(collector.collect_tables(clean_content))
+                    logger.info(f"Found {len(cell_tables)} tables in cell {i}")
 
                     # Add source lineage to each table
                     for table in cell_tables:
@@ -493,7 +497,6 @@ class WorkspaceTablesLinter:
                             source_id=obj.path,
                             source_lineage=source_lineage,
                         ))
-
                 except Exception as e:
                     logger.debug(f"Failed to process cell {i} in {obj.path}: {e}")
                     continue
