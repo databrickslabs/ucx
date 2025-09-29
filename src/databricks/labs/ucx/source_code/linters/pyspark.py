@@ -116,15 +116,14 @@ class _TableNameMatcher(ABC):
         """Check if this is a DataFrame method call like df.write.mode().saveAsTable()"""
         if not isinstance(node.func, Attribute):
             return False
-
         # Check if the method name matches what we're looking for
         if node.func.attrname != self.method_name:
             return False
-
         # Check if this is a DataFrameWriter method call
         # The pattern is: df.write.mode().saveAsTable() or df.write.saveAsTable()
         # We need to check if the call chain includes DataFrameWriter methods
         expr = node.func.expr
+
 
         # Check if this is a call on a DataFrameWriter (like .write.mode() or .write)
         if isinstance(expr, Call):
@@ -139,7 +138,6 @@ class _TableNameMatcher(ABC):
             if expr.attrname == 'write':
                 # This is likely a DataFrameWriter method
                 return True
-
         return False
 
 
