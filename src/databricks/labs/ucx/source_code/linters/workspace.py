@@ -208,19 +208,18 @@ class WorkspaceTablesLinter:
         export_response = self._ws.workspace.export(path)
         if isinstance(export_response.content, bytes):
             return export_response.content.decode('utf-8')
-        else:
+        try:
+            # If content is a string representation of bytes, convert it back to bytes
+            # Try to evaluate the string as a bytes literal
+            content_bytes = ast.literal_eval(str(export_response.content))
+            return content_bytes.decode('utf-8')
+        except (ValueError, SyntaxError):
+            # If that fails, try base64 decoding
             try:
-                # If content is a string representation of bytes, convert it back to bytes
-                    # Try to evaluate the string as a bytes literal
-                content_bytes = ast.literal_eval(str(export_response.content))
-                return content_bytes.decode('utf-8')
-            except (ValueError, SyntaxError):
-                # If that fails, try base64 decoding
-                try:
-                    return base64.b64decode(str(export_response.content)).decode('utf-8')
-                except Exception:
-                    # If that also fails, treat it as a regular string
-                    return str(export_response.content)
+                return base64.b64decode(str(export_response.content)).decode('utf-8')
+            except Exception:
+                # If that also fails, treat it as a regular string
+                return str(export_response.content)
 
     def _extract_tables_from_notebook(
         self, obj: WorkspaceObjectInfo, source_lineage: list[LineageAtom]
@@ -241,12 +240,11 @@ class WorkspaceTablesLinter:
 
             # Parse the notebook
             # Convert language string to Language enum if needed
-            language = Language.PYTHON  # Default fallback
             if obj.language:
                 try:
                     language = Language(obj.language.upper())
                 except (ValueError, AttributeError):
-                    pass  # Keep default
+                    language = Language.PYTHON  # Default fallback
 
             if not obj.path:
                 logger.warning("No path available for notebook object")
@@ -254,10 +252,13 @@ class WorkspaceTablesLinter:
 
             # At this point obj.path is guaranteed to be not None
             assert obj.path is not None
+            assert language is not None
             notebook = Notebook.parse(Path(str(obj.path)), content, language)
 
-            dummy_index = TableMigrationIndex([])
-            linter_context = LinterContext(dummy_index, CurrentSessionState())
+            # Use a dummy migration index to enable full collectors
+            # since we only care about table extraction here
+            # and not actual migration status
+            linter_context = LinterContext(TableMigrationIndex([]), CurrentSessionState())
 
             # Extract tables from each cell in the notebook
             tables = []
@@ -312,7 +313,7 @@ class WorkspaceTablesLinter:
         """
         try:
             if not obj.path:
-                    return []
+                return []
             content = self._get_str_content_from_path(obj.path)
 
             # Check if this is actually a Databricks notebook stored as a file
