@@ -255,22 +255,21 @@ class WorkspaceTablesLinter:
         Returns:
             Cleaned cell content
         """
-        clean_content = cell_content
-        if cell_content.strip().startswith('# MAGIC'):
-            # Remove MAGIC prefixes and clean up
-            clean_lines = []
-            for line in cell_content.split('\n'):
-                if line.strip().startswith('# MAGIC'):
-                    # Remove the # MAGIC prefix
-                    clean_line = line.replace('# MAGIC ', '')
-                    # For SQL magic commands, also remove the %sql part
-                    if clean_line.strip() == '%sql':
-                        continue  # Skip the %sql line entirely
+        if not cell_content.strip().startswith('# MAGIC'):
+            return cell_content
+
+        # Remove MAGIC prefixes and clean up
+        clean_lines = []
+        for line in cell_content.split('\n'):
+            if line.strip().startswith('# MAGIC'):
+                # Remove the # MAGIC prefix
+                clean_line = line.replace('# MAGIC ', '')
+                # For SQL magic commands, also remove the %sql part
+                if clean_line.strip() != '%sql':
                     clean_lines.append(clean_line)
-                else:
-                    clean_lines.append(line)
-            clean_content = '\n'.join(clean_lines)
-        return clean_content
+            else:
+                clean_lines.append(line)
+        return '\n'.join(clean_lines)
 
     def _get_language_from_content(self, cell_content: str) -> Language:
         """Determine the language of a notebook cell based on magic commands.
