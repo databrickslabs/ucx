@@ -4,7 +4,6 @@ from databricks.sdk.service.jobs import JobParameterDefinition
 
 from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
 from databricks.labs.ucx.framework.tasks import Workflow, job_task
-from databricks.labs.ucx.source_code.linters.workspace import WorkspaceTablesLinter
 
 
 logger = logging.getLogger(__name__)
@@ -250,7 +249,7 @@ class Failing(Workflow):
         raise ValueError("This task is supposed to fail.")
 
 
-class WorkspaceTablesLinter(Workflow):
+class WorkspaceTablesScanner(Workflow):
     def __init__(self):
         super().__init__('workspace_tables_linter', [JobParameterDefinition(name="path", default="")])
 
@@ -258,14 +257,14 @@ class WorkspaceTablesLinter(Workflow):
     def scan_workspace_tables(self, ctx: RuntimeContext):
         """Scan workspace for table usage using WorkspaceTablesLinter."""
         logger.info("Starting workspace table scanning")
-        
+
         # Get the path parameter and split by comma if multiple paths
         path_param = ctx.named_parameters.get("path", "")
         if not path_param:
             paths = ["/"]
         else:
             paths = [p.strip() for p in path_param.split(",") if p.strip()]
-        
+
         # Create and use the workspace linter
         workspace_linter = ctx.workspace_tables_linter
         workspace_linter.scan_workspace_for_tables(paths)
