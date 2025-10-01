@@ -59,7 +59,6 @@ dbutils.fs.rm("abfss://standard@accounting.dfs.core.windows.net/projects/account
 # MAGIC location  'abfss://standard@accounting.dfs.core.windows.net/projects/accounting/records'
 '''
 
-
     def cleanup():
         try:
             ws.workspace.delete(notebook_path, recursive=False)
