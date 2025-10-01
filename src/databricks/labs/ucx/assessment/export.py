@@ -1,8 +1,10 @@
 import base64
 import logging
+from io import BytesIO
 from datetime import timedelta
 from pathlib import Path
 from typing import Any
+from zipfile import ZipFile, ZIP_LZMA
 
 from databricks.sdk.service import compute, jobs
 from databricks.sdk.service.jobs import RunResultState
@@ -36,36 +38,43 @@ class AssessmentExporter:
         assessment_metadata: DashboardMetadata, sql_backend: SqlBackend, export_path: Path, writter: Any
     ):
         """Export Assessment to Excel"""
-        with writter.ExcelWriter(export_path, engine='xlsxwriter') as writer:
-            for tile in assessment_metadata.tiles:
-                if not tile.metadata.is_query():
-                    continue
+        with ZipFile(export_path.with_suffix(".zip"), mode="w", compression=ZIP_LZMA) as zip_file:
+            excel_buffer = BytesIO()
 
-                try:
-                    rows = list(sql_backend.fetch(tile.content))
-                    if not rows:
+            with writter.ExcelWriter(excel_buffer, engine='xlsxwriter') as writer:
+                for tile in assessment_metadata.tiles:
+                    if not tile.metadata.is_query():
                         continue
 
-                    data = [row.asDict() for row in rows]
-                    df = writter.DataFrame(data)
+                    try:
+                        rows = list(sql_backend.fetch(tile.content))
+                        if not rows:
+                            continue
 
-                    sheet_name = str(tile.metadata.id)[:31]
-                    df.to_excel(writer, sheet_name=sheet_name, index=False)
+                        data = [row.asDict() for row in rows]
+                        df = writter.DataFrame(data)
 
-                except NotFound as e:
-                    msg = (
-                        str(e).split(" Verify", maxsplit=1)[0] + f" Export will continue without {tile.metadata.title}"
-                    )
-                    logging.warning(msg)
-                    continue
+                        sheet_name = str(tile.metadata.id)[:31]
+                        df.to_excel(writer, sheet_name=sheet_name, index=False)
+
+                    except NotFound as e:
+                        msg = (
+                            str(e).split(" Verify", maxsplit=1)[0]
+                            + f" Export will continue without {tile.metadata.title}"
+                        )
+                        logging.warning(msg)
+                        continue
+
+            zip_file.writestr(export_path.with_suffix(".xlsx").name, excel_buffer.getvalue())
 
     @retried(on=[ResourceDoesNotExist], timeout=timedelta(minutes=1))
     def _render_export(self, export_file_path: Path) -> str:
         """Render an HTML link for downloading the results."""
-        binary_data = self._ws.workspace.download(export_file_path.as_posix()).read()
+        file_name = export_file_path.with_suffix(".zip")
+        binary_data = self._ws.workspace.download(file_name.as_posix()).read()
         b64_data = base64.b64encode(binary_data).decode('utf-8')
 
-        return EXPORT_HTML_TEMPLATE.format(b64_data=b64_data, export_file_path_name=export_file_path.name)
+        return EXPORT_HTML_TEMPLATE.format(b64_data=b64_data, export_file_path_name=file_name.name)
 
     @staticmethod
     def _get_output_directory(prompts: Prompts) -> Path:
@@ -102,8 +111,8 @@ class AssessmentExporter:
     def cli_export_xlsx_results(self, prompts: Prompts) -> Path:
         """Submit Excel export notebook in a job"""
 
-        notebook_path = f"{self._install_folder}/EXPORT_ASSESSMENT_TO_EXCEL"
-        export_file_name = Path(f"{self._install_folder}/ucx_assessment_main.xlsx")
+        notebook_path = f"{self._install_folder}EXPORT_ASSESSMENT_TO_EXCEL"
+        export_file_name = Path(f"{self._install_folder}/ucx_assessment_main.zip")
         results_directory = Path(self._get_output_directory(prompts)) / export_file_name.name
 
         run = self._ws.jobs.submit_and_wait(
@@ -135,7 +144,7 @@ class AssessmentExporter:
 
     def web_export_results(self, writer: Any) -> str:
         """Alternative method to export results from the UI."""
-        export_file_name = Path(f"{self._install_folder}/ucx_assessment_main.xlsx")
+        export_file_name = Path(f"{self._install_folder}/ucx_assessment_main")
         assessment_main = self._get_queries("main")
         self._export_to_excel(assessment_main, self._sql_backend, export_file_name, writer)
         return self._render_export(export_file_name)

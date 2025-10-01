@@ -9,13 +9,8 @@ def test_cli_export_xlsx_results(ws, env_or_skip):
     dummy_notebook = """# Databricks notebook source
     # MAGIC
     # COMMAND ----------
-    # MAGIC %pip install xlsxwriter -qqq
-    # MAGIC dbutils.library.restartPython()
-    # COMMAND ----------
-import xlsxwriter
-with xlsxwriter.Workbook("/Workspace/tmp/ucx/ucx_assessment_main.xlsx") as workbook:
-    # Create dummy export file
-    worksheet = workbook.add_worksheet()
+from zipfile import ZipFile
+ZipFile('/Workspace/tmp/ucx/ucx_assessment_main.zip', 'w').close()
     """
 
     directory = "/tmp/ucx"
@@ -39,9 +34,9 @@ with xlsxwriter.Workbook("/Workspace/tmp/ucx/ucx_assessment_main.xlsx") as workb
 
     assert run
 
-    export_file_name = f"{directory}/ucx_assessment_main.xlsx"
-    expected_excel_signature = b'PK\x03\x04\x14\x00\x00\x00\x08\x00\x00\x00?\x008\x9d\x86\xd8'
+    export_file_name = f"{directory}/ucx_assessment_main.zip"
+    expected_zip_signature = b'PK\x05\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
 
     if run.state and run.state.result_state == RunResultState.SUCCESS:
         binary_resp = ws.workspace.download(path=export_file_name, format=ExportFormat.SOURCE)
-        assert binary_resp.read().startswith(expected_excel_signature)
+        assert binary_resp.read().startswith(expected_zip_signature)

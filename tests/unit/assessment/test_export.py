@@ -1,6 +1,5 @@
 from unittest.mock import create_autospec, patch
 
-
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.assessment.export import AssessmentExporter
 from databricks.labs.lsql.backends import MockBackend
@@ -22,11 +21,9 @@ CONFIG = WorkspaceConfig(inventory_database="ucx")
 def test_cli_csv_export(ws, tmp_path):
     """Test the cli csv export_results method of the AssessmentExporter class."""
 
-    # Prepare temporary paths and files
     export_path = tmp_path / "export_csv"
     export_path.mkdir(parents=True, exist_ok=True)
 
-    # Mock backend and prompts
     mock_backend = MockBackend(rows=QUERY)
     query_choice = {"assessment_name": "main", "option": 3}
     mock_prompts = MockPrompts(
@@ -36,11 +33,9 @@ def test_cli_csv_export(ws, tmp_path):
         }
     )
 
-    # Execute export process
     export = AssessmentExporter(ws, mock_backend, CONFIG)
     exported = export.cli_export_csv_results(mock_prompts)
 
-    # Assertion based on the query_choice
     expected_file_name = f"export_{query_choice['assessment_name']}_results.zip"
     assert exported == export_path / expected_file_name
 
@@ -48,11 +43,9 @@ def test_cli_csv_export(ws, tmp_path):
 def test_cli_xlsx_export(ws, tmp_path):
     """Test the cli xlsx export_results method of the AssessmentExporter class."""
 
-    # Prepare temporary paths and files
-    export_path = tmp_path / "export_excel"
+    export_path = tmp_path / "export_excel_zipped"
     export_path.mkdir(parents=True, exist_ok=True)
 
-    # Mock backend and prompts
     mock_backend = MockBackend(rows=QUERY)
     mock_prompts = MockPrompts(
         {
@@ -60,12 +53,10 @@ def test_cli_xlsx_export(ws, tmp_path):
         }
     )
 
-    # Execute export process
     export = AssessmentExporter(ws, mock_backend, CONFIG)
     exported = export.cli_export_xlsx_results(mock_prompts)
 
-    # Assertion based on the query_choice
-    expected_file_name = "ucx_assessment_main.xlsx"  # Adjusted filename
+    expected_file_name = "ucx_assessment_main.zip"
     assert exported == export_path / expected_file_name
 
 
@@ -78,7 +69,7 @@ def test_web_export(ws, tmp_path):
     expected_html = """
             <div class="export-container">
                 <h2>Export Results</h2>
-                <button onclick="downloadExcel()">Download Results</button>
+                <button onclick="downloadZip()">Download Results</button>
             </div>
             """
 
@@ -103,11 +94,17 @@ def test_web_export(ws, tmp_path):
 
     mock_writer = create_autospec(PandasSpec)
 
-    with patch.object(export, '_render_export') as mock_render_export:
+    install_dir = tmp_path / "Workspace" / "Applications" / "ucx"
+    install_dir.mkdir(parents=True, exist_ok=True)
+
+    with (
+        patch.object(export, '_render_export') as mock_render_export,
+        patch.object(export, '_install_folder', str(install_dir) + "/"),
+    ):
         mock_render_export.return_value = expected_html
 
         result = export.web_export_results(mock_writer)
-        assert "downloadExcel()" in result
+        assert "downloadZip()" in result
         assert "Download Results" in result
 
     mock_writer.ExcelWriter.assert_called_once()
