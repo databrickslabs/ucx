@@ -38,9 +38,27 @@ df1.write.mode("overwrite").saveAsTable("analytics.customer_analysis")
 spark.read.table("warehouse.products").createOrReplaceTempView("temp_products")
 
 # COMMAND ----------
+dbutils.fs.rm("abfss://standard@accounting.dfs.core.windows.net/projects/accounting/records",True)
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC drop table accounting.records
+
+# COMMAND ----------
+
+# DBTITLE 1,accounting.records table creation
+# MAGIC %sql
+# MAGIC CREATE TABLE accounting.records (
+# MAGIC   team STRING,
+# MAGIC   expenses STRING,
+# MAGIC   team_id STRING,
+# MAGIC   dest_cd STRING,
+# MAGIC   dest_desc STRING,
+# MAGIC USING delta
+# MAGIC location  'abfss://standard@accounting.dfs.core.windows.net/projects/accounting/records'
 '''
 
-    notebook_path = f"/tmp/test_workspace_linting_{make_random()}.py"
 
     def cleanup():
         try:
@@ -87,6 +105,7 @@ spark.read.table("warehouse.products").createOrReplaceTempView("temp_products")
         ('marketing', 'campaigns', False),  # FROM marketing.campaigns
         ('warehouse', 'products', False),  # spark.read.table
         ('analytics', 'customer_analysis', True),  # saveAsTable("analytics.customer_analysis")
+        ('accounting', 'records', False),  # CREATE TABLE accounting.records
     }
 
     # Verify we found the expected tables
