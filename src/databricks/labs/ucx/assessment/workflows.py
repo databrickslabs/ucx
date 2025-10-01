@@ -251,7 +251,7 @@ class Failing(Workflow):
 
 class WorkspaceTablesScanner(Workflow):
     def __init__(self):
-        super().__init__('workspace_tables_linter', [JobParameterDefinition(name="path", default="")])
+        super().__init__('workspace-tables-scanner', [JobParameterDefinition(name="path", default="")])
 
     @job_task
     def scan_workspace_tables(self, ctx: RuntimeContext):
@@ -268,3 +268,4 @@ class WorkspaceTablesScanner(Workflow):
         # Create and use the workspace linter
         workspace_linter = ctx.workspace_tables_linter
         workspace_linter.scan_workspace_for_tables(paths)
+        logger.info("Workspace table scanning completed and results stored in inventory database")
