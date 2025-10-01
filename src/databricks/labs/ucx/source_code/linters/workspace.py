@@ -263,6 +263,9 @@ class WorkspaceTablesLinter:
                 if line.strip().startswith('# MAGIC'):
                     # Remove the # MAGIC prefix
                     clean_line = line.replace('# MAGIC ', '')
+                    # For SQL magic commands, also remove the %sql part
+                    if clean_line.strip() == '%sql':
+                        continue  # Skip the %sql line entirely
                     clean_lines.append(clean_line)
                 else:
                     clean_lines.append(line)
