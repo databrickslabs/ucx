@@ -4,7 +4,7 @@ from astroid import Call, Const, Expr  # type: ignore
 
 from databricks.sdk.service.workspace import Language
 
-from databricks.labs.ucx.source_code.base import Deprecation, CurrentSessionState
+from databricks.labs.ucx.source_code.base import Deprecation, CurrentSessionState, UsedTable
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.linters.pyspark import FromTableSqlPyLinter
 from databricks.labs.ucx.source_code.linters.from_table import FromTableSqlLinter
@@ -656,3 +656,13 @@ def test_spark_collect_tables_ignores_dfsas(source_code, expected, migration_ind
     for used_table in used_tables:
         actual = (used_table.catalog_name, used_table.schema_name, used_table.table_name)
         assert actual in expected
+
+
+def test_spark_collect_tables_dataframe_calls(migration_index) -> None:
+    source_code = """df1.write.mode("overwrite").saveAsTable("analytics.customer_analysis")"""
+    session_state = CurrentSessionState('old')
+    from_table = FromTableSqlLinter(migration_index, session_state)
+    linter = SparkTableNamePyLinter(from_table, migration_index, session_state)
+    used_tables = list(linter.collect_tables(source_code))
+
+    assert used_tables == [UsedTable(catalog_name='hive_metastore', schema_name='analytics', table_name='customer_analysis', is_read=False, is_write=True)]
