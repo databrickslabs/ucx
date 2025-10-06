@@ -665,4 +665,12 @@ def test_spark_collect_tables_dataframe_calls(migration_index) -> None:
     linter = SparkTableNamePyLinter(from_table, migration_index, session_state)
     used_tables = list(linter.collect_tables(source_code))
 
-    assert used_tables == [UsedTable(catalog_name='hive_metastore', schema_name='analytics', table_name='customer_analysis', is_read=False, is_write=True)]
+    assert used_tables == [
+        UsedTable(
+            catalog_name='hive_metastore',
+            schema_name='analytics',
+            table_name='customer_analysis',
+            is_read=False,
+            is_write=True,
+        )
+    ]
