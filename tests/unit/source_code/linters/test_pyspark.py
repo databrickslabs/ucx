@@ -658,19 +658,63 @@ def test_spark_collect_tables_ignores_dfsas(source_code, expected, migration_ind
         assert actual in expected
 
 
-def test_spark_collect_tables_dataframe_calls(migration_index) -> None:
-    source_code = """df1.write.mode("overwrite").saveAsTable("analytics.customer_analysis")"""
+@pytest.mark.parametrize(
+    "source_code, expected",
+    [
+        (
+            """"df.write.saveAsTable('analytics.customer_analysis')""",
+            [
+                UsedTable(
+                    catalog_name='hive_metastore',
+                    schema_name='analytics',
+                    table_name='customer_analysis',
+                    is_read=False,
+                    is_write=True,
+                )
+            ],
+        ),
+        (
+            """df.write.mode("append").saveAsTable('analytics.customer_analysis')""",
+            [
+                UsedTable(
+                    catalog_name='hive_metastore',
+                    schema_name='analytics',
+                    table_name='customer_analysis',
+                    is_read=False,
+                    is_write=True,
+                )
+            ],
+        ),
+        (
+            """df.write.mode("append").format("parquet").saveAsTable('analytics.customer_analysis')""",
+            [
+                UsedTable(
+                    catalog_name='hive_metastore',
+                    schema_name='analytics',
+                    table_name='customer_analysis',
+                    is_read=False,
+                    is_write=True,
+                )
+            ],
+        ),
+        (
+            """df.write.mode("append").format("parquet").option("key", "value").partitionBy("col").saveAsTable('analytics.customer_analysis')""",
+            [
+                UsedTable(
+                    catalog_name='hive_metastore',
+                    schema_name='analytics',
+                    table_name='customer_analysis',
+                    is_read=False,
+                    is_write=True,
+                )
+            ],
+        ),
+    ],
+)
+def test_spark_collect_tables_dataframe_calls(source_code, expected, migration_index) -> None:
     session_state = CurrentSessionState('old')
     from_table = FromTableSqlLinter(migration_index, session_state)
     linter = SparkTableNamePyLinter(from_table, migration_index, session_state)
     used_tables = list(linter.collect_tables(source_code))
 
-    assert used_tables == [
-        UsedTable(
-            catalog_name='hive_metastore',
-            schema_name='analytics',
-            table_name='customer_analysis',
-            is_read=False,
-            is_write=True,
-        )
-    ]
+    assert used_tables == expected
