@@ -381,6 +381,7 @@ class TablesMigrator:
     def _convert_wasbs_table_to_abfss(self, src_table: Table) -> bool:
         """
         Converts a Hive metastore azure wasbs table to abfss using alter table command.
+        This command and workflow requires a single user cluster with DB16 or newer.
         """
         logger.info(f"Changing HMS managed table {src_table.name} to External Table type.")
         inventory_table = self._tables_crawler.full_name
@@ -392,7 +393,6 @@ class TablesMigrator:
             return False
         try:
             old_table = self._catalog.getTableMetadata(table_identifier)
-            entity_storage_locations = self._get_entity_storage_locations(old_table)
             table_location = old_table.storage()
             new_location = self._catalog_storage(
                 self._spark._jvm.scala.Some(  # pylint: disable=protected-access
@@ -404,32 +404,84 @@ class TablesMigrator:
                 table_location.compressed(),
                 table_location.properties(),
             )
-            new_table = self._catalog_table(
-                old_table.identifier(),
-                old_table.tableType(),
-                new_location,
-                old_table.schema(),
-                old_table.provider(),
-                old_table.partitionColumnNames(),
-                old_table.bucketSpec(),
-                old_table.owner(),
-                old_table.createTime(),
-                old_table.lastAccessTime(),
-                old_table.createVersion(),
-                old_table.properties(),
-                old_table.stats(),
-                old_table.viewText(),
-                old_table.comment(),
-                old_table.unsupportedFeatures(),
-                old_table.tracksPartitionsInCatalog(),
-                old_table.schemaPreservesCase(),
-                old_table.ignoredProperties(),
-                old_table.viewOriginalText(),
-                # From DBR 16, there's a new constructor argument: entityStorageLocations (Seq[EntityStorageLocation])
-                # (We can't detect whether the argument is needed by the constructor, but assume that if the accessor
-                # is present on the source table then the argument is needed.)
-                *([entity_storage_locations] if entity_storage_locations is not None else []),
-            )
+            logger.info(f"Updating table {src_table.name} location from {src_table.location} to {new_table_location}")
+            if 'collation' in dir(old_table):
+                new_table = self._catalog_table(
+                    old_table.identifier(),
+                    old_table.tableType(),
+                    new_location,
+                    old_table.schema(),
+                    old_table.provider(),
+                    old_table.partitionColumnNames(),
+                    old_table.bucketSpec(),
+                    old_table.owner(),
+                    old_table.createTime(),
+                    old_table.lastAccessTime(),
+                    old_table.createVersion(),
+                    old_table.properties(),
+                    old_table.stats(),
+                    old_table.viewText(),
+                    old_table.comment(),
+                    old_table.collation(),
+                    old_table.unsupportedFeatures(),
+                    old_table.tracksPartitionsInCatalog(),
+                    old_table.schemaPreservesCase(),
+                    old_table.ignoredProperties(),
+                    old_table.viewOriginalText(),
+                    old_table.viewDependencyList(),
+                    old_table.tableConstraints(),
+                    old_table.deltaRuntimeProperties(),
+                    old_table.pipelineUuid(),
+                    old_table.rowFilter(),
+                    old_table.columnMasks(),
+                    old_table.enableAutoMaintenance(),
+                    old_table.effectiveAutoMaintenanceFlag(),
+                    old_table.baseTableId(),
+                    old_table.baseTableLocation(),
+                    old_table.accessPoint(),
+                    old_table.deltaUniformIceberg(),
+                    old_table.shallowClones(),
+                    old_table.encryptionDetails(),
+                    old_table.deltaSharingKind(),
+                    old_table.reconciliationDefinition(),
+                    old_table.parentTable(),
+                    old_table.partitionLogLocation(),
+                    old_table.capabilities(),
+                    old_table.auxiliaryManagedLocation(),
+                    old_table.provisioningInfo(),
+                    old_table.useRemoteFiltering(),
+                    old_table.deltaCoordinatedCommitsInfo(),
+                    old_table.rowFiltersImplicitFromABAC(),
+                    old_table.columnMasksImplicitFromABAC(),
+                    old_table.entityStorageLocations(),
+                    old_table.parentTableUuid(),
+                    old_table.isArclightTableCreation(),
+                    old_table.resourceName(),
+                    old_table.governanceMetadata(),
+                )
+            else:
+                new_table = self._catalog_table(
+                    old_table.identifier(),
+                    old_table.tableType(),
+                    new_location,
+                    old_table.schema(),
+                    old_table.provider(),
+                    old_table.partitionColumnNames(),
+                    old_table.bucketSpec(),
+                    old_table.owner(),
+                    old_table.createTime(),
+                    old_table.lastAccessTime(),
+                    old_table.createVersion(),
+                    old_table.properties(),
+                    old_table.stats(),
+                    old_table.viewText(),
+                    old_table.comment(),
+                    old_table.unsupportedFeatures(),
+                    old_table.tracksPartitionsInCatalog(),
+                    old_table.schemaPreservesCase(),
+                    old_table.ignoredProperties(),
+                    old_table.viewOriginalText(),
+                )
             self._catalog.alterTable(new_table)
         except Exception as e:  # pylint: disable=broad-exception-caught
             logger.warning(f"Error converting HMS table {src_table.name} to abfss: {e}", exc_info=True)
