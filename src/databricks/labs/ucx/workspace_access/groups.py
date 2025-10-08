@@ -929,7 +929,7 @@ class AccountGroupLookup:
             return None
         if len(groups) == 1:
             return groups[0].display_name
-        group_names = [group.display_name for group in groups]
+        group_names = [group.display_name for group in groups if group and group.display_name]
         return prompt.choice("Select the group to be used as the owner group", group_names, max_attempts=3)
 
     def user_in_group(self, group_name: str, user: User) -> bool:
