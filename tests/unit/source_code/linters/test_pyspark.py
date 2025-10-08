@@ -662,7 +662,7 @@ def test_spark_collect_tables_ignores_dfsas(source_code, expected, migration_ind
     "source_code, expected",
     [
         (
-            """"df.write.saveAsTable('analytics.customer_analysis')""",
+            """df.write.saveAsTable('analytics.customer_analysis')""",
             [
                 UsedTable(
                     catalog_name='hive_metastore',
