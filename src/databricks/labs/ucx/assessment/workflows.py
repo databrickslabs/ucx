@@ -249,9 +249,9 @@ class Failing(Workflow):
         raise ValueError("This task is supposed to fail.")
 
 
-class WorkspaceTablesScanner(Workflow):
+class WorkspaceCodeScanner(Workflow):
     def __init__(self):
-        super().__init__('workspace-tables-scanner-experimental', [JobParameterDefinition(name="path", default="")])
+        super().__init__('workspace-code-scanner-experimental', [JobParameterDefinition(name="path", default="")])
 
     @job_task
     def scan_workspace_code(self, ctx: RuntimeContext):
@@ -265,7 +265,7 @@ class WorkspaceTablesScanner(Workflow):
         else:
             paths = [p.strip() for p in path_param.split(",") if p.strip()]
 
-        # Create and use the workspace linter
-        workspace_linter = ctx.workspace_tables_linter
-        workspace_linter.scan_workspace_for_tables(paths)
-        logger.info("Workspace table scanning completed and results stored in inventory database")
+            # Create and use the workspace linter
+            workspace_linter = ctx.workspace_tables_linter
+            workspace_linter.scan_workspace_for_tables(paths)
+            logger.info("Workspace table scanning completed and results stored in inventory database")
