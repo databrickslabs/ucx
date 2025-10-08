@@ -251,17 +251,17 @@ class Failing(Workflow):
 
 class WorkspaceTablesScanner(Workflow):
     def __init__(self):
-        super().__init__('workspace-tables-scanner', [JobParameterDefinition(name="path", default="")])
+        super().__init__('workspace-tables-scanner-experimental', [JobParameterDefinition(name="path", default="")])
 
     @job_task
-    def scan_workspace_tables(self, ctx: RuntimeContext):
+    def scan_workspace_code(self, ctx: RuntimeContext):
         """Scan workspace for table usage using WorkspaceTablesLinter."""
         logger.info("Starting workspace table scanning")
 
         # Get the path parameter and split by comma if multiple paths
         path_param = ctx.named_parameters.get("path", "")
         if not path_param:
-            paths = ["/"]
+            logger.error("No path parameter provided. Please provide a comma-separated list of paths to scan.")
         else:
             paths = [p.strip() for p in path_param.split(",") if p.strip()]
 
