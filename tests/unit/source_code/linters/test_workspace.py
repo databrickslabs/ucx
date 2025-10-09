@@ -1,15 +1,16 @@
-"""Unit tests for WorkspaceTablesLinter."""
+"""Unit tests for WorkspaceCodeLinter."""
 
 from unittest.mock import create_autospec
 from databricks.sdk.service.workspace import Language, ImportFormat, ObjectType, ExportResponse, ObjectInfo
-from databricks.labs.ucx.source_code.linters.workspace import WorkspaceTablesLinter
+
+from databricks.labs.ucx.source_code.linters.workspace import WorkspaceCodeLinter
 from databricks.labs.ucx.source_code.used_table import UsedTablesCrawler
 
 from databricks.labs.ucx.workspace_access.listing import WorkspaceListing
 
 
-class TestWorkspaceTablesLinter:
-    """Test cases for WorkspaceTablesLinter."""
+class TestWorkspaceCodeLinter:
+    """Test cases for WorkspaceCodeLinter."""
 
     def test_scan_workspace_for_tables_empty_and_none_paths(self, ws, tmp_path, mock_path_lookup, mock_backend):
         """Test successful workspace scanning with table detection."""
@@ -21,7 +22,7 @@ class TestWorkspaceTablesLinter:
         mock_workspace_listing.walk.return_value = []  # Empty workspace
 
         # Create the linter instance
-        linter = WorkspaceTablesLinter(
+        linter = WorkspaceCodeLinter(
             ws=ws,
             sql_backend=mock_backend,
             inventory_database="test_db",
@@ -102,7 +103,7 @@ spark.read.table("warehouse.products").createOrReplaceTempView("temp_products")
         ws.workspace.export.return_value = ExportResponse(content=python_file_path.read_text())
 
         # Create the linter instance
-        linter = WorkspaceTablesLinter(
+        linter = WorkspaceCodeLinter(
             ws=ws,
             sql_backend=mock_backend,
             inventory_database="test_db",

@@ -66,7 +66,7 @@ from databricks.labs.ucx.installer.workflows import DeployedWorkflows
 from databricks.labs.ucx.progress.install import VerifyProgressTracking
 from databricks.labs.ucx.source_code.graph import DependencyResolver
 from databricks.labs.ucx.source_code.linters.jobs import WorkflowLinter
-from databricks.labs.ucx.source_code.linters.workspace import WorkspaceTablesLinter
+from databricks.labs.ucx.source_code.linters.workspace import WorkspaceCodeLinter
 from databricks.labs.ucx.source_code.known import KnownList
 from databricks.labs.ucx.source_code.folders import FolderLoader
 from databricks.labs.ucx.source_code.files import FileLoader, ImportFileResolver
@@ -612,8 +612,8 @@ class GlobalContext(abc.ABC):
         )
 
     @cached_property
-    def workspace_tables_linter(self) -> WorkspaceTablesLinter:
-        return WorkspaceTablesLinter(
+    def workspace_tables_linter(self) -> WorkspaceCodeLinter:
+        return WorkspaceCodeLinter(
             self.workspace_client,
             self.sql_backend,
             self.inventory_database,

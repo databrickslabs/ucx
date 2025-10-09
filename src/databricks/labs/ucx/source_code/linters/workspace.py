@@ -29,7 +29,7 @@ from databricks.labs.ucx.workspace_access.listing import WorkspaceListing
 logger = logging.getLogger(__name__)
 
 
-class WorkspaceTablesLinter:
+class WorkspaceCodeLinter:
     """Linter for extracting table usage from all notebooks and files in workspace paths.
 
     This class scans workspace paths recursively to find all notebooks and files,
