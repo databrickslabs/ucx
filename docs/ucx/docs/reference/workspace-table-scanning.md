@@ -34,9 +34,15 @@ The scanner supports:
 
 UCX now includes a dedicated `workspace-table-scanner` workflow that runs independently:
 
-
 **Workflow Parameters:**
-- `workspace_paths`: JSON list of workspace paths to scan (default: `["/"]`)
+- `paths`: JSON list of workspace paths to scan (default: `["/"]`)
+
+### Via CLI command
+You can also run the scanner via the UCX CLI:
+
+```bash
+databricks ucx workspace-table-scanner --paths '["/Users", "/Shared"]'
+```
 
 ### Programmatic Usage
 

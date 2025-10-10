@@ -101,8 +101,8 @@ commands:
   - name: run-workspace-code-scanner
     description: (Experimental) trigger the `workspace-code-scanner-experimental` job to scan the workspace code for fetching tables referenced in the codebase.
     flags:
-      - name: path
-        description: The workspace path to the directory to scan.
+      - name: paths
+        description: The workspace paths to the directory to scan.
       - name: run-as-collection
         description: (Optional) Whether to run the workspace-code-scanner for the collection of workspaces with ucx
           installed. Default is False.
