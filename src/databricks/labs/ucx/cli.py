@@ -271,7 +271,9 @@ def run_workspace_code_scanner_experimental(
         workspace_id = ctx.workspace_client.get_workspace_id()
         deployed_workflows = ctx.deployed_workflows
         logger.info(f"Starting 'workspace-code-scanner-experimental' workflow in workspace: {workspace_id}")
-        deployed_workflows.run_workflow("workspace-code-scanner-experimental", named_parameters={"paths": paths}, skip_job_wait=run_as_collection)
+        deployed_workflows.run_workflow(
+            "workspace-code-scanner-experimental", named_parameters={"paths": paths}, skip_job_wait=run_as_collection
+        )
 
 
 @ucx.command
