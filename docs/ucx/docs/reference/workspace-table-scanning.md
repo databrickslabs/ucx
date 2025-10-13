@@ -123,9 +123,9 @@ ORDER BY usage_count DESC;
 ```sql
 SELECT
     CASE
-        WHEN source_id LIKE '/Users/%' THEN 'User Notebooks'
-        WHEN source_id LIKE '/Shared/%' THEN 'Shared Notebooks'
-        WHEN source_id LIKE '/Repos/%' THEN 'Repository Code'
+        WHEN source_id LIKE '%/Users/%' THEN 'User Notebooks'
+        WHEN source_id LIKE '%/Shared/%' THEN 'Shared Notebooks'
+        WHEN source_id LIKE '%/Repos/%' THEN 'Repository Code'
         ELSE 'Other'
     END as workspace_area,
     COUNT(DISTINCT CONCAT(catalog_name, '.', schema_name, '.', table_name)) as unique_tables,
