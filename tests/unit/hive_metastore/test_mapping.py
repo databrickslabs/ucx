@@ -950,20 +950,17 @@ def test_table_with_no_target_reverted_failed(caplog):
     assert "Failed to unset upgraded_to property" in caplog.text
 
 
-def test_table_mapping_chunks_large_dataset():
-    # Setup
-    ws = create_autospec(WorkspaceClient)
-    sql_backend = create_autospec(SqlBackend)
+def test_table_mapping_chunks_large_dataset(ws, mock_backend):
 
     # Create test data
     workspace_name = "test-workspace"
     catalog_name = "test_workspace"
     test_tables = []
-    for i in range(2500):
+    for i in range(3000):
         test_tables.append(
             Table(
                 catalog="hive_metastore",
-                database=f"db_{i // 100}",
+                database=f"db_{i % 1000 // 100}",
                 name=f"table_{i}",
                 object_type="TABLE",
                 table_format="DELTA",
@@ -971,50 +968,47 @@ def test_table_mapping_chunks_large_dataset():
         )
 
     # Prepare the chunks data
-    first_chunk_rules = [
-        {
-            'workspace_name': workspace_name,
-            'catalog_name': catalog_name,
-            'src_schema': f"db_{i // 100}",
-            'dst_schema': f"db_{i // 100}",
-            'src_table': f"table_{i}",
-            'dst_table': f"table_{i}"
-        }
-        for i in range(1000)
-    ]
-
-    second_chunk_rules = [
-        {
-            'workspace_name': workspace_name,
-            'catalog_name': catalog_name,
-            'src_schema': f"db_{i // 100}",
-            'dst_schema': f"db_{i // 100}",
-            'src_table': f"table_{i}",
-            'dst_table': f"table_{i}"
-        }
-        for i in range(1000, 2000)
-    ]
-
-    third_chunk_rules = [
-        {
-            'workspace_name': workspace_name,
-            'catalog_name': catalog_name,
-            'src_schema': f"db_{i // 100}",
-            'dst_schema': f"db_{i // 100}",
-            'src_table': f"table_{i}",
-            'dst_table': f"table_{i}"
-        }
-        for i in range(2000, 2500)
-    ]
+    first_chunk_rules = []
+    second_chunk_rules = []
+    third_chunk_rules = []
+    for i in range(1000):
+        first_chunk_rules.append(
+            {
+                'workspace_name': workspace_name,
+                'catalog_name': catalog_name,
+                'src_schema': f"db_{i // 100}",
+                'dst_schema': f"db_{i // 100}",
+                'src_table': f"table_{i}",
+                'dst_table': f"table_{i}",
+            }
+        )
+        second_chunk_rules.append(
+            {
+                'workspace_name': workspace_name,
+                'catalog_name': catalog_name,
+                'src_schema': f"db_{i // 100}",
+                'dst_schema': f"db_{i // 100}",
+                'src_table': f"table_{i+1000}",
+                'dst_table': f"table_{i+1000}",
+            }
+        )
+        third_chunk_rules.append(
+            {
+                'workspace_name': workspace_name,
+                'catalog_name': catalog_name,
+                'src_schema': f"db_{i // 100}",
+                'dst_schema': f"db_{i // 100}",
+                'src_table': f"table_{i + 2000}",
+                'dst_table': f"table_{i + 2000}",
+            }
+        )
 
     # Initialize MockInstallation with pre-loaded files
-    installation = MockInstallation({
-        'mapping.csv': first_chunk_rules,
-        'mapping_2.csv': second_chunk_rules,
-        'mapping_3.csv': third_chunk_rules
-    })
+    installation = MockInstallation(
+        {'mapping.csv': first_chunk_rules, 'mapping_2.csv': second_chunk_rules, 'mapping_3.csv': third_chunk_rules}
+    )
 
-    mapping = TableMapping(installation, ws, sql_backend)
+    mapping = TableMapping(installation, ws, mock_backend)
 
     # Mock the TablesCrawler
     tables_crawler = create_autospec(TablesCrawler)
@@ -1036,7 +1030,7 @@ def test_table_mapping_chunks_large_dataset():
     loaded_rules = mapping.load()
 
     # Verify the content
-    assert len(loaded_rules) == 2500
+    assert len(loaded_rules) == 3000
 
     # Verify first rule
     assert loaded_rules[0].workspace_name == workspace_name
@@ -1047,9 +1041,9 @@ def test_table_mapping_chunks_large_dataset():
     # Verify last rule
     assert loaded_rules[-1].workspace_name == workspace_name
     assert loaded_rules[-1].catalog_name == catalog_name
-    assert loaded_rules[-1].src_schema == "db_24"
-    assert loaded_rules[-1].src_table == "table_2499"
+    assert loaded_rules[-1].src_schema == "db_9"
+    assert loaded_rules[-1].src_table == "table_2999"
 
     # Verify the rules are unique
     unique_rules = {(r.src_schema, r.src_table) for r in loaded_rules}
-    assert len(unique_rules) == 2500
+    assert len(unique_rules) == 3000

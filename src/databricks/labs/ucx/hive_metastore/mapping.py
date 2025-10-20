@@ -90,7 +90,7 @@ class TableToMigrate:
 
 
 class TableMapping:
-    FILENAME = 'Wh.csv'
+    FILENAME = 'mapping.csv'
     UCX_SKIP_PROPERTY = "databricks.labs.ucx.skip"
 
     def __init__(
@@ -116,15 +116,43 @@ class TableMapping:
     def save(self, tables: TablesCrawler, workspace_info: WorkspaceInfo) -> str:
         workspace_name = workspace_info.current()
         default_catalog_name = re.sub(r"\W+", "_", workspace_name)
-        current_tables = self.current_tables(tables, workspace_name, default_catalog_name)
-        return self._installation.save(list(current_tables), filename=self.FILENAME)
+        current_tables = list(self.current_tables(tables, workspace_name, default_catalog_name))
+
+        # Split tables into chunks of 1000 entries
+        chunk_size = 1000
+        chunks = [current_tables[i : i + chunk_size] for i in range(0, len(current_tables), chunk_size)]
+
+        # Save first chunk to mapping.csv
+        first_save = self._installation.save(chunks[0], filename="mapping.csv")
+
+        # Save additional chunks with numbered suffixes
+        if len(chunks) > 1:
+            for i, chunk in enumerate(chunks[1:], start=2):
+                self._installation.save(chunk, filename=f"mapping_{i}.csv")
+
+        return first_save
 
     def load(self) -> list[Rule]:
+        all_rules = []
         try:
-            return self._installation.load(list[Rule], filename=self.FILENAME)
-        except NotFound:
+            # Try loading mapping.csv first
+            rules = self._installation.load(list[Rule], filename="mapping.csv")
+            all_rules.extend(rules)
+
+            # Try loading additional numbered files
+            i = 2
+            while True:
+                try:
+                    filename = f"mapping_{i}.csv"
+                    rules = self._installation.load(list[Rule], filename=filename)
+                    all_rules.extend(rules)
+                    i += 1
+                except NotFound:
+                    break
+            return all_rules
+        except NotFound as exc:
             msg = "Please run: databricks labs ucx create-table-mapping"
-            raise ValueError(msg) from None
+            raise ValueError(msg) from exc
 
     def skip_table_or_view(self, schema_name: str, table_name: str, load_table: Callable[[str, str], Table | None]):
         # Marks a table to be skipped in the migration process by applying a table property
