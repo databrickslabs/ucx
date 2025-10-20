@@ -90,7 +90,7 @@ class TableToMigrate:
 
 
 class TableMapping:
-    FILENAME = 'mapping.csv'
+    FILENAME = 'Wh.csv'
     UCX_SKIP_PROPERTY = "databricks.labs.ucx.skip"
 
     def __init__(
