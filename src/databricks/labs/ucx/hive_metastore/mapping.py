@@ -138,21 +138,21 @@ class TableMapping:
             # Try loading mapping.csv first
             rules = self._installation.load(list[Rule], filename="mapping.csv")
             all_rules.extend(rules)
-
-            # Try loading additional numbered files
-            i = 2
-            while True:
-                try:
-                    filename = f"mapping_{i}.csv"
-                    rules = self._installation.load(list[Rule], filename=filename)
-                    all_rules.extend(rules)
-                    i += 1
-                except NotFound:
-                    break
-            return all_rules
         except NotFound as exc:
             msg = "Please run: databricks labs ucx create-table-mapping"
             raise ValueError(msg) from exc
+
+        # Try loading additional numbered files
+        i = 2
+        while True:
+            try:
+                filename = f"mapping_{i}.csv"
+                rules = self._installation.load(list[Rule], filename=filename)
+                all_rules.extend(rules)
+                i += 1
+            except NotFound:
+                break
+        return all_rules
 
     def skip_table_or_view(self, schema_name: str, table_name: str, load_table: Callable[[str, str], Table | None]):
         # Marks a table to be skipped in the migration process by applying a table property
