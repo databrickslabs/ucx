@@ -900,7 +900,7 @@ def test_migrate_external_tables_with_spn_azure(
 
     table_migrate = ctx.tables_migrator
 
-    spn_with_mount_access = "5a11359f-ba1f-483f-8e00-0fe55ec003ed"
+    spn_with_mount_access = "1d9d8d0f-9b6f-44bf-b46d-360a352cb921"
     make_cluster_permissions(
         object_id=cluster.cluster_id,
         permission_level=PermissionLevel.CAN_ATTACH_TO,
