@@ -890,7 +890,10 @@ def test_migrate_table_in_mount(
 
 
 def test_migrate_external_tables_with_spn_azure(
-    ws: WorkspaceClient, prepared_principal_acl, make_cluster_permissions, make_cluster, az_cli_ctx,
+    ws: WorkspaceClient,
+    prepared_principal_acl,
+    make_cluster_permissions,
+    make_cluster,
 ) -> None:
     if not ws.config.is_azure:
         pytest.skip("temporary: only works in azure test env")
