@@ -890,7 +890,7 @@ def test_migrate_table_in_mount(
 
 
 def test_migrate_external_tables_with_spn_azure(
-    ws: WorkspaceClient, prepared_principal_acl, make_cluster_permissions, make_cluster
+    ws: WorkspaceClient, prepared_principal_acl, make_cluster_permissions, make_cluster, az_cli_ctx,
 ) -> None:
     if not ws.config.is_azure:
         pytest.skip("temporary: only works in azure test env")
@@ -900,7 +900,7 @@ def test_migrate_external_tables_with_spn_azure(
 
     table_migrate = ctx.tables_migrator
 
-    spn_with_mount_access = "1d9d8d0f-9b6f-44bf-b46d-360a352cb921"
+    spn_with_mount_access = ws.dbutils.secrets.get("mounts", "spn_client_id")
     make_cluster_permissions(
         object_id=cluster.cluster_id,
         permission_level=PermissionLevel.CAN_ATTACH_TO,
