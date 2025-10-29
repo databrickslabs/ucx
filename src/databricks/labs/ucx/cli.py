@@ -198,6 +198,26 @@ def create_table_mapping(
 
 
 @ucx.command
+def create_directfs_mapping(
+    w: WorkspaceClient,
+    ctx: WorkspaceContext | None = None,
+    run_as_collection: bool = False,
+    a: AccountClient | None = None,
+):
+    """Create DirectFS mapping for all the direcfs references in the workspace"""
+    workspace_contexts = _get_workspace_contexts(w, a, run_as_collection)
+
+    if ctx:
+        workspace_contexts = [ctx]
+    for workspace_ctx in workspace_contexts:
+        workspace_ctx.directfs_mapping.save(
+            [workspace_ctx.directfs_access_crawler_for_paths, workspace_ctx.directfs_access_crawler_for_queries],
+            workspace_ctx.tables_crawler,
+            workspace_ctx.workspace_info,
+        )
+
+
+@ucx.command
 def validate_external_locations(
     w: WorkspaceClient,
     prompts: Prompts,
