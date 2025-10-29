@@ -8,7 +8,6 @@ from databricks.sdk.service.iam import PermissionLevel
 @retried(on=[NotFound, InvalidParameterValue])
 def test_running_real_assessment_job(
     installation_ctx,
-    make_dashboard,
     sql_backend,
 ) -> None:
     ws_group, _ = installation_ctx.make_ucx_group()
