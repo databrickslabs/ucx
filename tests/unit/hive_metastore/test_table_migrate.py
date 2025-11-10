@@ -3,7 +3,7 @@ import logging
 import sys
 from collections.abc import Generator
 from itertools import cycle
-from unittest.mock import create_autospec, Mock
+from unittest.mock import create_autospec
 
 import pytest
 from databricks.labs.lsql.backends import MockBackend, SqlBackend
@@ -54,11 +54,25 @@ def mock_pyspark(mocker):
 
 
 @pytest.fixture
-def mock_hms_table_dbr15(mocker):
+def mock_table_location(mocker):
+    table_location = mocker.Mock()
+    table_location.inputFormat.return_value = "org.apache.hadoop.mapred.TextInputFormat"
+    table_location.outputFormat.return_value = "org.apache.hadoop.mapred.TextOutputFormat"
+    table_location.serde.return_value = "org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe"
+    table_location.compressed.return_value = False
+    table_location.properties.return_value = {
+        "serialization.format": "1",
+        "field.delim": ",",
+    }
+    return table_location
+
+
+@pytest.fixture
+def mock_hms_table_dbr15(mocker, mock_table_location):
     table_metadata = mocker.Mock()
     table_metadata.identifier.return_value = "hive_metastore.db1_src.managed_dbfs"
     table_metadata.tableType.return_value = "MANAGED"
-    table_metadata.storage.return_value = {"location": "dbfs:/mnt/foo"}
+    table_metadata.storage.return_value = mock_table_location
     table_metadata.schema.return_value = "db1_src"
     table_metadata.provider.return_value = "DELTA"
     table_metadata.partitionColumnNames.return_value = []
@@ -77,15 +91,17 @@ def mock_hms_table_dbr15(mocker):
     table_metadata.ignoredProperties.return_value = []
     table_metadata.viewOriginalText.return_value = None
     table_metadata.entityStorageLocations.return_value = {}
-    return table_metadata
+    mock_catalog = mocker.Mock()
+    mock_catalog.getTableMetadata.return_value = table_metadata
+    return mock_catalog
 
 
 @pytest.fixture
-def mock_hms_table_dbr16(mocker):
+def mock_hms_table_dbr16(mocker, mock_table_location):
     table_metadata = mocker.Mock()
     table_metadata.identifier.return_value = "hive_metastore.db1_src.managed_mnt"
     table_metadata.tableType.return_value = "MANAGED"
-    table_metadata.storage.return_value = {"location": "dbfs:/mnt/bar"}
+    table_metadata.storage.return_value = mock_table_location
     table_metadata.schema.return_value = "db1_src"
     table_metadata.provider.return_value = "DELTA"
     table_metadata.partitionColumnNames.return_value = ["dt"]
@@ -106,7 +122,9 @@ def mock_hms_table_dbr16(mocker):
     table_metadata.viewOriginalText.return_value = None
     table_metadata.entityStorageLocations.return_value = {"default": "s3://some_location/table"}
     table_metadata.resourceName.return_value = "hive_metastore.db1_src.managed_mnt"
-    return table_metadata
+    mock_catalog = mocker.Mock()
+    mock_catalog.getTableMetadata.return_value = table_metadata
+    return mock_catalog
 
 
 def test_migrate_dbfs_root_tables_should_produce_proper_queries(ws, mock_pyspark):
@@ -263,7 +281,7 @@ def test_migrate_external_tables_should_produce_proper_queries(ws, mock_pyspark)
 
 @pytest.mark.parametrize("dbr_16", [True, False])
 def test_migrate_managed_table_as_external_tables_with_conversion(
-    ws, mock_pyspark, mock_hms_table_dbr15, mock_hms_table_dbr16, dbr_16, caplog
+    ws, mock_pyspark, mock_hms_table_dbr15, mock_hms_table_dbr16, dbr_16, caplog, mocker
 ):
     errors = {}
     rows = {r"SYNC .*": MockBackend.rows("status_code", "description")[("SUCCESS", "test")]}
@@ -281,18 +299,15 @@ def test_migrate_managed_table_as_external_tables_with_conversion(
     caplog.set_level(logging.DEBUG)
 
     # Mock Spark session to return different table metadata based on DBR version
-    mock_session = Mock()
-    mock_session_state = Mock()
-    mock_catalog = Mock()
+    mock_session = mocker.Mock()
+    mock_session_state = mocker.Mock()
     if dbr_16:
-        mock_catalog.getTableMetadata.return_value = mock_hms_table_dbr16
+        mock_session_state.catalog.return_value = mock_hms_table_dbr16
     else:
-        mock_catalog.getTableMetadata.return_value = mock_hms_table_dbr15
-    mock_session_state.catalog.return_value = mock_catalog
+        mock_session_state.catalog.return_value = mock_hms_table_dbr15
     mock_session._jsparkSession.sessionState.return_value = mock_session_state  # pylint: disable=protected-access
     mock_pyspark.SparkSession.builder.getOrCreate.return_value = mock_session
     table_migrate.convert_managed_hms_to_external(managed_table_external_storage="CONVERT_TO_EXTERNAL")
-
     external_locations.resolve_mount.assert_not_called()
     migrate_grants.apply.assert_not_called()
     assert backend.queries == [
@@ -304,7 +319,23 @@ def test_migrate_managed_table_as_external_tables_with_conversion(
         assert "DBR15" in caplog.text
 
 
-def test_convert_wasbs_to_adls_gen2(ws, mock_pyspark):
+@pytest.mark.parametrize("dbr_16", [True, False])
+def test_convert_wasbs_to_adls_gen2(
+    ws, mock_pyspark, caplog, mock_hms_table_dbr15, mock_hms_table_dbr16, dbr_16, mocker
+):
+    caplog.set_level(logging.DEBUG)
+
+    # Mock Spark session to return different table metadata based on DBR version
+    mock_session = mocker.Mock()
+    mock_session_state = mocker.Mock()
+    if dbr_16:
+        mock_session_state.catalog.return_value = mock_hms_table_dbr16
+    else:
+        mock_session_state.catalog.return_value = mock_hms_table_dbr15
+
+    mock_session._jsparkSession.sessionState.return_value = mock_session_state  # pylint: disable=protected-access
+    mock_pyspark.SparkSession.builder.getOrCreate.return_value = mock_session
+
     errors = {}
     rows = {r"SYNC .*": MockBackend.rows("status_code", "description")[("SUCCESS", "test")]}
     crawler_backend = MockBackend(fails_on_first=errors, rows=rows)
@@ -323,6 +354,10 @@ def test_convert_wasbs_to_adls_gen2(ws, mock_pyspark):
     assert backend.queries == [
         "UPDATE `hive_metastore`.`inventory_database`.`tables` SET location = 'abfss://bucket/test/table1' WHERE catalog='hive_metastore' AND database='db1_src' AND name='wasbs_src';"
     ]
+    if dbr_16:
+        assert "DBR16" in caplog.text
+    else:
+        assert "DBR15" in caplog.text
 
 
 def test_migrate_managed_table_as_external_tables_without_conversion(ws, mock_pyspark):
