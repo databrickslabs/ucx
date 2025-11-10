@@ -52,6 +52,7 @@ def mock_pyspark(mocker):
     sys.modules["pyspark.sql.session"] = pyspark_sql_session
     yield pyspark_sql_session
 
+
 @pytest.fixture
 def mock_hms_table_dbr15(mocker):
     table_metadata = mocker.Mock()
@@ -77,6 +78,7 @@ def mock_hms_table_dbr15(mocker):
     table_metadata.viewOriginalText.return_value = None
     table_metadata.entityStorageLocations.return_value = {}
     return table_metadata
+
 
 @pytest.fixture
 def mock_hms_table_dbr16(mocker):
@@ -105,6 +107,7 @@ def mock_hms_table_dbr16(mocker):
     table_metadata.entityStorageLocations.return_value = {"default": "s3://some_location/table"}
     table_metadata.resourceName.return_value = "hive_metastore.db1_src.managed_mnt"
     return table_metadata
+
 
 def test_migrate_dbfs_root_tables_should_produce_proper_queries(ws, mock_pyspark):
 
@@ -259,7 +262,9 @@ def test_migrate_external_tables_should_produce_proper_queries(ws, mock_pyspark)
 
 
 @pytest.mark.parametrize("dbr_16", [True, False])
-def test_migrate_managed_table_as_external_tables_with_conversion(ws, mock_pyspark, mock_hms_table_dbr15, mock_hms_table_dbr16, dbr_16, caplog):
+def test_migrate_managed_table_as_external_tables_with_conversion(
+    ws, mock_pyspark, mock_hms_table_dbr15, mock_hms_table_dbr16, dbr_16, caplog
+):
     errors = {}
     rows = {r"SYNC .*": MockBackend.rows("status_code", "description")[("SUCCESS", "test")]}
     crawler_backend = MockBackend(fails_on_first=errors, rows=rows)
@@ -284,7 +289,7 @@ def test_migrate_managed_table_as_external_tables_with_conversion(ws, mock_pyspa
     else:
         mock_catalog.getTableMetadata.return_value = mock_hms_table_dbr15
     mock_session_state.catalog.return_value = mock_catalog
-    mock_session._jsparkSession.sessionState.return_value = mock_session_state
+    mock_session._jsparkSession.sessionState.return_value = mock_session_state  # pylint: disable=protected-access
     mock_pyspark.SparkSession.builder.getOrCreate.return_value = mock_session
     table_migrate.convert_managed_hms_to_external(managed_table_external_storage="CONVERT_TO_EXTERNAL")
 
