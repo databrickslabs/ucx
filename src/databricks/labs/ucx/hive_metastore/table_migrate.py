@@ -183,7 +183,6 @@ class TablesMigrator:
     def _spark_session(self):
         # pylint: disable-next=import-error,import-outside-toplevel
         from pyspark.sql.session import SparkSession  # type: ignore[import-not-found]
-
         return SparkSession.builder.getOrCreate()
 
     def _migrate_managed_table(
@@ -341,8 +340,8 @@ class TablesMigrator:
             #    methods will be automatically created on the proxy but fail when invoked.
             # Instead the only approach is to use dir() to check if the method exists _prior_ to trying to access it.
             # (After trying to access it, dir() will also include it even though it doesn't exist.)
-            if 'entityStorageLocations' in dir(old_table):
-                logger.debug("Detected entityStorageLocations property on table metadata, assuming DBR16+")
+            if 'collation' in dir(old_table):
+                logger.debug("Detected Collation property on table metadata, assuming DBR16+")
                 new_table = self._catalog_table(
                     old_table.identifier(),
                     self._catalog_type('EXTERNAL'),
@@ -366,9 +365,10 @@ class TablesMigrator:
                     old_table.ignoredProperties(),
                     old_table.viewOriginalText(),
                     old_table.entityStorageLocations(),
+                    old_table.resourceName()
                 )
             else:
-                logger.debug("No entityStorageLocations property on table metadata, assuming DBR15 or older")
+                logger.debug("No Collation property on table metadata, assuming DBR15 or older")
                 new_table = self._catalog_table(
                     old_table.identifier(),
                     self._catalog_type('EXTERNAL'),
@@ -390,6 +390,7 @@ class TablesMigrator:
                     old_table.schemaPreservesCase(),
                     old_table.ignoredProperties(),
                     old_table.viewOriginalText(),
+                    old_table.entityStorageLocations()
                 )
             self._catalog.alterTable(new_table)
             self._update_table_status(src_table, inventory_table)
@@ -424,8 +425,8 @@ class TablesMigrator:
                 table_location.compressed(),
                 table_location.properties(),
             )
-            if 'entityStorageLocations' in dir(old_table):
-                logger.debug("Detected entityStorageLocations property on table metadata, assuming DBR16+")
+            if 'collation' in dir(old_table):
+                logger.debug("Detected Collation property on table metadata, assuming DBR16+")
                 new_table = self._catalog_table(
                     old_table.identifier(),
                     old_table.tableType(),
@@ -449,9 +450,10 @@ class TablesMigrator:
                     old_table.ignoredProperties(),
                     old_table.viewOriginalText(),
                     old_table.entityStorageLocations(),
+                    old_table.resourceName()
                 )
             else:
-                logger.debug("No entityStorageLocations property on table metadata, assuming DBR15 or older")
+                logger.debug("No Collation property on table metadata, assuming DBR15 or older")
                 new_table = self._catalog_table(
                     old_table.identifier(),
                     old_table.tableType(),
@@ -473,6 +475,7 @@ class TablesMigrator:
                     old_table.schemaPreservesCase(),
                     old_table.ignoredProperties(),
                     old_table.viewOriginalText(),
+                    old_table.entityStorageLocations()
                 )
             self._catalog.alterTable(new_table)
         except Exception as e:  # pylint: disable=broad-exception-caught

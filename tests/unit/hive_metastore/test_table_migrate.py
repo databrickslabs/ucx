@@ -3,7 +3,7 @@ import logging
 import sys
 from collections.abc import Generator
 from itertools import cycle
-from unittest.mock import create_autospec
+from unittest.mock import create_autospec, Mock
 
 import pytest
 from databricks.labs.lsql.backends import MockBackend, SqlBackend
@@ -50,7 +50,61 @@ logger = logging.getLogger(__name__)
 def mock_pyspark(mocker):
     pyspark_sql_session = mocker.Mock()
     sys.modules["pyspark.sql.session"] = pyspark_sql_session
+    yield pyspark_sql_session
 
+@pytest.fixture
+def mock_hms_table_dbr15(mocker):
+    table_metadata = mocker.Mock()
+    table_metadata.identifier.return_value = "hive_metastore.db1_src.managed_dbfs"
+    table_metadata.tableType.return_value = "MANAGED"
+    table_metadata.storage.return_value = {"location": "dbfs:/mnt/foo"}
+    table_metadata.schema.return_value = "db1_src"
+    table_metadata.provider.return_value = "DELTA"
+    table_metadata.partitionColumnNames.return_value = []
+    table_metadata.bucketSpec.return_value = None
+    table_metadata.owner.return_value = "owner"
+    table_metadata.createTime.return_value = 1600000000
+    table_metadata.lastAccessTime.return_value = None
+    table_metadata.createVersion.return_value = None
+    table_metadata.properties.return_value = {}
+    table_metadata.stats.return_value = None
+    table_metadata.viewText.return_value = None
+    table_metadata.comment.return_value = None
+    table_metadata.unsupportedFeatures.return_value = []
+    table_metadata.tracksPartitionsInCatalog.return_value = False
+    table_metadata.schemaPreservesCase.return_value = False
+    table_metadata.ignoredProperties.return_value = []
+    table_metadata.viewOriginalText.return_value = None
+    table_metadata.entityStorageLocations.return_value = {}
+    return table_metadata
+
+@pytest.fixture
+def mock_hms_table_dbr16(mocker):
+    table_metadata = mocker.Mock()
+    table_metadata.identifier.return_value = "hive_metastore.db1_src.managed_mnt"
+    table_metadata.tableType.return_value = "MANAGED"
+    table_metadata.storage.return_value = {"location": "dbfs:/mnt/bar"}
+    table_metadata.schema.return_value = "db1_src"
+    table_metadata.provider.return_value = "DELTA"
+    table_metadata.partitionColumnNames.return_value = ["dt"]
+    table_metadata.bucketSpec.return_value = None
+    table_metadata.owner.return_value = "owner2"
+    table_metadata.createTime.return_value = 1610000000
+    table_metadata.lastAccessTime.return_value = None
+    table_metadata.createVersion.return_value = None
+    table_metadata.properties.return_value = {"some": "prop"}
+    table_metadata.stats.return_value = None
+    table_metadata.viewText.return_value = None
+    table_metadata.comment.return_value = "test comment"
+    table_metadata.collation.return_value = None
+    table_metadata.unsupportedFeatures.return_value = []
+    table_metadata.tracksPartitionsInCatalog.return_value = True
+    table_metadata.schemaPreservesCase.return_value = False
+    table_metadata.ignoredProperties.return_value = []
+    table_metadata.viewOriginalText.return_value = None
+    table_metadata.entityStorageLocations.return_value = {"default": "s3://some_location/table"}
+    table_metadata.resourceName.return_value = "hive_metastore.db1_src.managed_mnt"
+    return table_metadata
 
 def test_migrate_dbfs_root_tables_should_produce_proper_queries(ws, mock_pyspark):
 
@@ -204,7 +258,8 @@ def test_migrate_external_tables_should_produce_proper_queries(ws, mock_pyspark)
     ]
 
 
-def test_migrate_managed_table_as_external_tables_with_conversion(ws, mock_pyspark):
+@pytest.mark.parametrize("dbr_16", [True, False])
+def test_migrate_managed_table_as_external_tables_with_conversion(ws, mock_pyspark, mock_hms_table_dbr15, mock_hms_table_dbr16, dbr_16, caplog):
     errors = {}
     rows = {r"SYNC .*": MockBackend.rows("status_code", "description")[("SUCCESS", "test")]}
     crawler_backend = MockBackend(fails_on_first=errors, rows=rows)
@@ -217,6 +272,20 @@ def test_migrate_managed_table_as_external_tables_with_conversion(ws, mock_pyspa
     table_migrate = TablesMigrator(
         table_crawler, ws, backend, table_mapping, migration_status_refresher, migrate_grants, external_locations
     )
+
+    caplog.set_level(logging.DEBUG)
+
+    # Mock Spark session to return different table metadata based on DBR version
+    mock_session = Mock()
+    mock_session_state = Mock()
+    mock_catalog = Mock()
+    if dbr_16:
+        mock_catalog.getTableMetadata.return_value = mock_hms_table_dbr16
+    else:
+        mock_catalog.getTableMetadata.return_value = mock_hms_table_dbr15
+    mock_session_state.catalog.return_value = mock_catalog
+    mock_session._jsparkSession.sessionState.return_value = mock_session_state
+    mock_pyspark.SparkSession.builder.getOrCreate.return_value = mock_session
     table_migrate.convert_managed_hms_to_external(managed_table_external_storage="CONVERT_TO_EXTERNAL")
 
     external_locations.resolve_mount.assert_not_called()
@@ -224,6 +293,10 @@ def test_migrate_managed_table_as_external_tables_with_conversion(ws, mock_pyspa
     assert backend.queries == [
         "UPDATE `hive_metastore`.`inventory_database`.`tables` SET object_type = 'EXTERNAL' WHERE catalog='hive_metastore' AND database='db1_src' AND name='managed_other';"
     ]
+    if dbr_16:
+        assert "DBR16" in caplog.text
+    else:
+        assert "DBR15" in caplog.text
 
 
 def test_convert_wasbs_to_adls_gen2(ws, mock_pyspark):
