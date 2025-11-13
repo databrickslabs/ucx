@@ -1,5 +1,12 @@
 # Version changelog
 
+## 0.60.2
+
+* Added a dataframe call matcher for linting tables ([#4664](https://github.com/databrickslabs/ucx/issues/4664)). Improved linting: Enhanced table checks and fixed group selection issues.
+* Updated integration test with new SPN ID ([#4704](https://github.com/databrickslabs/ucx/issues/4704)). Improved authentication: Enhanced integration with secure ID updates.
+* Updates documentation with installation prompt details ([#4399](https://github.com/databrickslabs/ucx/issues/4399)). Simplified installation: Added guidance on UCX install prompts, improving user experience.
+
+
 ## 0.60.1
 
 * Added CI fix for hatch dependency ([#4433](https://github.com/databrickslabs/ucx/issues/4433)). A temporary fix has been implemented to address a dependency issue with hatch, specifically related to a problem with the Click library, as tracked in the Click project. To ensure compatibility and prevent errors in the testing process, which relies on hatch, the installation of hatch now includes a version constraint for the Click library, ensuring that a version less than 8.3.0 is installed. This adjustment provides a workaround for a known issue, allowing the testing framework to proceed without disruptions, and ensuring that the project's testing dependency on hatch remains functional until a more permanent solution is available.
