@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence, Iterable
+from typing import Any
 
 from databricks.labs.blueprint.paths import WorkspacePath
 from databricks.sdk import WorkspaceClient
@@ -15,6 +16,7 @@ from databricks.labs.ucx.framework.owners import (
     AdministratorLocator,
     WorkspacePathOwnership,
     LegacyQueryOwnership,
+    LegacyQueryPath,
 )
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.source_code.base import DirectFsAccess
@@ -87,9 +89,12 @@ class DirectFsAccessOwnership(Ownership[DirectFsAccess]):
         self._legacy_query_ownership = legacy_query_ownership
         self._workspace_client = workspace_client
 
+    def is_applicable_to(self, record: Any) -> bool:
+        return isinstance(record, DirectFsAccess)
+
     def _maybe_direct_owner(self, record: DirectFsAccess) -> str | None:
         if record.source_type == 'QUERY' and record.query_id:
-            return self._legacy_query_ownership.owner_of(record.query_id)
+            return self._legacy_query_ownership.owner_of(LegacyQueryPath(record.query_id))
         if record.source_type in {'NOTEBOOK', 'FILE'}:
             return self._notebook_owner(record)
         logger.warning(f"Unknown source type {record.source_type} for {record.source_id}")
