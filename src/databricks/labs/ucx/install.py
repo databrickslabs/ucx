@@ -243,6 +243,7 @@ class WorkspaceInstaller(WorkspaceContext):
         configure_groups = ConfigureGroups(self.prompts)
         configure_groups.run()
         include_databases = self._select_databases()
+        include_database_prefixes = self._select_database_prefixes()
 
         skip_tacl_migration = self.prompts.confirm("Do you want to skip TACL migration when migrating tables?")
 
@@ -272,6 +273,7 @@ class WorkspaceInstaller(WorkspaceContext):
             log_level=log_level,
             num_threads=num_threads,
             include_databases=include_databases,
+            include_database_prefixes=include_database_prefixes,
             trigger_job=trigger_job,
             recon_tolerance_percent=recon_tolerance_percent,
             upload_dependencies=upload_dependencies,
@@ -426,6 +428,16 @@ class WorkspaceInstaller(WorkspaceContext):
         )
         if selected_databases != "<ALL>":
             return [x.strip() for x in selected_databases.split(",")]
+        return None
+
+    def _select_database_prefixes(self):
+        selected_prefixes = self.prompts.question(
+            "Comma-separated list of database prefixes to include (e.g., 'dev_', 'test_'). "
+            "If not specified, prefix filtering will not be applied",
+            default="<NONE>",
+        )
+        if selected_prefixes != "<NONE>":
+            return [x.strip() for x in selected_prefixes.split(",")]
         return None
 
     def configure_warehouse(self) -> str:
