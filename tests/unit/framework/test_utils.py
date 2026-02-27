@@ -47,11 +47,11 @@ def test_offset_pagination_empty_first_page() -> None:
     """No items returned on the first request."""
     pages: list[dict] = [{"Resources": []}]
 
-    def fetch_page(query: dict) -> dict:
+    def fetch_page(_query: dict) -> dict:
         return pages.pop(0)
 
     results = list(paginated_fetch_offset(fetch_page, items_key="Resources", page_size=10))
-    assert results == []
+    assert not results
 
 
 def test_offset_pagination_single_page() -> None:
@@ -59,7 +59,7 @@ def test_offset_pagination_single_page() -> None:
     items = [{"id": "1"}, {"id": "2"}]
     pages = [{"Resources": items}]
 
-    def fetch_page(query: dict) -> dict:
+    def fetch_page(_query: dict) -> dict:
         return pages.pop(0)
 
     results = list(paginated_fetch_offset(fetch_page, items_key="Resources", page_size=10))
@@ -87,11 +87,11 @@ def test_offset_pagination_terminates_on_missing_key() -> None:
     """Stops when the items key is missing from the response entirely."""
     pages = [{"other_key": "value"}]
 
-    def fetch_page(query: dict) -> dict:
+    def fetch_page(_query: dict) -> dict:
         return pages.pop(0)
 
     results = list(paginated_fetch_offset(fetch_page, items_key="Resources", page_size=10))
-    assert results == []
+    assert not results
 
 
 def test_offset_pagination_respects_start_index() -> None:
@@ -115,11 +115,11 @@ def test_cursor_pagination_empty_first_page() -> None:
     """No items returned on the first request."""
     pages: list[dict] = [{"feature_tables": []}]
 
-    def fetch_page(token: str | None) -> dict:
+    def fetch_page(_token: str | None) -> dict:
         return pages.pop(0)
 
     results = list(paginated_fetch_cursor(fetch_page, items_key="feature_tables"))
-    assert results == []
+    assert not results
 
 
 def test_cursor_pagination_single_page_no_token() -> None:
@@ -127,7 +127,7 @@ def test_cursor_pagination_single_page_no_token() -> None:
     items = [{"id": "t1"}, {"id": "t2"}]
     pages = [{"feature_tables": items}]
 
-    def fetch_page(token: str | None) -> dict:
+    def fetch_page(_token: str | None) -> dict:
         return pages.pop(0)
 
     results = list(paginated_fetch_cursor(fetch_page, items_key="feature_tables"))
@@ -158,7 +158,7 @@ def test_cursor_pagination_custom_token_key() -> None:
         {"items": [{"id": "2"}]},
     ]
 
-    def fetch_page(token: str | None) -> dict:
+    def fetch_page(_token: str | None) -> dict:
         return pages.pop(0)
 
     results = list(paginated_fetch_cursor(fetch_page, items_key="items", next_token_key="continuation"))
@@ -169,8 +169,8 @@ def test_cursor_pagination_terminates_on_missing_items_key() -> None:
     """Stops when the items key is missing from the response."""
     pages = [{"other": "data"}]
 
-    def fetch_page(token: str | None) -> dict:
+    def fetch_page(_token: str | None) -> dict:
         return pages.pop(0)
 
     results = list(paginated_fetch_cursor(fetch_page, items_key="feature_tables"))
-    assert results == []
+    assert not results

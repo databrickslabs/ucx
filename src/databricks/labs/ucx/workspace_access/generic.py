@@ -448,10 +448,10 @@ def feature_store_listing(ws: WorkspaceClient):
             assert isinstance(result, dict)
             return result
 
-        return [
-            GenericPermissionsInfo(table["id"], "feature-tables")
-            for table in paginated_fetch_cursor(fetch_page, items_key="feature_tables")
-        ]
+        feature_tables = []
+        for table in paginated_fetch_cursor(fetch_page, items_key="feature_tables"):
+            feature_tables.append(GenericPermissionsInfo(table["id"], "feature-tables"))
+        return feature_tables
 
     return inner
 
