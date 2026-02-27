@@ -45,7 +45,7 @@ def test_escaped_when_column_contains_period() -> None:
 
 def test_offset_pagination_empty_first_page() -> None:
     """No items returned on the first request."""
-    pages = [{"Resources": []}]
+    pages: list[dict] = [{"Resources": []}]
 
     def fetch_page(query: dict) -> dict:
         return pages.pop(0)
@@ -113,7 +113,7 @@ def test_offset_pagination_respects_start_index() -> None:
 
 def test_cursor_pagination_empty_first_page() -> None:
     """No items returned on the first request."""
-    pages = [{"feature_tables": []}]
+    pages: list[dict] = [{"feature_tables": []}]
 
     def fetch_page(token: str | None) -> dict:
         return pages.pop(0)
@@ -136,9 +136,10 @@ def test_cursor_pagination_single_page_no_token() -> None:
 
 def test_cursor_pagination_multiple_pages() -> None:
     """Items span multiple pages with cursor tokens."""
-    page1 = {"feature_tables": [{"id": "t1"}], "next_page_token": "token_abc"}
-    page2 = {"feature_tables": [{"id": "t2"}, {"id": "t3"}]}
-    pages = [page1, page2]
+    pages: list[dict] = [
+        {"feature_tables": [{"id": "t1"}], "next_page_token": "token_abc"},
+        {"feature_tables": [{"id": "t2"}, {"id": "t3"}]},
+    ]
     captured_tokens: list[str | None] = []
 
     def fetch_page(token: str | None) -> dict:
@@ -152,9 +153,10 @@ def test_cursor_pagination_multiple_pages() -> None:
 
 def test_cursor_pagination_custom_token_key() -> None:
     """Supports a custom key name for the next page token."""
-    page1 = {"items": [{"id": "1"}], "continuation": "xyz"}
-    page2 = {"items": [{"id": "2"}]}
-    pages = [page1, page2]
+    pages: list[dict] = [
+        {"items": [{"id": "1"}], "continuation": "xyz"},
+        {"items": [{"id": "2"}]},
+    ]
 
     def fetch_page(token: str | None) -> dict:
         return pages.pop(0)
