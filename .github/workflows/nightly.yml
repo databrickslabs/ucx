@@ -20,12 +20,12 @@ jobs:
     runs-on: larger
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
           fetch-depth: 0
 
       - name: Install Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
         with:
           cache: 'pip'
           cache-dependency-path: '**/pyproject.toml'
@@ -35,7 +35,7 @@ jobs:
         run: pip install hatch==1.9.4 'click<8.3.0' # https://github.com/pallets/click/issues/3065
 
       - name: Run nightly tests
-        uses: databrickslabs/sandbox/acceptance@acceptance/v0.4.2
+        uses: databrickslabs/sandbox/acceptance@3313d06ce86227537b3f37f5974f7eecb2a8e59a  # acceptance/v0.4.4
         with:
           vault_uri: ${{ secrets.VAULT_URI }}
           timeout: 2h
