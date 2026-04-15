@@ -14,9 +14,6 @@ on:
     branches:
       - main
 
-env:
-  HATCH_VERSION: 1.9.4
-
 jobs:
   ci:
     runs-on: ubuntu-latest
@@ -30,18 +27,16 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Install Python
-        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
+      - name: Setup uv
+        uses: astral-sh/setup-uv@5a095e7a2014a4212f075830d4f7277575a9d098  # v7.3.1
         with:
-          cache: 'pip'
-          cache-dependency-path: '**/pyproject.toml'
-          python-version: ${{ matrix.pyVersion }}
-
-      - name: Install hatch
-        run: pip install hatch==$HATCH_VERSION 'click<8.3.0' # https://github.com/pallets/click/issues/3065
+          version: "0.11.2"
+          checksum: "7ac2ca0449c8d68dae9b99e635cd3bc9b22a4cb1de64b7c43716398447d42981"
 
       - name: Run unit tests
-        run: hatch run test
+        run: make test
+        env:
+          UV_PYTHON: ${{ matrix.pyVersion }}
 
       - name: Publish test coverage
         uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de  # v5.5.2
@@ -56,15 +51,11 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Install Python
-        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
+      - name: Setup uv
+        uses: astral-sh/setup-uv@5a095e7a2014a4212f075830d4f7277575a9d098  # v7.3.1
         with:
-          cache: 'pip'
-          cache-dependency-path: '**/pyproject.toml'
-          python-version: 3.10.x
-
-      - name: Install hatch
-        run: pip install hatch==$HATCH_VERSION 'click<8.3.0' # https://github.com/pallets/click/issues/3065
+          version: "0.11.2"
+          checksum: "7ac2ca0449c8d68dae9b99e635cd3bc9b22a4cb1de64b7c43716398447d42981"
 
       - name: Reformat code
         run: make fmt
