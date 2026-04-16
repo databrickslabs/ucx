@@ -19,7 +19,12 @@ permissions:
 
 jobs:
   ci:
-    runs-on: ubuntu-latest
+    runs-on:
+      group: databrickslabs-protected-runner-group
+      labels: linux-ubuntu-latest
+    permissions:
+      # Authenticate with JFrog for package resolution.
+      id-token: write
     strategy:
       fail-fast: false
       matrix:
@@ -36,6 +41,9 @@ jobs:
           version: "0.11.2"
           checksum: "7ac2ca0449c8d68dae9b99e635cd3bc9b22a4cb1de64b7c43716398447d42981"
 
+      - name: Setup for JFrog
+        uses: ./.github/actions/jfrog-auth
+
       - name: Run unit tests
         run: make test
         env:
@@ -47,7 +55,12 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
 
   fmt:
-    runs-on: ubuntu-latest
+    runs-on:
+      group: databrickslabs-protected-runner-group
+      labels: linux-ubuntu-latest
+    permissions:
+      # Authenticate with JFrog for package resolution.
+      id-token: write
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
@@ -59,6 +72,9 @@ jobs:
         with:
           version: "0.11.2"
           checksum: "7ac2ca0449c8d68dae9b99e635cd3bc9b22a4cb1de64b7c43716398447d42981"
+
+      - name: Setup for JFrog
+        uses: ./.github/actions/jfrog-auth
 
       - name: Reformat code
         run: make fmt
