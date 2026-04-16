@@ -6,6 +6,9 @@ on:
       - 'v*'
   workflow_dispatch: # Enables manual triggering of the workflow
 
+permissions:
+  contents: read
+
 jobs:
   build:
     name: Build Docusaurus

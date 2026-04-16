@@ -10,10 +10,7 @@ on:
       - main
 
 permissions:
-  id-token: write
   contents: read
-  issues: write
-  pull-requests: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -24,6 +21,12 @@ jobs:
     if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
     environment: account-admin
     runs-on: larger
+    permissions:
+      # Access to the integration testing infrastructure.
+      id-token: write
+      # Write test results to the PR.
+      issues: write
+      pull-requests: write
     steps:
       - name: Checkout Code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2

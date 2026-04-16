@@ -10,6 +10,8 @@ on:
     branches:
       - main
 
+permissions: {}
+
 jobs:
   no-pylint-disable:
     runs-on: ubuntu-latest

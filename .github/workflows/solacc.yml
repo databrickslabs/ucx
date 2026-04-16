@@ -5,6 +5,9 @@ on:
   schedule:
     - cron: '0 7 * * *'
 
+permissions:
+  contents: read
+
 jobs:
   solacc:
     runs-on: ubuntu-latest
