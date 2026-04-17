@@ -26,7 +26,7 @@ lint:
 	$(UV_RUN) pylint --output-format=colorized -j 0 src tests
 
 fmt:
-	$(UV_RUN) black . --extend-exclude 'tests/unit/source_code/samples/
+	$(UV_RUN) black . --extend-exclude 'tests/unit/source_code/samples/'
 	$(UV_RUN) ruff check . --fix
 	$(UV_RUN) mypy --disable-error-code 'annotation-unchecked' --exclude 'tests/unit/source_code/samples/*' --exclude dist .
 	$(UV_RUN) pylint --output-format=colorized -j 0 src tests
