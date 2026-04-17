@@ -11,7 +11,7 @@ on:
       - main
 
 permissions:
-    contents: read
+  contents: read
 
 jobs:
   no-pylint-disable:
