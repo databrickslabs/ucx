@@ -10,10 +10,7 @@ on:
       - main
 
 permissions:
-  id-token: write
   contents: read
-  issues: write
-  pull-requests: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -23,22 +20,29 @@ jobs:
   integration:
     if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
     environment: account-admin
-    runs-on: larger
+    runs-on:
+      group: larger-runners
+      labels: larger
+    permissions:
+      # Access to the integration testing infrastructure and JFrog package resolution.
+      id-token: write
+      # Write test results to the PR.
+      issues: write
+      pull-requests: write
     steps:
       - name: Checkout Code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
           fetch-depth: 0
 
-      - name: Install Python
-        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
+      - name: Setup uv
+        uses: astral-sh/setup-uv@5a095e7a2014a4212f075830d4f7277575a9d098  # v7.3.1
         with:
-          cache: 'pip'
-          cache-dependency-path: '**/pyproject.toml'
-          python-version: '3.10'
+          version: "0.11.2"
+          checksum: "7ac2ca0449c8d68dae9b99e635cd3bc9b22a4cb1de64b7c43716398447d42981"
 
-      - name: Install hatch
-        run: pip install hatch==1.9.4 'click<8.3.0' # https://github.com/pallets/click/issues/3065
+      - name: Setup for JFrog
+        uses: ./.github/actions/jfrog-auth
 
       - name: Fetch relevant branches
         run: |
