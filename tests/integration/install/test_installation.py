@@ -214,6 +214,7 @@ def test_installation_when_dashboard_is_trashed(ws, installation_ctx):
     assert True, "Installation succeeded when dashboard was trashed"
 
 
+@pytest.mark.skip(reason="Legacy dashboard creation is no longer supported by Databricks.")
 @pytest.mark.parametrize("dashboard_id", ["01ef4d7b294112968fa07ffae17dd55f", "invalid-dashboard-id", ""])
 def test_installation_when_dashboard_id_is_invalid(ws, installation_ctx, dashboard_id):
     """A dashboard reference might be invalid (after manual changes), the upgrade should handle this."""

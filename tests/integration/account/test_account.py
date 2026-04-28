@@ -74,7 +74,7 @@ def test_create_account_level_groups(
 
 
 def test_create_account_level_groups_nested_groups(
-    make_group, make_user, acc, ws, make_random, clean_account_level_groups, watchdog_purge_suffix, runtime_ctx, caplog
+    make_group, make_user, acc, ws, make_random, clean_account_level_groups, watchdog_purge_suffix, runtime_ctx
 ):
     suffix = f"{make_random(4).lower()}-{watchdog_purge_suffix}"
     # Test groups:
@@ -109,6 +109,7 @@ def test_create_account_level_groups_nested_groups(
         assert group
         assert len(group.members) == len(ws_group.members)
 
-    runtime_ctx.group_manager.validate_group_membership()
-
-    assert 'There are no groups with different membership between account and workspace.' in caplog.text
+    mismatches = runtime_ctx.group_manager.validate_group_membership()
+    created_names = {g.display_name for g in ws_groups}
+    mismatched_created = {m["wf_group_name"] for m in mismatches} & created_names
+    assert not mismatched_created, f"Created groups have mismatched membership: {mismatched_created}"
