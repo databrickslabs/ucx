@@ -3,6 +3,7 @@ These tests uses part of unit testing framework to mock the path lookup, and the
 because it uses the context and the time it takes to run the test.
 """
 
+import configparser
 import logging
 import os
 import re
@@ -16,15 +17,22 @@ from tests.unit.conftest import MockPathLookup
 
 
 def _resolved_index_url() -> str:
-    """Return the pip index URL configured for the current environment.
+    """Return a pip-usable index URL for the current environment.
 
-    Local dev points at the Databricks pypi proxy; CI configures JFrog via PIP_INDEX_URL/UV_INDEX_URL.
+    The notebook fixture invokes a real `pip install --index-url <url>`. CI's jfrog-auth action
+    writes a pip.conf at ``$PIP_CONFIG_FILE`` whose ``[global] index-url`` carries the
+    JFrog token; ``UV_INDEX_URL`` exists too but lacks credentials (uv stores auth in its keyring),
+    so passing it to pip would 401. Prefer ``PIP_CONFIG_FILE`` so pip can authenticate; fall back
+    to ``PIP_INDEX_URL`` and finally to the dev proxy used in local development.
     """
-    return (
-        os.environ.get("PIP_INDEX_URL")
-        or os.environ.get("UV_INDEX_URL")
-        or "https://pypi-proxy.dev.databricks.com/simple/"
-    )
+    pip_config_file = os.environ.get("PIP_CONFIG_FILE")
+    if pip_config_file and Path(pip_config_file).is_file():
+        parser = configparser.ConfigParser()
+        parser.read(pip_config_file)
+        url = parser.get("global", "index-url", fallback=None)
+        if url:
+            return url
+    return os.environ.get("PIP_INDEX_URL") or "https://pypi-proxy.dev.databricks.com/simple/"
 
 
 def _write_pytest_with_index_url_notebook(directory: Path) -> str:
