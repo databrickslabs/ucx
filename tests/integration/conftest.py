@@ -1484,30 +1484,51 @@ def get_group(group_manager: GroupManager, group_name: str) -> NoReturn:
 # Diagnostic hooks: when the acceptance wrapper reports `exit status 3` with no failed
 # tests, pytest is hitting an internal error after the visible test stream ends. The
 # wrapper only surfaces structured ✅/❌/⏭️ markers, so unhandled exceptions and signal
-# crashes vanish. Print them with grep-able prefixes (and dump faulthandler tracebacks)
-# so they show up in the raw GH Actions log.
+# crashes vanish from the GH Actions log. Write tracebacks and faulthandler output to a
+# file that a subsequent workflow step (`if: always()`) can dump verbatim.
+import atexit  # noqa: E402  pylint: disable=wrong-import-position,wrong-import-order
 import faulthandler  # noqa: E402  pylint: disable=wrong-import-position,wrong-import-order
 import sys  # noqa: E402  pylint: disable=wrong-import-position,wrong-import-order
+import tempfile  # noqa: E402  pylint: disable=wrong-import-position,wrong-import-order
 import traceback  # noqa: E402  pylint: disable=wrong-import-position,wrong-import-order
 
 
-faulthandler.enable()
+_DIAG_DIR = os.environ.get("UCX_PYTEST_DIAG_DIR") or os.environ.get("RUNNER_TEMP") or tempfile.gettempdir()
+_DIAG_PATH = os.path.join(_DIAG_DIR, "ucx_pytest_diag.log")
+_DIAG_FILE = open(_DIAG_PATH, "a", buffering=1, encoding="utf-8")  # pylint: disable=consider-using-with
+atexit.register(_DIAG_FILE.close)
+
+
+# faulthandler must own a writable file with a real fileno; reuse the same one so signal
+# crashes land alongside the rest of the diagnostic output.
+faulthandler.enable(file=_DIAG_FILE)
+
+
+def _diag(*parts: str) -> None:
+    line = " ".join(parts)
+    print(line, file=sys.stderr, flush=True)
+    _DIAG_FILE.write(line + "\n")
+    _DIAG_FILE.flush()
 
 
 def pytest_internalerror(excrepr, excinfo):
-    print("UCX_INTERNALERROR_BEGIN", file=sys.stderr, flush=True)
-    print(str(excrepr), file=sys.stderr, flush=True)
+    _diag("UCX_INTERNALERROR_BEGIN")
+    _diag(str(excrepr))
     if excinfo is not None:
+        traceback.print_exception(excinfo.type, excinfo.value, excinfo.tb, file=_DIAG_FILE)
+        _DIAG_FILE.flush()
         traceback.print_exception(excinfo.type, excinfo.value, excinfo.tb, file=sys.stderr)
-    print("UCX_INTERNALERROR_END", file=sys.stderr, flush=True)
+    _diag("UCX_INTERNALERROR_END")
     return False  # let pytest's default handler run too
 
 
 def pytest_keyboard_interrupt(excinfo):
-    print("UCX_KEYBOARD_INTERRUPT", file=sys.stderr, flush=True)
+    _diag("UCX_KEYBOARD_INTERRUPT")
     if excinfo is not None:
+        traceback.print_exception(excinfo.type, excinfo.value, excinfo.tb, file=_DIAG_FILE)
+        _DIAG_FILE.flush()
         traceback.print_exception(excinfo.type, excinfo.value, excinfo.tb, file=sys.stderr)
 
 
 def pytest_sessionfinish(session, exitstatus):  # pylint: disable=unused-argument
-    print(f"UCX_SESSION_FINISH exitstatus={exitstatus}", file=sys.stderr, flush=True)
+    _diag(f"UCX_SESSION_FINISH exitstatus={exitstatus}")

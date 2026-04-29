@@ -58,3 +58,16 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
           ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
+          UCX_PYTEST_DIAG_DIR: ${{ runner.temp }}
+
+      - name: Dump pytest diagnostics
+        if: always()
+        run: |
+          diag="${RUNNER_TEMP}/ucx_pytest_diag.log"
+          if [[ -s "$diag" ]]; then
+            echo "::group::pytest diagnostics ($diag)"
+            cat "$diag"
+            echo "::endgroup::"
+          else
+            echo "No diagnostics captured at $diag (file missing or empty)."
+          fi
