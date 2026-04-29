@@ -1479,3 +1479,35 @@ def get_group(group_manager: GroupManager, group_name: str) -> NoReturn:
         logger.info(f"Group {group_name} was not deleted. Retrying...")
         raise AssertionError(f"Group is not deleted: {group_name}")
     raise NotFound(f"Group not found: {group_name}")
+
+
+# Diagnostic hooks: when the acceptance wrapper reports `exit status 3` with no failed
+# tests, pytest is hitting an internal error after the visible test stream ends. The
+# wrapper only surfaces structured ✅/❌/⏭️ markers, so unhandled exceptions and signal
+# crashes vanish. Print them with grep-able prefixes (and dump faulthandler tracebacks)
+# so they show up in the raw GH Actions log.
+import faulthandler  # noqa: E402  pylint: disable=wrong-import-position,wrong-import-order
+import sys  # noqa: E402  pylint: disable=wrong-import-position,wrong-import-order
+import traceback  # noqa: E402  pylint: disable=wrong-import-position,wrong-import-order
+
+
+faulthandler.enable()
+
+
+def pytest_internalerror(excrepr, excinfo):
+    print("UCX_INTERNALERROR_BEGIN", file=sys.stderr, flush=True)
+    print(str(excrepr), file=sys.stderr, flush=True)
+    if excinfo is not None:
+        traceback.print_exception(excinfo.type, excinfo.value, excinfo.tb, file=sys.stderr)
+    print("UCX_INTERNALERROR_END", file=sys.stderr, flush=True)
+    return False  # let pytest's default handler run too
+
+
+def pytest_keyboard_interrupt(excinfo):
+    print("UCX_KEYBOARD_INTERRUPT", file=sys.stderr, flush=True)
+    if excinfo is not None:
+        traceback.print_exception(excinfo.type, excinfo.value, excinfo.tb, file=sys.stderr)
+
+
+def pytest_sessionfinish(session, exitstatus):  # pylint: disable=unused-argument
+    print(f"UCX_SESSION_FINISH exitstatus={exitstatus}", file=sys.stderr, flush=True)
