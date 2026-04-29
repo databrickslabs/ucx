@@ -104,6 +104,21 @@ runs:
         EOF
         printf '::debug::%s\n' 'Configured JFrog access for maven.'
 
+    - name: Configure netrc for JFrog
+      if: "${{ steps.detect-cmds.outputs.command_pip3 == 'true' ||
+               steps.detect-cmds.outputs.command_uv == 'true' }}"
+      shell: bash
+      env:
+        JFROG_ACCESS_TOKEN: "${{ steps.jfrog-auth.outputs.jfrog-access-token }}"
+      run: |
+        umask 077
+        cat > "${RUNNER_TEMP}/.netrc" << EOF
+        machine databricks.jfrog.io
+        login gha-service-account
+        password ${JFROG_ACCESS_TOKEN}
+        EOF
+        printf '%s=%s\n' 'NETRC' "${RUNNER_TEMP}/.netrc" >> "${GITHUB_ENV}"
+
     - name: Configure npm/yarn (classic) for JFrog
       if: "${{ steps.detect-cmds.outputs.command_npm == 'true' }}"
       shell: bash
@@ -122,13 +137,10 @@ runs:
     - name: Configure pip for JFrog
       if: "${{ steps.detect-cmds.outputs.command_pip3 == 'true' }}"
       shell: bash
-      env:
-        JFROG_ACCESS_TOKEN: "${{ steps.jfrog-auth.outputs.jfrog-access-token }}"
       run: |
-        umask 077
-        cat > "${RUNNER_TEMP}/.pip.conf" << EOF
+        cat > "${RUNNER_TEMP}/.pip.conf" << 'EOF'
         [global]
-        index-url = https://gha-service-account:${JFROG_ACCESS_TOKEN}@databricks.jfrog.io/artifactory/api/pypi/db-pypi/simple
+        index-url = https://databricks.jfrog.io/artifactory/api/pypi/db-pypi/simple
         EOF
         printf '%s=%s\n' 'PIP_CONFIG_FILE' "${RUNNER_TEMP}/.pip.conf" >> "${GITHUB_ENV}"
         printf '::debug::%s\n' 'Configured JFrog access for pip.'
@@ -163,10 +175,8 @@ runs:
       if: "${{ steps.detect-cmds.outputs.command_uv == 'true' }}"
       shell: bash
       env:
-        JFROG_ACCESS_TOKEN: "${{ steps.jfrog-auth.outputs.jfrog-access-token }}"
         UV_INDEX_URL: 'https://databricks.jfrog.io/artifactory/api/pypi/db-pypi/simple'
       run: |
-        uv auth login "${UV_INDEX_URL}" --username gha-service-account --password "${JFROG_ACCESS_TOKEN}"
         printf '%s=%s\n' 'UV_INDEX_URL' "${UV_INDEX_URL}" >> "${GITHUB_ENV}"
         printf '%s=%s\n' 'UV_FROZEN' '1' >> "${GITHUB_ENV}"
         printf '::debug::%s\n' 'Configured JFrog access for uv.'
