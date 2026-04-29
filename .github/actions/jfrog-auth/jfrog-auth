@@ -22,7 +22,7 @@ printf '::add-mask::%s\n' "${_id_token}"
 # Step 2: Exchange it for the JFrog access token.
 #
 printf '::debug::%s\n' "Exchanging OIDC identifier token for JFrog access token..."
-_access_token=$(curl -sLS \
+_access_token=$(curl -fsSL \
     --json "{\"grant_type\": \"urn:ietf:params:oauth:grant-type:token-exchange\", \"subject_token_type\":\"urn:ietf:params:oauth:token-type:id_token\", \"subject_token\": \"${_id_token}\", \"provider_name\": \"github-actions\"}" \
     "https://databricks.jfrog.io/access/api/v1/oidc/token" |
     jq -r .access_token)
