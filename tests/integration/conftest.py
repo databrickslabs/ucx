@@ -2,6 +2,7 @@ import atexit
 import collections
 import faulthandler
 import functools
+import glob
 import json
 import logging
 import os
@@ -1517,8 +1518,28 @@ def _diag_traceback(excinfo) -> None:
     os.write(_DIAG_FD, formatted.encode("utf-8"))
 
 
+def _diag_coverage_state() -> None:
+    """Snapshot coverage-related state when an internal error fires.
+
+    The wrapper invokes pytest multiple times; coverage's per-session combine() only
+    fails on the last one, so this snapshot of remaining `.coverage*` parts plus the
+    active config path narrows down which session wrote incompatible data.
+    """
+    rcfile = os.environ.get("COVERAGE_RCFILE", "<unset>")
+    _diag(f"UCX_COVERAGE_RCFILE={rcfile}")
+    coverage_files = sorted(glob.glob(".coverage*")) + sorted(glob.glob(os.path.join(os.getcwd(), ".coverage*")))
+    _diag(f"UCX_COVERAGE_FILES count={len(coverage_files)}")
+    for path in coverage_files:
+        try:
+            size = os.path.getsize(path)
+        except OSError:
+            size = -1
+        _diag(f"UCX_COVERAGE_FILE size={size} path={path}")
+
+
 def pytest_internalerror(excrepr, excinfo):
     _diag("UCX_INTERNALERROR_BEGIN")
+    _diag_coverage_state()
     _diag(str(excrepr))
     _diag_traceback(excinfo)
     _diag("UCX_INTERNALERROR_END")

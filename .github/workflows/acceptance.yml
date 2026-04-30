@@ -59,6 +59,10 @@ jobs:
           ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
           ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
           UCX_PYTEST_DIAG_DIR: ${{ runner.temp }}
+          # Pin coverage.py to the project's [tool.coverage.run] config (branch = true,
+          # parallel = true) regardless of which CWD the acceptance wrapper invokes pytest
+          # from, so every session writes the same data shape and combine() succeeds.
+          COVERAGE_RCFILE: ${{ github.workspace }}/pyproject.toml
 
       - name: Dump pytest diagnostics
         if: always()
