@@ -1,10 +1,15 @@
-import json
-import functools
+import atexit
 import collections
-import os
+import faulthandler
+import functools
+import json
 import logging
+import os
 import shutil
 import subprocess
+import sys
+import tempfile
+import traceback
 from collections.abc import Callable, Generator
 from dataclasses import replace
 from datetime import timedelta
@@ -1486,49 +1491,44 @@ def get_group(group_manager: GroupManager, group_name: str) -> NoReturn:
 # wrapper only surfaces structured ✅/❌/⏭️ markers, so unhandled exceptions and signal
 # crashes vanish from the GH Actions log. Write tracebacks and faulthandler output to a
 # file that a subsequent workflow step (`if: always()`) can dump verbatim.
-import atexit  # noqa: E402  pylint: disable=wrong-import-position,wrong-import-order
-import faulthandler  # noqa: E402  pylint: disable=wrong-import-position,wrong-import-order
-import sys  # noqa: E402  pylint: disable=wrong-import-position,wrong-import-order
-import tempfile  # noqa: E402  pylint: disable=wrong-import-position,wrong-import-order
-import traceback  # noqa: E402  pylint: disable=wrong-import-position,wrong-import-order
+def _diag_path() -> str:
+    diag_dir = os.environ.get("UCX_PYTEST_DIAG_DIR") or os.environ.get("RUNNER_TEMP") or tempfile.gettempdir()
+    return os.path.join(diag_dir, "ucx_pytest_diag.log")
 
 
-_DIAG_DIR = os.environ.get("UCX_PYTEST_DIAG_DIR") or os.environ.get("RUNNER_TEMP") or tempfile.gettempdir()
-_DIAG_PATH = os.path.join(_DIAG_DIR, "ucx_pytest_diag.log")
-_DIAG_FILE = open(_DIAG_PATH, "a", buffering=1, encoding="utf-8")  # pylint: disable=consider-using-with
-atexit.register(_DIAG_FILE.close)
-
-
-# faulthandler must own a writable file with a real fileno; reuse the same one so signal
-# crashes land alongside the rest of the diagnostic output.
-faulthandler.enable(file=_DIAG_FILE)
+# Persistent file descriptor opened via os.open so faulthandler has a real fileno that
+# outlives the registering function. Closed via atexit.
+_DIAG_FD = os.open(_diag_path(), os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o644)
+atexit.register(os.close, _DIAG_FD)
+faulthandler.enable(file=_DIAG_FD)
 
 
 def _diag(*parts: str) -> None:
-    line = " ".join(parts)
-    print(line, file=sys.stderr, flush=True)
-    _DIAG_FILE.write(line + "\n")
-    _DIAG_FILE.flush()
+    line = " ".join(parts) + "\n"
+    print(line, end="", file=sys.stderr, flush=True)
+    os.write(_DIAG_FD, line.encode("utf-8"))
+
+
+def _diag_traceback(excinfo) -> None:
+    if excinfo is None:
+        return
+    formatted = "".join(traceback.format_exception(excinfo.type, excinfo.value, excinfo.tb))
+    print(formatted, end="", file=sys.stderr, flush=True)
+    os.write(_DIAG_FD, formatted.encode("utf-8"))
 
 
 def pytest_internalerror(excrepr, excinfo):
     _diag("UCX_INTERNALERROR_BEGIN")
     _diag(str(excrepr))
-    if excinfo is not None:
-        traceback.print_exception(excinfo.type, excinfo.value, excinfo.tb, file=_DIAG_FILE)
-        _DIAG_FILE.flush()
-        traceback.print_exception(excinfo.type, excinfo.value, excinfo.tb, file=sys.stderr)
+    _diag_traceback(excinfo)
     _diag("UCX_INTERNALERROR_END")
     return False  # let pytest's default handler run too
 
 
 def pytest_keyboard_interrupt(excinfo):
     _diag("UCX_KEYBOARD_INTERRUPT")
-    if excinfo is not None:
-        traceback.print_exception(excinfo.type, excinfo.value, excinfo.tb, file=_DIAG_FILE)
-        _DIAG_FILE.flush()
-        traceback.print_exception(excinfo.type, excinfo.value, excinfo.tb, file=sys.stderr)
+    _diag_traceback(excinfo)
 
 
-def pytest_sessionfinish(session, exitstatus):  # pylint: disable=unused-argument
+def pytest_sessionfinish(exitstatus):
     _diag(f"UCX_SESSION_FINISH exitstatus={exitstatus}")
