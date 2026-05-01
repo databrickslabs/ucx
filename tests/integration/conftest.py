@@ -1,16 +1,10 @@
-import atexit
 import collections
-import faulthandler
 import functools
-import glob
 import json
 import logging
 import os
 import shutil
 import subprocess
-import sys
-import tempfile
-import traceback
 from collections.abc import Callable, Generator
 from dataclasses import replace
 from datetime import timedelta
@@ -1485,71 +1479,3 @@ def get_group(group_manager: GroupManager, group_name: str) -> NoReturn:
         logger.info(f"Group {group_name} was not deleted. Retrying...")
         raise AssertionError(f"Group is not deleted: {group_name}")
     raise NotFound(f"Group not found: {group_name}")
-
-
-# Diagnostic hooks: when the acceptance wrapper reports `exit status 3` with no failed
-# tests, pytest is hitting an internal error after the visible test stream ends. The
-# wrapper only surfaces structured ✅/❌/⏭️ markers, so unhandled exceptions and signal
-# crashes vanish from the GH Actions log. Write tracebacks and faulthandler output to a
-# file that a subsequent workflow step (`if: always()`) can dump verbatim.
-def _diag_path() -> str:
-    diag_dir = os.environ.get("UCX_PYTEST_DIAG_DIR") or os.environ.get("RUNNER_TEMP") or tempfile.gettempdir()
-    return os.path.join(diag_dir, "ucx_pytest_diag.log")
-
-
-# Persistent file descriptor opened via os.open so faulthandler has a real fileno that
-# outlives the registering function. Closed via atexit.
-_DIAG_FD = os.open(_diag_path(), os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o644)
-atexit.register(os.close, _DIAG_FD)
-faulthandler.enable(file=_DIAG_FD)
-
-
-def _diag(*parts: str) -> None:
-    line = " ".join(parts) + "\n"
-    print(line, end="", file=sys.stderr, flush=True)
-    os.write(_DIAG_FD, line.encode("utf-8"))
-
-
-def _diag_traceback(excinfo) -> None:
-    if excinfo is None:
-        return
-    formatted = "".join(traceback.format_exception(excinfo.type, excinfo.value, excinfo.tb))
-    print(formatted, end="", file=sys.stderr, flush=True)
-    os.write(_DIAG_FD, formatted.encode("utf-8"))
-
-
-def _diag_coverage_state() -> None:
-    """Snapshot coverage-related state when an internal error fires.
-
-    The wrapper invokes pytest multiple times; coverage's per-session combine() only
-    fails on the last one, so this snapshot of remaining `.coverage*` parts plus the
-    active config path narrows down which session wrote incompatible data.
-    """
-    rcfile = os.environ.get("COVERAGE_RCFILE", "<unset>")
-    _diag(f"UCX_COVERAGE_RCFILE={rcfile}")
-    coverage_files = sorted(glob.glob(".coverage*")) + sorted(glob.glob(os.path.join(os.getcwd(), ".coverage*")))
-    _diag(f"UCX_COVERAGE_FILES count={len(coverage_files)}")
-    for path in coverage_files:
-        try:
-            size = os.path.getsize(path)
-        except OSError:
-            size = -1
-        _diag(f"UCX_COVERAGE_FILE size={size} path={path}")
-
-
-def pytest_internalerror(excrepr, excinfo):
-    _diag("UCX_INTERNALERROR_BEGIN")
-    _diag_coverage_state()
-    _diag(str(excrepr))
-    _diag_traceback(excinfo)
-    _diag("UCX_INTERNALERROR_END")
-    return False  # let pytest's default handler run too
-
-
-def pytest_keyboard_interrupt(excinfo):
-    _diag("UCX_KEYBOARD_INTERRUPT")
-    _diag_traceback(excinfo)
-
-
-def pytest_sessionfinish(exitstatus):
-    _diag(f"UCX_SESSION_FINISH exitstatus={exitstatus}")
