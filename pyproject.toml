@@ -88,7 +88,7 @@ lint = [
     "databricks-labs-pylint~=0.5",
     "ruff~=0.3.4",
     "types-PyYAML~=6.0.12",
-    "types-requests~=2.31.0",
+    "types-requests>=2.31,<2.34",
 ]
 pytest = [
     "coverage[toml]~=7.4.4",
