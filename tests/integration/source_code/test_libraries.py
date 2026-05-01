@@ -21,11 +21,13 @@ def _resolved_index_url() -> str:
 
     Note: this only checks the configuration files, it ignores the PIP_INDEX_URL environment variable.
     """
-    cmd = [sys.executable, "-m", "pip", "config", "get", "global.index-url"]
+    # Cannot use 'config get': that will not consult the file if PIP_CONFIG_FILE is set.
+    cmd = [sys.executable, "-m", "pip", "config", "list"]
     result = subprocess.run(cmd, capture_output=True, text=True, check=False, timeout=10)
     if result.returncode == 0:
-        if index_url := result.stdout.strip():
-            return index_url
+        for line in result.stdout.splitlines():
+            if line.startswith("global.index-url="):
+                return line.split("=", 1)[1].strip().strip("'\"")
     return "https://pypi.python.org/simple"
 
 

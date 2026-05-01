@@ -529,7 +529,7 @@ dev = [
     { name = "databricks-labs-pylint", specifier = "~=0.5" },
     { name = "databricks-labs-pytester", specifier = ">=0.7.2" },
     { name = "mypy", specifier = "~=1.9.0" },
-    { name = "pip" },
+    { name = "pip", specifier = "~=26.0" },
     { name = "pylint", specifier = "~=3.3.1" },
     { name = "pylint-pytest", specifier = "==2.0.0a0" },
     { name = "pytest", specifier = "~=8.3.3" },
@@ -564,7 +564,7 @@ pytest = [
 test = [
     { name = "coverage", extras = ["toml"], specifier = "~=7.4.4" },
     { name = "databricks-labs-pytester", specifier = ">=0.7.2" },
-    { name = "pip" },
+    { name = "pip", specifier = "~=26.0" },
     { name = "pytest", specifier = "~=8.3.3" },
     { name = "pytest-cov", specifier = "~=4.1.0" },
     { name = "pytest-mock", specifier = "~=3.14.0" },
