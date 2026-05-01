@@ -19,18 +19,13 @@ from tests.unit.conftest import MockPathLookup
 def _resolved_index_url() -> str:
     """Return whichever pip mirror is configured locally, or public PyPI as a fallback.
 
-    ``pip config get`` only inspects the ``user``/``global``/``site`` scopes; it does not
-    read ``PIP_CONFIG_FILE`` (which loads as the ``env`` scope). CI's jfrog-auth action
-    configures pip via ``PIP_CONFIG_FILE``, so ``get`` returns no key there and we'd fall
-    back to public PyPI, which is unreachable from CI. ``pip config list`` *does* surface
-    every scope as ``key='value'`` lines, so parse that instead.
+    Note: this only checks the configuration files, it ignores the PIP_INDEX_URL environment variable.
     """
-    cmd = [sys.executable, "-m", "pip", "config", "list"]
+    cmd = [sys.executable, "-m", "pip", "config", "get", "global.index-url"]
     result = subprocess.run(cmd, capture_output=True, text=True, check=False, timeout=10)
     if result.returncode == 0:
-        for line in result.stdout.splitlines():
-            if line.startswith("global.index-url="):
-                return line.split("=", 1)[1].strip().strip("'\"")
+        if index_url := result.stdout.strip():
+            return index_url
     return "https://pypi.python.org/simple"
 
 
