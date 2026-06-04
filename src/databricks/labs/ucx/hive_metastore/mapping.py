@@ -92,6 +92,8 @@ class TableToMigrate:
 class TableMapping:
     FILENAME = 'mapping.csv'
     UCX_SKIP_PROPERTY = "databricks.labs.ucx.skip"
+    # Workspace import API has a 10 MB hard limit; 50 K rows × ~160 bytes ≈ 8 MB per page
+    _PAGE_SIZE = 50_000
 
     def __init__(
         self,
