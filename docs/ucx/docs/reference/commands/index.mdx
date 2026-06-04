@@ -575,6 +575,14 @@ databricks labs ucx create-catalogs-schemas
 ```
 After [`create-table-mapping` command](/docs/reference/commands#create-table-mapping) is executed, you can run this command to have the required UC catalogs and schemas created.
 This command is supposed to be run before migrating tables to UC using [table migration process](/docs/process/#table-migration-process).
+
+This command prompts for a storage location at the **catalog** level only. It does not support specifying storage
+locations at the schema level. If you need to assign different storage locations per schema, create the catalogs and
+schemas manually before running this command (see [below](#custom-storage-locations-per-schema)).
+
+This command **skips** catalogs and schemas that already exist, so any manually pre-created assets will be left
+unchanged.
+
 Catalog & Schema ACL:
 `create-catalogs-schemas` command also applies any catalog and schema ACL from existing clusters.
 For Azure it checks if there are any interactive cluster or sql warehouse which has service principals configured to access storage.
@@ -583,6 +591,24 @@ the schema and catalog if at least one such table is migrated to it.
 For AWS, it checks any instance profiles mapped to the interactive cluster or sql warehouse. It checks the mapping of instance profiles
 to the bucket. It then maps the bucket to the tables which has external location on those bucket created and grants `USAGE` access to
 the schema and catalog if at least one such table is migrated to it.
+
+#### Custom storage locations per schema
+
+If your governance model requires different storage locations for individual schemas, you must create the catalogs and
+schemas manually **before** running `create-catalogs-schemas`. The command will detect the existing assets and skip
+them, then proceed to apply the grants.
+
+1. Run [`create-table-mapping`](/docs/reference/commands#create-table-mapping) to generate the mapping file.
+2. Review the mapping file to identify the target catalogs and schemas that will be created.
+3. Create the catalogs and schemas manually using the Databricks UI, CLI, or SQL, specifying the desired storage
+   location for each schema. For example:
+   ```sql
+   CREATE CATALOG IF NOT EXISTS my_catalog MANAGED LOCATION 'abfss://container@account.dfs.core.windows.net/catalog-root';
+   CREATE SCHEMA IF NOT EXISTS my_catalog.schema_a MANAGED LOCATION 'abfss://container@account.dfs.core.windows.net/schema-a';
+   CREATE SCHEMA IF NOT EXISTS my_catalog.schema_b MANAGED LOCATION 'abfss://container@account.dfs.core.windows.net/schema-b';
+   ```
+4. Run `databricks labs ucx create-catalogs-schemas`. The command will skip the pre-created catalogs and schemas and
+   apply the necessary permissions.
 
 ### `assign-owner-group`
 
