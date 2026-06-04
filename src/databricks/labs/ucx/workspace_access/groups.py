@@ -967,13 +967,13 @@ class AccountGroupLookup:
         # get account-level groups even if they're not (yet) assigned to a workspace
         logger.info(f"Listing account groups with {scim_attributes}...")
 
-        def fetch_page(query: dict) -> dict:
-            query["attributes"] = scim_attributes
+        def fetch_account_groups(start_index: int, count: int) -> dict:
+            query = {"startIndex": start_index, "count": count, "attributes": scim_attributes}
             return self._ws.api_client.do("GET", "/api/2.0/account/scim/v2/Groups", query=query)  # type: ignore[return-value]
 
         account_groups: list[iam.Group] = []
         seen: set[str] = set()
-        for resource in paginated_fetch_offset(fetch_page, items_key="Resources", page_size=self.PAGE_SIZE):
+        for resource in paginated_fetch_offset(fetch_account_groups, items_key="Resources", page_size=self.PAGE_SIZE):
             group = iam.Group.from_dict(resource)
             if group.id and group.id in seen:
                 continue

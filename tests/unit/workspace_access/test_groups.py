@@ -621,6 +621,30 @@ def test_list_account_groups_filters_system_groups_across_pages():
     assert "users" not in groups
 
 
+def test_list_account_groups_deduplicates_across_pages():
+    """Duplicate group IDs across pages should be counted only once."""
+    wsclient = create_autospec(WorkspaceClient)
+
+    duplicate = Group(id="1", display_name="alpha").as_dict()
+    page1 = [duplicate, Group(id="2", display_name="beta").as_dict()]
+    page2 = [duplicate, Group(id="3", display_name="gamma").as_dict()]
+    responses = iter([{"Resources": page1}, {"Resources": page2}])
+
+    def do_side_effect(_method, *_args, **_kwargs):
+        return next(responses)
+
+    wsclient.api_client.do.side_effect = do_side_effect
+
+    with patch.object(AccountGroupLookup, "PAGE_SIZE", 2):
+        lookup = AccountGroupLookup(wsclient)
+        groups = lookup.get_mapping()
+
+    assert len(groups) == 3
+    assert "alpha" in groups
+    assert "beta" in groups
+    assert "gamma" in groups
+
+
 def test_delete_original_workspace_groups_should_delete_reflected_acc_groups_in_workspace(fake_sleep: Mock) -> None:
     account_id = "11"
     ws_id = "1"

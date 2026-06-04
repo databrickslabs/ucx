@@ -1,7 +1,6 @@
 import logging
 import subprocess
 from collections.abc import Callable, Iterator
-from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +24,7 @@ def escape_sql_identifier(path: str, *, maxsplit: int = 2) -> str:
 
 
 def paginated_fetch_offset(
-    fetch_page: Callable[[dict[str, Any]], dict],
+    fetch_page: Callable[[int, int], dict],
     items_key: str,
     page_size: int,
     start_index: int = 1,
@@ -33,7 +32,7 @@ def paginated_fetch_offset(
     """Paginate a SCIM-style offset API (startIndex / count).
 
     Args:
-        fetch_page: Callable that takes a query dict and returns a response dict.
+        fetch_page: Callable that takes (start_index, count) and returns a response dict.
         items_key: Key in the response containing the list of items (e.g. "Resources").
         page_size: Number of items to request per page.
         start_index: 1-based index to start from (SCIM default is 1).
@@ -41,16 +40,15 @@ def paginated_fetch_offset(
     Yields:
         Individual raw item dicts from each page.
     """
-    query: dict[str, Any] = {"startIndex": start_index, "count": page_size}
     while True:
-        response = fetch_page(query)
+        response = fetch_page(start_index, page_size)
         items = response.get(items_key, [])
         if not items:
             break
         yield from items
         if len(items) < page_size:
             break
-        query["startIndex"] = int(query["startIndex"]) + len(items)
+        start_index += len(items)
 
 
 def paginated_fetch_cursor(

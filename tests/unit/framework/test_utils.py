@@ -47,7 +47,7 @@ def test_offset_pagination_empty_first_page() -> None:
     """No items returned on the first request."""
     pages: list[dict] = [{"Resources": []}]
 
-    def fetch_page(_query: dict) -> dict:
+    def fetch_page(_start_index: int, _count: int) -> dict:
         return pages.pop(0)
 
     results = list(paginated_fetch_offset(fetch_page, items_key="Resources", page_size=10))
@@ -59,7 +59,7 @@ def test_offset_pagination_single_page() -> None:
     items = [{"id": "1"}, {"id": "2"}]
     pages = [{"Resources": items}]
 
-    def fetch_page(_query: dict) -> dict:
+    def fetch_page(_start_index: int, _count: int) -> dict:
         return pages.pop(0)
 
     results = list(paginated_fetch_offset(fetch_page, items_key="Resources", page_size=10))
@@ -71,23 +71,23 @@ def test_offset_pagination_multiple_pages() -> None:
     page1 = [{"id": "1"}, {"id": "2"}]
     page2 = [{"id": "3"}]
     pages = [{"Resources": page1}, {"Resources": page2}]
-    captured_queries: list[dict] = []
+    captured_calls: list[tuple[int, int]] = []
 
-    def fetch_page(query: dict) -> dict:
-        captured_queries.append(dict(query))
+    def fetch_page(start_index: int, count: int) -> dict:
+        captured_calls.append((start_index, count))
         return pages.pop(0)
 
     results = list(paginated_fetch_offset(fetch_page, items_key="Resources", page_size=2))
     assert results == [{"id": "1"}, {"id": "2"}, {"id": "3"}]
-    assert captured_queries[0]["startIndex"] == 1
-    assert captured_queries[1]["startIndex"] == 3
+    assert captured_calls[0] == (1, 2)
+    assert captured_calls[1] == (3, 2)
 
 
 def test_offset_pagination_terminates_on_missing_key() -> None:
     """Stops when the items key is missing from the response entirely."""
     pages = [{"other_key": "value"}]
 
-    def fetch_page(_query: dict) -> dict:
+    def fetch_page(_start_index: int, _count: int) -> dict:
         return pages.pop(0)
 
     results = list(paginated_fetch_offset(fetch_page, items_key="Resources", page_size=10))
@@ -97,15 +97,15 @@ def test_offset_pagination_terminates_on_missing_key() -> None:
 def test_offset_pagination_respects_start_index() -> None:
     """Custom start_index is passed to the first request."""
     pages = [{"Resources": [{"id": "5"}]}]
-    captured_queries: list[dict] = []
+    captured_calls: list[tuple[int, int]] = []
 
-    def fetch_page(query: dict) -> dict:
-        captured_queries.append(dict(query))
+    def fetch_page(start_index: int, count: int) -> dict:
+        captured_calls.append((start_index, count))
         return pages.pop(0)
 
     results = list(paginated_fetch_offset(fetch_page, items_key="Resources", page_size=10, start_index=5))
     assert results == [{"id": "5"}]
-    assert captured_queries[0]["startIndex"] == 5
+    assert captured_calls[0] == (5, 10)
 
 
 # --- paginated_fetch_cursor tests ---

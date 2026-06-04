@@ -441,7 +441,7 @@ def experiments_listing(ws: WorkspaceClient):
 
 def feature_store_listing(ws: WorkspaceClient):
     def inner() -> list[GenericPermissionsInfo]:
-        def fetch_page(token: str | None) -> dict:
+        def fetch_feature_tables(token: str | None) -> dict:
             result = ws.api_client.do(
                 "GET", "/api/2.0/feature-store/feature-tables/search", query={"page_token": token, "max_results": 200}
             )
@@ -449,7 +449,7 @@ def feature_store_listing(ws: WorkspaceClient):
             return result
 
         feature_tables = []
-        for table in paginated_fetch_cursor(fetch_page, items_key="feature_tables"):
+        for table in paginated_fetch_cursor(fetch_feature_tables, items_key="feature_tables"):
             feature_tables.append(GenericPermissionsInfo(table["id"], "feature-tables"))
         return feature_tables
 
