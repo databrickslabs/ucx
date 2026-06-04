@@ -89,6 +89,7 @@ jobs:
         env:  # this is a temporary hack
           DATABRICKS_HOST: any
           DATABRICKS_TOKEN: any
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Reformat SQL queries
         run: databricks labs lsql fmt --normalize-case false --exclude tests/unit/source_code/samples/
