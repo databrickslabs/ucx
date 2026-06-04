@@ -626,8 +626,10 @@ def test_list_account_groups_deduplicates_across_pages():
     wsclient = create_autospec(WorkspaceClient)
 
     duplicate = Group(id="1", display_name="alpha").as_dict()
+    # page1 fills PAGE_SIZE (2), so pagination continues; page2 is shorter, so it stops.
+    # alpha appears on both pages and must only be counted once.
     page1 = [duplicate, Group(id="2", display_name="beta").as_dict()]
-    page2 = [duplicate, Group(id="3", display_name="gamma").as_dict()]
+    page2 = [duplicate]
     responses = iter([{"Resources": page1}, {"Resources": page2}])
 
     def do_side_effect(_method, *_args, **_kwargs):
@@ -639,10 +641,9 @@ def test_list_account_groups_deduplicates_across_pages():
         lookup = AccountGroupLookup(wsclient)
         groups = lookup.get_mapping()
 
-    assert len(groups) == 3
+    assert len(groups) == 2
     assert "alpha" in groups
     assert "beta" in groups
-    assert "gamma" in groups
 
 
 def test_delete_original_workspace_groups_should_delete_reflected_acc_groups_in_workspace(fake_sleep: Mock) -> None:
