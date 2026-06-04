@@ -118,8 +118,13 @@ class TableMapping:
     def save(self, tables: TablesCrawler, workspace_info: WorkspaceInfo) -> str:
         workspace_name = workspace_info.current()
         default_catalog_name = re.sub(r"\W+", "_", workspace_name)
-        current_tables = self.current_tables(tables, workspace_name, default_catalog_name)
-        return self._installation.save(list(current_tables), filename=self.FILENAME)
+        rules = list(self.current_tables(tables, workspace_name, default_catalog_name))
+        pages = [rules[i : i + self._PAGE_SIZE] for i in range(0, len(rules), self._PAGE_SIZE)]
+        path = None
+        for i, page in enumerate(pages):
+            filename = self.FILENAME if i == 0 else f"mapping-{i}.csv"
+            path = self._installation.save(page, filename=filename)
+        return path or f"{self._installation.install_folder()}/{self.FILENAME}"
 
     def load(self) -> list[Rule]:
         try:
