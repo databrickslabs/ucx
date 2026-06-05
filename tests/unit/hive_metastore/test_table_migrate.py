@@ -1837,6 +1837,8 @@ def test_migrate_dbfs_root_delta_table_with_uniform_iceberg_enabled(ws, mock_pys
         "'delta.universalFormat.enabledFormats' = 'iceberg', "
         "'delta.enableIcebergCompatV2' = 'true')"
     ) in backend.queries
+    migrate_grants.apply.assert_called()
+    external_locations.resolve_mount.assert_not_called()
 
 
 def test_migrate_external_sync_table_with_uniform_iceberg_enabled(ws, mock_pyspark):
@@ -1872,6 +1874,8 @@ def test_migrate_external_sync_table_with_uniform_iceberg_enabled(ws, mock_pyspa
         "'delta.universalFormat.enabledFormats' = 'iceberg', "
         "'delta.enableIcebergCompatV2' = 'true')"
     ) in backend.queries
+    migrate_grants.apply.assert_called()
+    external_locations.resolve_mount.assert_not_called()
 
 
 def test_migrate_non_delta_table_with_uniform_iceberg_does_not_alter(ws, mock_pyspark):
@@ -1901,6 +1905,8 @@ def test_migrate_non_delta_table_with_uniform_iceberg_does_not_alter(ws, mock_py
         "'delta.enableIcebergCompatV2' = 'true')"
     )
     assert all(uniform_query not in q for q in backend.queries)
+    migrate_grants.apply.assert_called()
+    external_locations.resolve_mount.assert_not_called()
 
 
 def test_migrate_delta_table_without_uniform_iceberg_flag_does_not_alter(ws, mock_pyspark):
@@ -1930,3 +1936,5 @@ def test_migrate_delta_table_without_uniform_iceberg_flag_does_not_alter(ws, moc
         "'delta.enableIcebergCompatV2' = 'true')"
     )
     assert all(uniform_query not in q for q in backend.queries)
+    migrate_grants.apply.assert_called()
+    external_locations.resolve_mount.assert_not_called()

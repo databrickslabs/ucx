@@ -135,7 +135,11 @@ class TablesMigrator:
         if what == What.VIEW:
             return self._migrate_views()
         return self._migrate_tables(
-            what, managed_table_external_storage.upper(), hiveserde_in_place_migrate, check_uc_table, enable_uniform_iceberg
+            what,
+            managed_table_external_storage.upper(),
+            hiveserde_in_place_migrate,
+            check_uc_table,
+            enable_uniform_iceberg,
         )
 
     def _migrate_tables(
@@ -760,8 +764,7 @@ class TablesMigrator:
         logger.info(f"Enabling UniForm Iceberg compatibility on {target_table_key}")
         escaped = escape_sql_identifier(target_table_key)
         self._sql_backend.execute(
-            f"ALTER TABLE {escaped} "
-            f"SET TBLPROPERTIES ('delta.enableDeletionVectors' = 'false')"
+            f"ALTER TABLE {escaped} " f"SET TBLPROPERTIES ('delta.enableDeletionVectors' = 'false')"
         )
         self._sql_backend.execute(f"REORG TABLE {escaped} APPLY (PURGE)")
         self._sql_backend.execute(
