@@ -82,14 +82,39 @@ jobs:
       - name: Install Databricks CLI
         uses: databricks/setup-cli@8db12393ac48926ab0074f3928f36c7abc441f90  # v0.292.0
 
+      # `databricks labs install lsql` fetches the release list and source zipball from
+      # api.github.com *anonymously* (the CLI never reads GITHUB_TOKEN), so it routinely
+      # hits GitHub's 60 req/hr unauthenticated rate limit on shared runner IPs and fails
+      # with "403 Forbidden". To avoid that, pre-fetch everything with authenticated `gh`
+      # (5000 req/hr), seed the CLI's local cache + lib dir, then install with --offline so
+      # the CLI makes no GitHub API calls at all.
       - name: Install LSQL
-        run: |
-          databricks labs install lsql --log-level=trace
-          databricks labs installed
-        env:  # this is a temporary hack
+        env:
           DATABRICKS_HOST: any
           DATABRICKS_TOKEN: any
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          labs_dir="$HOME/.databricks/labs/lsql"
+          mkdir -p "$labs_dir/cache" "$labs_dir/lib"
+
+          # Seed the version cache the CLI reads, so `install --offline` resolves "latest"
+          # without calling api.github.com. The cache format is {refreshed_at, data:[releases]}.
+          releases="$(gh api repos/databrickslabs/lsql/releases)"
+          latest_tag="$(printf '%s' "$releases" | jq -r '.[0].tag_name')"
+          printf '%s' "$releases" \
+            | jq '{refreshed_at: (now | todate), data: .}' \
+            > "$labs_dir/cache/databrickslabs-lsql-releases.json"
+
+          # Download and unpack the release source into the lib dir (what the CLI would
+          # otherwise pull from the GitHub zipball endpoint). Strip the single top-level dir.
+          tmp="$(mktemp -d)"
+          gh release download "$latest_tag" --repo databrickslabs/lsql --archive=zip --output "$tmp/lsql.zip"
+          unzip -q "$tmp/lsql.zip" -d "$tmp/unpacked"
+          cp -R "$(find "$tmp/unpacked" -mindepth 1 -maxdepth 1 -type d)"/. "$labs_dir/lib/"
+
+          databricks labs install lsql --offline --log-level=trace
+          databricks labs installed
 
       - name: Reformat SQL queries
         run: databricks labs lsql fmt --normalize-case false --exclude tests/unit/source_code/samples/
