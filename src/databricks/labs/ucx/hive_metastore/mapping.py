@@ -92,6 +92,8 @@ class TableToMigrate:
 class TableMapping:
     FILENAME = 'mapping.csv'
     UCX_SKIP_PROPERTY = "databricks.labs.ucx.skip"
+    # Workspace import API has a 10 MB hard limit; 50 K rows × ~160 bytes ≈ 8 MB per page
+    _PAGE_SIZE = 50_000
 
     def __init__(
         self,
@@ -116,15 +118,28 @@ class TableMapping:
     def save(self, tables: TablesCrawler, workspace_info: WorkspaceInfo) -> str:
         workspace_name = workspace_info.current()
         default_catalog_name = re.sub(r"\W+", "_", workspace_name)
-        current_tables = self.current_tables(tables, workspace_name, default_catalog_name)
-        return self._installation.save(list(current_tables), filename=self.FILENAME)
+        rules = list(self.current_tables(tables, workspace_name, default_catalog_name))
+        pages = [rules[i : i + self._PAGE_SIZE] for i in range(0, len(rules), self._PAGE_SIZE)]
+        path = None
+        for i, page in enumerate(pages):
+            filename = self.FILENAME if i == 0 else f"mapping-{i}.csv"
+            path = self._installation.save(page, filename=filename)
+        return path or f"{self._installation.install_folder()}/{self.FILENAME}"
 
     def load(self) -> list[Rule]:
         try:
-            return self._installation.load(list[Rule], filename=self.FILENAME)
+            rules = self._installation.load(list[Rule], filename=self.FILENAME)
         except NotFound:
             msg = "Please run: databricks labs ucx create-table-mapping"
             raise ValueError(msg) from None
+        page = 1
+        while True:
+            try:
+                rules += self._installation.load(list[Rule], filename=f"mapping-{page}.csv")
+                page += 1
+            except NotFound:
+                break
+        return rules
 
     def skip_table_or_view(self, schema_name: str, table_name: str, load_table: Callable[[str, str], Table | None]):
         # Marks a table to be skipped in the migration process by applying a table property
