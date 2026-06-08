@@ -24,7 +24,9 @@ class TableMigration(Workflow):
         to the Unity Catalog.
         """
         ctx.tables_migrator.migrate_tables(
-            what=What.EXTERNAL_SYNC, managed_table_external_storage=ctx.config.managed_table_external_storage
+            what=What.EXTERNAL_SYNC,
+            managed_table_external_storage=ctx.config.managed_table_external_storage,
+            enable_uniform_iceberg=ctx.config.enable_uniform_iceberg,
         )
 
     @job_task(job_cluster="user_isolation", depends_on=[Assessment.crawl_tables, convert_managed_table])
@@ -32,7 +34,10 @@ class TableMigration(Workflow):
         """This workflow task migrates delta tables stored in DBFS root from the Hive Metastore to the Unity Catalog
         using deep clone.
         """
-        ctx.tables_migrator.migrate_tables(what=What.DBFS_ROOT_DELTA)
+        ctx.tables_migrator.migrate_tables(
+            what=What.DBFS_ROOT_DELTA,
+            enable_uniform_iceberg=ctx.config.enable_uniform_iceberg,
+        )
 
     @job_task(job_cluster="user_isolation", depends_on=[Assessment.crawl_tables, convert_managed_table])
     def migrate_dbfs_root_non_delta_tables(
@@ -42,7 +47,10 @@ class TableMigration(Workflow):
         """This workflow task migrates non delta tables stored in DBFS root from the Hive Metastore to the Unity Catalog
         using CTAS.
         """
-        ctx.tables_migrator.migrate_tables(what=What.DBFS_ROOT_NON_DELTA)
+        ctx.tables_migrator.migrate_tables(
+            what=What.DBFS_ROOT_NON_DELTA,
+            enable_uniform_iceberg=ctx.config.enable_uniform_iceberg,
+        )
 
     @job_task(
         job_cluster="user_isolation",
@@ -119,6 +127,7 @@ class MigrateHiveSerdeTablesInPlace(Workflow):
         ctx.tables_migrator.migrate_tables(
             what=What.EXTERNAL_HIVESERDE,
             hiveserde_in_place_migrate=True,
+            enable_uniform_iceberg=ctx.config.enable_uniform_iceberg,
         )
 
     @job_task(
@@ -180,6 +189,7 @@ class MigrateExternalTablesCTAS(Workflow):
         """This workflow task migrates non-SYNC supported and non HiveSerde external tables using CTAS"""
         ctx.tables_migrator.migrate_tables(
             what=What.EXTERNAL_NO_SYNC,
+            enable_uniform_iceberg=ctx.config.enable_uniform_iceberg,
         )
 
     @job_task(job_cluster="user_isolation", depends_on=[Assessment.crawl_tables])
@@ -187,6 +197,7 @@ class MigrateExternalTablesCTAS(Workflow):
         """This workflow task migrates HiveSerde tables using CTAS"""
         ctx.tables_migrator.migrate_tables(
             what=What.EXTERNAL_HIVESERDE,
+            enable_uniform_iceberg=ctx.config.enable_uniform_iceberg,
         )
 
     @job_task(
@@ -296,7 +307,10 @@ class MigrateTablesInMounts(Workflow):
     @job_task(job_cluster="user_isolation", depends_on=[ScanTablesInMounts.scan_tables_in_mounts_experimental])
     def migrate_tables_in_mounts_experimental(self, ctx: RuntimeContext):
         """[EXPERIMENTAL] This workflow migrates `delta tables stored in mount points` to Unity Catalog using a Create Table statement."""
-        ctx.tables_migrator.migrate_tables(what=What.TABLE_IN_MOUNT)
+        ctx.tables_migrator.migrate_tables(
+            what=What.TABLE_IN_MOUNT,
+            enable_uniform_iceberg=ctx.config.enable_uniform_iceberg,
+        )
 
     @job_task(job_cluster="user_isolation")
     def verify_progress_tracking_prerequisites(self, ctx: RuntimeContext) -> None:
