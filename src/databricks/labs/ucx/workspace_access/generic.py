@@ -23,6 +23,8 @@ from databricks.sdk.retries import retried
 from databricks.sdk.service import iam, ml
 from databricks.sdk.service.iam import PermissionLevel
 
+from databricks.labs.ucx.framework.utils import paginated_fetch_cursor
+
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.workspace_access.base import AclSupport, Permissions, StaticListing
@@ -439,20 +441,16 @@ def experiments_listing(ws: WorkspaceClient):
 
 def feature_store_listing(ws: WorkspaceClient):
     def inner() -> list[GenericPermissionsInfo]:
-        feature_tables = []
-        token = None
-        while True:
+        def fetch_feature_tables(token: str | None) -> dict:
             result = ws.api_client.do(
                 "GET", "/api/2.0/feature-store/feature-tables/search", query={"page_token": token, "max_results": 200}
             )
             assert isinstance(result, dict)
-            for table in result.get("feature_tables", []):
-                feature_tables.append(GenericPermissionsInfo(table["id"], "feature-tables"))
+            return result
 
-            if "next_page_token" not in result:
-                break
-            token = result["next_page_token"]  # type: ignore[index]
-
+        feature_tables = []
+        for table in paginated_fetch_cursor(fetch_feature_tables, items_key="feature_tables"):
+            feature_tables.append(GenericPermissionsInfo(table["id"], "feature-tables"))
         return feature_tables
 
     return inner

@@ -1,5 +1,12 @@
 name: 'Authenticate for JFrog'
 description: 'Authenticate with JFrog using OIDC based on the GitHub repository.'
+# Some things to note:
+#  - Run this _after_ installing any tools that need to use JFrog; auth is configured for all the (supported) tools that
+#    it detects.
+#  - Where possible we avoid exposing tokens in environment variables, preferring to write them into files instead.
+#    (Tokens in environment variables tend to be more exposed and easier to leak than those written into files.)
+#
+# TODO: Factor out into an external action, once releases are allowed.
 outputs:
   jfrog-access-token:
     description: "Access token for JFrog"
@@ -11,36 +18,165 @@ runs:
       name: Authenticate against JFrog
       shell: bash
       run: |
+        if [[ -z "${ACTIONS_ID_TOKEN_REQUEST_URL}" ]] || [[ -z "${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" ]]
+        then
+            printf '::error::%s\n' 'This action uses OIDC: job must have "id-token: write" permission'
+            exit 1
+        fi
         "${GITHUB_ACTION_PATH}/jfrog-auth" "${ACTIONS_ID_TOKEN_REQUEST_URL}" "${ACTIONS_ID_TOKEN_REQUEST_TOKEN}"
+
     - id: detect-cmds
-      name: Detecting python package/project managers.
+      name: Detecting package/project managers.
       shell: bash
       run: |
-        for cmd in pip3 uv
+        for cmd in bun coursier mvn npm pip3 sbt uv
         do
-          command -v "${cmd}" > /dev/null && found=true || found=false
-          printf '::debug::%s\n' "Found ${cmd}: ${found}"
-          printf '%s=%s\n' "command_${cmd}" "${found}" >> "${GITHUB_OUTPUT}"
+            command -v "${cmd}" > /dev/null && found=true || found=false
+            printf '::debug::%s\n' "Found ${cmd}: ${found}"
+            printf '%s=%s\n' "command_${cmd}" "${found}" >> "${GITHUB_OUTPUT}"
         done
-    - name: Configure pip for JFrog
-      if: "${{ steps.detect-cmds.outputs.command_pip3 == 'true' }}"
+
+    - name: Configure bun for JFrog
+      if: "${{ steps.detect-cmds.outputs.command_bun == 'true' }}"
       shell: bash
       env:
         JFROG_ACCESS_TOKEN: "${{ steps.jfrog-auth.outputs.jfrog-access-token }}"
       run: |
         umask 077
-        cat > "$RUNNER_TEMP/.pip.conf" <<EOF
+        cat > ~/.bunfig.toml << 'EOF'
+        [install]
+        registry = { url = "https://databricks.jfrog.io/artifactory/api/npm/db-npm/", token = "$jfrog_access_token" }
+        EOF
+        cat > "${RUNNER_TEMP}/.bun.env" << EOF
+        # Environment variables loaded by bun.
+        jfrog_access_token='${JFROG_ACCESS_TOKEN}'
+        EOF
+        printf '%s=%s\n' 'BUN_OPTIONS' "--env-file=${RUNNER_TEMP}/.bun.env" >> "${GITHUB_ENV}"
+        printf '::debug::%s\n' 'Configured JFrog access for bun.'
+        # There are currently the following issues with JFrog:
+        #  - The default set of CAs doesn't seem to cover the ones used by our JFrog instance.
+        #  - The JSON metadata returned for some NPM artefacts can be invalid JSON.
+        printf '::warning::%s\n' 'JFrog has compatibility issues with bun; it will probably not work.'
+
+    - name: Configure coursier for JFrog
+      # Note: SBT bootstrapping uses Coursier internally.
+      if: "${{ steps.detect-cmds.outputs.command_coursier == 'true' ||
+               steps.detect-cmds.outputs.command_sbt == 'true' }}"
+      shell: bash
+      env:
+        JFROG_ACCESS_TOKEN: "${{ steps.jfrog-auth.outputs.jfrog-access-token }}"
+      run: |
+        umask 077
+        cat > "${RUNNER_TEMP}/.coursier-credentials.properties" << EOF
+        jfrog.host=databricks.jfrog.io
+        jfrog.realm=Artifactory Realm
+        jfrog.username=gha-service-account
+        jfrog.password=${JFROG_ACCESS_TOKEN}
+        EOF
+        printf '%s=%s\n' 'COURSIER_CREDENTIALS' "${RUNNER_TEMP}/.coursier-credentials.properties" >> "${GITHUB_ENV}"
+        printf '::debug::%s\n' 'Configured JFrog access for Coursier.'
+
+    - name: Configure Maven for JFrog
+      if: "${{ steps.detect-cmds.outputs.command_mvn == 'true' }}"
+      shell: bash
+      env:
+        JFROG_ACCESS_TOKEN: "${{ steps.jfrog-auth.outputs.jfrog-access-token }}"
+      run: |
+        umask 077
+        mkdir -p ~/.m2
+        cat > ~/.m2/settings.xml << EOF
+        <settings>
+          <mirrors>
+            <mirror>
+              <id>jfrog-central</id>
+              <mirrorOf>*</mirrorOf>
+              <url>https://databricks.jfrog.io/artifactory/db-maven/</url>
+            </mirror>
+          </mirrors>
+          <servers>
+            <server>
+              <id>jfrog-central</id>
+              <username>gha-service-account</username>
+              <password>${JFROG_ACCESS_TOKEN}</password>
+            </server>
+          </servers>
+        </settings>
+        EOF
+        printf '::debug::%s\n' 'Configured JFrog access for maven.'
+
+    - name: Configure netrc for JFrog
+      if: "${{ steps.detect-cmds.outputs.command_pip3 == 'true' ||
+               steps.detect-cmds.outputs.command_uv == 'true' }}"
+      shell: bash
+      env:
+        JFROG_ACCESS_TOKEN: "${{ steps.jfrog-auth.outputs.jfrog-access-token }}"
+      run: |
+        umask 077
+        cat > "${RUNNER_TEMP}/.netrc" << EOF
+        machine databricks.jfrog.io
+        login gha-service-account
+        password ${JFROG_ACCESS_TOKEN}
+        EOF
+        printf '%s=%s\n' 'NETRC' "${RUNNER_TEMP}/.netrc" >> "${GITHUB_ENV}"
+
+    - name: Configure npm/yarn (classic) for JFrog
+      if: "${{ steps.detect-cmds.outputs.command_npm == 'true' }}"
+      shell: bash
+      env:
+        JFROG_ACCESS_TOKEN: "${{ steps.jfrog-auth.outputs.jfrog-access-token }}"
+      run: |
+        umask 077
+        cat > ~/.npmrc << EOF
+        registry=https://databricks.jfrog.io/artifactory/api/npm/db-npm/
+        always-auth=true
+        ignore-scripts=true
+        //databricks.jfrog.io/artifactory/api/npm/db-npm/:_authToken=${JFROG_ACCESS_TOKEN}
+        EOF
+        printf '::debug::%s\n' 'Configured JFrog access for npm/yarn (classic).'
+
+    - name: Configure pip for JFrog
+      if: "${{ steps.detect-cmds.outputs.command_pip3 == 'true' }}"
+      shell: bash
+      run: |
+        cat > "${RUNNER_TEMP}/.pip.conf" << 'EOF'
         [global]
-        index-url = https://gha-service-account:${JFROG_ACCESS_TOKEN}@databricks.jfrog.io/artifactory/api/pypi/db-pypi/simple
+        index-url = https://databricks.jfrog.io/artifactory/api/pypi/db-pypi/simple
         EOF
         printf '%s=%s\n' 'PIP_CONFIG_FILE' "${RUNNER_TEMP}/.pip.conf" >> "${GITHUB_ENV}"
+        printf '::debug::%s\n' 'Configured JFrog access for pip.'
+
+    - name: Configure sbt for JFrog
+      if: "${{ steps.detect-cmds.outputs.command_sbt == 'true' }}"
+      shell: bash
+      env:
+        JFROG_ACCESS_TOKEN: "${{ steps.jfrog-auth.outputs.jfrog-access-token }}"
+      run: |
+        umask 077
+        mkdir -p ~/.sbt/1.0
+        cat > ~/.sbt/repositories << 'EOF'
+        [repositories]
+          local
+          databricks-jfrog: https://databricks.jfrog.io/artifactory/db-maven/
+        EOF
+
+        cat > "${RUNNER_TEMP}/.sbt.credentials" << EOF
+        realm=Artifactory Realm
+        host=databricks.jfrog.io
+        user=gha-service-account
+        password=${JFROG_ACCESS_TOKEN}
+        EOF
+
+        cat > ~/.sbt/1.0/global.sbt << 'EOF'
+        credentials += Credentials(file(sys.env("RUNNER_TEMP")) / ".sbt.credentials")
+        EOF
+        printf '::debug::%s\n' 'Configured JFrog access for SBT.'
+
     - name: Configure uv for JFrog
       if: "${{ steps.detect-cmds.outputs.command_uv == 'true' }}"
       shell: bash
       env:
-        JFROG_ACCESS_TOKEN: "${{ steps.jfrog-auth.outputs.jfrog-access-token }}"
         UV_INDEX_URL: 'https://databricks.jfrog.io/artifactory/api/pypi/db-pypi/simple'
       run: |
-        uv auth login "${UV_INDEX_URL}" --username gha-service-account --password "${JFROG_ACCESS_TOKEN}"
-        printf "%s=%s\n" 'UV_INDEX_URL' "${UV_INDEX_URL}" >> "${GITHUB_ENV}"
-        printf "%s=%s\n" 'UV_FROZEN' '1' >> "${GITHUB_ENV}"
+        printf '%s=%s\n' 'UV_INDEX_URL' "${UV_INDEX_URL}" >> "${GITHUB_ENV}"
+        printf '%s=%s\n' 'UV_FROZEN' '1' >> "${GITHUB_ENV}"
+        printf '::debug::%s\n' 'Configured JFrog access for uv.'

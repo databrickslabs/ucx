@@ -101,7 +101,7 @@ pytest = [
 ]
 test = [
     { include-group = "pytest" },
-    "pip",
+    "pip~=26.0",
     "python-lsp-server>=1.9.0",
 ]
 
