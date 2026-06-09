@@ -188,6 +188,8 @@ def test_sequence_view_with_invalid_query_raises_value_error(tables) -> None:
     with pytest.raises(ValueError) as error:
         sequencer.sequence_batches()
     assert "Could not analyze view SQL:" in str(error)
+    # The offending view name must be included in the error to aid troubleshooting (issue #4438)
+    assert tables[0].src.key in str(error)
 
 
 @pytest.mark.parametrize("tables", [("db1.v9",)], indirect=True)
