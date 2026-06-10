@@ -258,6 +258,25 @@ def run_assess_workflows(
 
 
 @ucx.command
+def run_workspace_code_scanner_experimental(
+    w: WorkspaceClient, run_as_collection: bool = False, a: AccountClient | None = None, paths: str | None = None
+):
+    """Manually trigger the workspace-code-scanner-experimental job."""
+    if paths is None:
+        logger.error("--paths is a required parameter.")
+        return
+
+    workspace_contexts = _get_workspace_contexts(w, a, run_as_collection)
+    for ctx in workspace_contexts:
+        workspace_id = ctx.workspace_client.get_workspace_id()
+        deployed_workflows = ctx.deployed_workflows
+        logger.info(f"Starting 'workspace-code-scanner-experimental' workflow in workspace: {workspace_id}")
+        deployed_workflows.run_workflow(
+            "workspace-code-scanner-experimental", named_parameters={"paths": paths}, skip_job_wait=run_as_collection
+        )
+
+
+@ucx.command
 def update_migration_progress(
     w: WorkspaceClient,
     run_as_collection: bool = False,

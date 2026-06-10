@@ -247,3 +247,25 @@ class Failing(Workflow):
         logger.warning("This is a test warning message.")
         logger.error("This is a test error message.")
         raise ValueError("This task is supposed to fail.")
+
+
+class WorkspaceCodeScanner(Workflow):
+    def __init__(self):
+        super().__init__('workspace-code-scanner-experimental', [JobParameterDefinition(name="paths", default="")])
+
+    @job_task
+    def scan_workspace_code(self, ctx: RuntimeContext):
+        """Scan workspace for table usage using WorkspaceTablesLinter."""
+        logger.info("Starting workspace table scanning")
+
+        # Get the path parameter and split by comma if multiple paths
+        path_param = ctx.named_parameters.get("paths", "")
+        if not path_param:
+            logger.error("No path parameter provided. Please provide a comma-separated list of paths to scan.")
+        else:
+            paths = [p.strip() for p in path_param.split(",") if p.strip()]
+
+            # Create and use the workspace linter
+            workspace_linter = ctx.workspace_tables_linter
+            workspace_linter.scan_workspace_for_tables(paths)
+            logger.info("Workspace table scanning completed and results stored in inventory database")
