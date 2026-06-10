@@ -47,6 +47,8 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
 
     # Whether the assessment should capture a specific list of databases, if not specified, it will list all databases.
     include_databases: list[str] | None = None
+    # Whether the assessment should capture databases matching specific prefixes, if not specified, it will list all databases.
+    include_database_prefixes: list[str] | None = None
 
     # Whether the tables in mounts crawler should crawl a specific list of mounts.
     # If not specified, it will list all mounts.
