@@ -14,6 +14,7 @@ from databricks.sdk.service import iam
 from databricks.sdk.service.iam import ComplexValue, Group, ResourceMeta
 
 from databricks.labs.ucx.workspace_access.groups import (
+    AccountGroupLookup,
     ConfigureGroups,
     GroupManager,
     MigratedGroup,
@@ -566,6 +567,83 @@ def test_reflect_account_should_not_fail_if_group_not_in_the_account_anymore():
         f"/api/2.0/preview/permissionassignments/principals/{account_group1.id}",
         data=json.dumps({"permissions": ["USER"]}),
     )
+
+
+def test_list_account_groups_paginates_through_multiple_pages():
+    """Verify _list_account_groups uses paginated_fetch_offset to retrieve all pages."""
+    wsclient = create_autospec(WorkspaceClient)
+
+    page1 = [
+        Group(id="1", display_name="alpha").as_dict(),
+        Group(id="2", display_name="beta").as_dict(),
+    ]
+    page2 = [
+        Group(id="3", display_name="gamma").as_dict(),
+    ]
+    responses = iter([{"Resources": page1}, {"Resources": page2}])
+
+    def do_side_effect(_method, *_args, **_kwargs):
+        return next(responses)
+
+    wsclient.api_client.do.side_effect = do_side_effect
+
+    with patch.object(AccountGroupLookup, "PAGE_SIZE", 2):
+        lookup = AccountGroupLookup(wsclient)
+        groups = lookup.get_mapping()
+
+    assert len(groups) == 3
+    assert "alpha" in groups
+    assert "beta" in groups
+    assert "gamma" in groups
+    assert wsclient.api_client.do.call_count == 2
+
+
+def test_list_account_groups_filters_system_groups_across_pages():
+    """System groups should be filtered even when they appear on later pages."""
+    wsclient = create_autospec(WorkspaceClient)
+
+    page1 = [
+        Group(id="1", display_name="real_group").as_dict(),
+        Group(id="2", display_name="users").as_dict(),
+    ]
+    responses = iter([{"Resources": page1}])
+
+    def do_side_effect(_method, *_args, **_kwargs):
+        return next(responses)
+
+    wsclient.api_client.do.side_effect = do_side_effect
+
+    lookup = AccountGroupLookup(wsclient)
+    groups = lookup.get_mapping()
+
+    assert len(groups) == 1
+    assert "real_group" in groups
+    assert "users" not in groups
+
+
+def test_list_account_groups_deduplicates_across_pages():
+    """Duplicate group IDs across pages should be counted only once."""
+    wsclient = create_autospec(WorkspaceClient)
+
+    duplicate = Group(id="1", display_name="alpha").as_dict()
+    # page1 fills PAGE_SIZE (2), so pagination continues; page2 is shorter, so it stops.
+    # alpha appears on both pages and must only be counted once.
+    page1 = [duplicate, Group(id="2", display_name="beta").as_dict()]
+    page2 = [duplicate]
+    responses = iter([{"Resources": page1}, {"Resources": page2}])
+
+    def do_side_effect(_method, *_args, **_kwargs):
+        return next(responses)
+
+    wsclient.api_client.do.side_effect = do_side_effect
+
+    with patch.object(AccountGroupLookup, "PAGE_SIZE", 2):
+        lookup = AccountGroupLookup(wsclient)
+        groups = lookup.get_mapping()
+
+    assert len(groups) == 2
+    assert "alpha" in groups
+    assert "beta" in groups
 
 
 def test_delete_original_workspace_groups_should_delete_reflected_acc_groups_in_workspace(fake_sleep: Mock) -> None:

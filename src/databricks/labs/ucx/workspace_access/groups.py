@@ -24,7 +24,7 @@ from databricks.sdk.service import iam
 from databricks.sdk.service.iam import Group, User
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
-from databricks.labs.ucx.framework.utils import escape_sql_identifier
+from databricks.labs.ucx.framework.utils import escape_sql_identifier, paginated_fetch_offset
 
 logger = logging.getLogger(__name__)
 
@@ -913,6 +913,8 @@ class GroupManager(CrawlerBase[MigratedGroup]):
 
 
 class AccountGroupLookup:
+    PAGE_SIZE = 10000
+
     def __init__(self, ws: WorkspaceClient):
         self._ws = ws
 
@@ -964,13 +966,23 @@ class AccountGroupLookup:
         # TODO: we should avoid using this method, as it's not documented
         # get account-level groups even if they're not (yet) assigned to a workspace
         logger.info(f"Listing account groups with {scim_attributes}...")
-        account_groups = []
-        raw = self._ws.api_client.do("GET", "/api/2.0/account/scim/v2/Groups", query={"attributes": scim_attributes})
-        for resource in raw.get("Resources", []):  # type: ignore[union-attr]
+
+        def fetch_account_groups(start_index: int, count: int) -> dict:
+            query = {"startIndex": start_index, "count": count, "attributes": scim_attributes}
+            return self._ws.api_client.do("GET", "/api/2.0/account/scim/v2/Groups", query=query)  # type: ignore[return-value]
+
+        account_groups: list[iam.Group] = []
+        seen: set[str] = set()
+        for resource in paginated_fetch_offset(fetch_account_groups, items_key="Resources", page_size=self.PAGE_SIZE):
             group = iam.Group.from_dict(resource)
+            if group.id and group.id in seen:
+                continue
+            if group.id:
+                seen.add(group.id)
             if group.display_name in SYSTEM_GROUPS:
                 continue
             account_groups.append(group)
+
         logger.info(f"Found {len(account_groups)} account groups")
         sorted_groups: list[iam.Group] = sorted(
             account_groups, key=lambda _: _.display_name if _.display_name else ""

@@ -21,6 +21,7 @@ from databricks.sdk.service.pipelines import PipelineStateInfo
 from databricks.sdk.service.workspace import Language, ObjectInfo, ObjectType
 
 from databricks.labs.ucx.workspace_access.generic import (
+    GenericPermissionsInfo,
     GenericPermissionsSupport,
     Listing,
     Permissions,
@@ -870,6 +871,25 @@ def test_feature_tables_listing():
     assert len(result) == 4
     assert result[0].object_id == "table1"
     assert result[0].request_type == "feature-tables"
+
+
+def test_feature_store_listing_collects_all_pages():
+    ws = create_autospec(WorkspaceClient)
+    page1_tables = [{"id": f"table{i}"} for i in range(200)]
+    page2_tables = [{"id": f"table{i}"} for i in range(200, 250)]
+
+    def do_api_side_effect(*_, query):
+        if not query["page_token"]:
+            return {"feature_tables": page1_tables, "next_page_token": "token2"}
+        return {"feature_tables": page2_tables}
+
+    ws.api_client.do.side_effect = do_api_side_effect
+
+    result = feature_store_listing(ws)()
+
+    assert len(result) == 250
+    assert all(isinstance(item, GenericPermissionsInfo) for item in result)
+    assert all(item.request_type == "feature-tables" for item in result)
 
 
 def test_root_page_listing():
