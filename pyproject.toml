@@ -4,9 +4,20 @@ requires = [
 ]
 build-backend = "hatchling.build"
 
-[tool.hatch.build]
-sources = ["src"]
-include = ["src"]
+[tool.hatch.build.targets.sdist]
+only-include = [
+    "/.build-constraints.txt",
+    "/README.*",
+    "/LICEN[CS]E",
+    "/NOTICE",
+    "/pyproject.toml",
+    "/src/",
+    "/tests/",
+    "/uv.lock",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/databricks"]
 
 [tool.uv]
 required-version = "~= 0.11.0"
