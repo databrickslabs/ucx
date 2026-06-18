@@ -2,7 +2,7 @@ import logging
 from collections.abc import Iterable
 from dataclasses import dataclass, replace
 from functools import partial
-from typing import ClassVar
+from typing import ClassVar, Any
 
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend
@@ -150,6 +150,9 @@ class UdfOwnership(Ownership[Udf]):
 
     At the present we don't determine a specific owner for UDFs.
     """
+
+    def is_applicable_to(self, record: Any) -> bool:
+        return isinstance(record, Udf)
 
     def _maybe_direct_owner(self, record: Udf) -> None:
         return None

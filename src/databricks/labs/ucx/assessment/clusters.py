@@ -3,7 +3,7 @@ import json
 import logging
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import ClassVar
+from typing import ClassVar, Any
 
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
@@ -196,6 +196,9 @@ class ClusterOwnership(Ownership[ClusterInfo]):
     This is the cluster creator (if known).
     """
 
+    def is_applicable_to(self, record: Any) -> bool:
+        return isinstance(record, ClusterInfo)
+
     def _maybe_direct_owner(self, record: ClusterInfo) -> str | None:
         return record.creator
 
@@ -262,6 +265,9 @@ class ClusterPolicyOwnership(Ownership[PolicyInfo]):
 
     This is the creator of the cluster policy (if known).
     """
+
+    def is_applicable_to(self, record: Any) -> bool:
+        return isinstance(record, PolicyInfo)
 
     def _maybe_direct_owner(self, record: PolicyInfo) -> str | None:
         return record.creator
