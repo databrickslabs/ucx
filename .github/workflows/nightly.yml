@@ -31,8 +31,8 @@ jobs:
       - name: Setup uv
         uses: astral-sh/setup-uv@5a095e7a2014a4212f075830d4f7277575a9d098  # v7.3.1
         with:
-          version: "0.11.2"
-          checksum: "7ac2ca0449c8d68dae9b99e635cd3bc9b22a4cb1de64b7c43716398447d42981"
+          version: "0.13.7"
+          checksum: "c5221ff41b7892bfc223543883600125f6a47fe845093e0f5bdff4f359196d83"
 
       - name: Setup for JFrog
         uses: ./.github/actions/jfrog-auth
