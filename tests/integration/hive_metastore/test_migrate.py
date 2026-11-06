@@ -948,3 +948,27 @@ def test_migration_index_deleted_source(make_table, runtime_ctx, sql_backend, ma
         f"failed-to-migrate: {src_table.schema_name}.{src_table.name} set as a source does no longer exist"
     )
     assert any(expected_message in record.message for record in caplog.records)
+
+
+@retried(on=[NotFound], timeout=timedelta(minutes=2))
+def test_migrate_managed_tables_with_uniform_iceberg(ws, sql_backend, runtime_ctx, make_catalog):
+    src_schema = runtime_ctx.make_schema(catalog_name="hive_metastore")
+    src_managed_table = runtime_ctx.make_table(
+        catalog_name=src_schema.catalog_name,
+        schema_name=src_schema.name,
+    )
+
+    dst_catalog = make_catalog()
+    dst_schema = runtime_ctx.make_schema(catalog_name=dst_catalog.name, name=src_schema.name)
+
+    rules = [Rule.from_src_dst(src_managed_table, dst_schema)]
+
+    runtime_ctx.with_table_mapping_rules(rules)
+    runtime_ctx.with_dummy_resource_permission()
+    runtime_ctx.tables_migrator.migrate_tables(what=What.DBFS_ROOT_DELTA, enable_uniform_iceberg=True)
+
+    target_table_properties = ws.tables.get(f"{dst_schema.full_name}.{src_managed_table.name}").properties
+    assert target_table_properties["upgraded_from"] == src_managed_table.full_name
+    assert target_table_properties["delta.columnMapping.mode"] == "name"
+    assert target_table_properties["delta.universalFormat.enabledFormats"] == "iceberg"
+    assert target_table_properties["delta.enableIcebergCompatV2"] == "true"

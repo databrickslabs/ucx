@@ -1803,3 +1803,138 @@ def test_migrate_tables_handles_table_with_empty_column(caplog) -> None:
     migration_status_refresher.index.assert_not_called()  # Only called when migrating view
     migrate_grants.apply.assert_not_called()  # Errors before getting here
     external_locations.resolve_mount.assert_not_called()  # Only called when migrating external table
+
+
+def test_migrate_dbfs_root_delta_table_with_uniform_iceberg_enabled(ws, mock_pyspark):
+    errors = {}
+    rows = {}
+    backend = MockBackend(fails_on_first=errors, rows=rows)
+    table_crawler = TablesCrawler(backend, "inventory_database")
+    table_mapping = mock_table_mapping(["managed_dbfs"])
+    migration_status_refresher = TableMigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
+    migrate_grants = create_autospec(MigrateGrants)
+    external_locations = create_autospec(ExternalLocations)
+    table_migrate = TablesMigrator(
+        table_crawler,
+        ws,
+        backend,
+        table_mapping,
+        migration_status_refresher,
+        migrate_grants,
+        external_locations,
+    )
+    table_migrate.migrate_tables(what=What.DBFS_ROOT_DELTA, enable_uniform_iceberg=True)
+
+    assert (
+        "ALTER TABLE `ucx_default`.`db1_dst`.`managed_dbfs` "
+        "SET TBLPROPERTIES ('delta.enableDeletionVectors' = 'false')"
+    ) in backend.queries
+    assert "REORG TABLE `ucx_default`.`db1_dst`.`managed_dbfs` APPLY (PURGE)" in backend.queries
+    assert (
+        "ALTER TABLE `ucx_default`.`db1_dst`.`managed_dbfs` "
+        "SET TBLPROPERTIES ("
+        "'delta.columnMapping.mode' = 'name', "
+        "'delta.universalFormat.enabledFormats' = 'iceberg', "
+        "'delta.enableIcebergCompatV2' = 'true')"
+    ) in backend.queries
+    migrate_grants.apply.assert_called()
+    external_locations.resolve_mount.assert_not_called()
+
+
+def test_migrate_external_sync_table_with_uniform_iceberg_enabled(ws, mock_pyspark):
+    errors = {}
+    rows = {r"SYNC .*": MockBackend.rows("status_code", "description")[("SUCCESS", "test")]}
+    backend = MockBackend(fails_on_first=errors, rows=rows)
+    crawler_backend = MockBackend(fails_on_first=errors, rows=rows)
+    table_crawler = TablesCrawler(crawler_backend, "inventory_database")
+    table_mapping = mock_table_mapping(["external_src"])
+    migration_status_refresher = TableMigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
+    migrate_grants = create_autospec(MigrateGrants)
+    external_locations = create_autospec(ExternalLocations)
+    table_migrate = TablesMigrator(
+        table_crawler,
+        ws,
+        backend,
+        table_mapping,
+        migration_status_refresher,
+        migrate_grants,
+        external_locations,
+    )
+    table_migrate.migrate_tables(what=What.EXTERNAL_SYNC, enable_uniform_iceberg=True)
+
+    assert (
+        "ALTER TABLE `ucx_default`.`db1_dst`.`external_dst` "
+        "SET TBLPROPERTIES ('delta.enableDeletionVectors' = 'false')"
+    ) in backend.queries
+    assert "REORG TABLE `ucx_default`.`db1_dst`.`external_dst` APPLY (PURGE)" in backend.queries
+    assert (
+        "ALTER TABLE `ucx_default`.`db1_dst`.`external_dst` "
+        "SET TBLPROPERTIES ("
+        "'delta.columnMapping.mode' = 'name', "
+        "'delta.universalFormat.enabledFormats' = 'iceberg', "
+        "'delta.enableIcebergCompatV2' = 'true')"
+    ) in backend.queries
+    migrate_grants.apply.assert_called()
+    external_locations.resolve_mount.assert_not_called()
+
+
+def test_migrate_non_delta_table_with_uniform_iceberg_does_not_alter(ws, mock_pyspark):
+    errors = {}
+    rows = {}
+    backend = MockBackend(fails_on_first=errors, rows=rows)
+    table_crawler = TablesCrawler(backend, "inventory_database")
+    table_mapping = mock_table_mapping(["dbfs_parquet"])
+    migration_status_refresher = TableMigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
+    migrate_grants = create_autospec(MigrateGrants)
+    external_locations = create_autospec(ExternalLocations)
+    table_migrate = TablesMigrator(
+        table_crawler,
+        ws,
+        backend,
+        table_mapping,
+        migration_status_refresher,
+        migrate_grants,
+        external_locations,
+    )
+    table_migrate.migrate_tables(what=What.DBFS_ROOT_NON_DELTA, enable_uniform_iceberg=True)
+
+    uniform_query = (
+        "SET TBLPROPERTIES ("
+        "'delta.columnMapping.mode' = 'name', "
+        "'delta.universalFormat.enabledFormats' = 'iceberg', "
+        "'delta.enableIcebergCompatV2' = 'true')"
+    )
+    assert all(uniform_query not in q for q in backend.queries)
+    migrate_grants.apply.assert_called()
+    external_locations.resolve_mount.assert_not_called()
+
+
+def test_migrate_delta_table_without_uniform_iceberg_flag_does_not_alter(ws, mock_pyspark):
+    errors = {}
+    rows = {}
+    backend = MockBackend(fails_on_first=errors, rows=rows)
+    table_crawler = TablesCrawler(backend, "inventory_database")
+    table_mapping = mock_table_mapping(["managed_dbfs"])
+    migration_status_refresher = TableMigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
+    migrate_grants = create_autospec(MigrateGrants)
+    external_locations = create_autospec(ExternalLocations)
+    table_migrate = TablesMigrator(
+        table_crawler,
+        ws,
+        backend,
+        table_mapping,
+        migration_status_refresher,
+        migrate_grants,
+        external_locations,
+    )
+    table_migrate.migrate_tables(what=What.DBFS_ROOT_DELTA, enable_uniform_iceberg=False)
+
+    uniform_query = (
+        "SET TBLPROPERTIES ("
+        "'delta.columnMapping.mode' = 'name', "
+        "'delta.universalFormat.enabledFormats' = 'iceberg', "
+        "'delta.enableIcebergCompatV2' = 'true')"
+    )
+    assert all(uniform_query not in q for q in backend.queries)
+    migrate_grants.apply.assert_called()
+    external_locations.resolve_mount.assert_not_called()
