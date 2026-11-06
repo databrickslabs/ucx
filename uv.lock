@@ -381,14 +381,16 @@ wheels = [
 
 [[package]]
 name = "databricks-labs-blueprint"
-version = "0.11.4"
+version = "0.13.0"
 source = { registry = "https://pypi-proxy.dev.databricks.com/simple/" }
 dependencies = [
+    { name = "certifi" },
     { name = "databricks-sdk" },
+    { name = "pip" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/8e/32/da0404466da25f9daf2be96ffbf77be3b31b90d647b6b0d540fd0729045b/databricks_labs_blueprint-0.11.4.tar.gz", hash = "sha256:09104dff7ec4d973baf6f927c44ab46ba88774eebe4971f20f4a8d2886e33777", size = 82714, upload-time = "2025-10-06T09:58:32.667Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/51/4b/fa4e10bdb9fadebbc1b1e38f4f5284770565283b38a05b984b94c60246b4/databricks_labs_blueprint-0.13.0.tar.gz", hash = "sha256:462d326a5caf0655b2d9ed07540ffa29412101775d52bda78f7ef57a8650f75c", size = 185555, upload-time = "2026-11-03T19:15:54.822Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d4/66/a604f0279453cbdbe7229f7bb57a73b8b2ca73a32ecbd8bc6ef12cd9dbf2/databricks_labs_blueprint-0.11.4-py3-none-any.whl", hash = "sha256:8f148bd4659f90c066e3ad5e9c7b8a4ea4e244063d0fcebd23d2189f7c8bbf6e", size = 67803, upload-time = "2025-10-06T09:58:31.195Z" },
+    { url = "https://files.pythonhosted.org/packages/ff/58/a7897a397b13d648d6ede15813b640b8b9949fc5d4b5935e01e778dbf50a/databricks_labs_blueprint-0.13.0-py3-none-any.whl", hash = "sha256:5e1d9d7cd915d4ad69844c5cfc6721c2bf6d44453765f4e7610a72a8da7ca120", size = 70339, upload-time = "2026-11-03T19:15:53.494Z" },
 ]
 
 [package.optional-dependencies]
@@ -515,7 +517,7 @@ yq = [
 requires-dist = [
     { name = "astroid", specifier = ">=3.3.0,<3.4.0" },
     { name = "certifi", specifier = ">=2026.10.19" },
-    { name = "databricks-labs-blueprint", specifier = ">=0.11.0,<0.12.0" },
+    { name = "databricks-labs-blueprint", specifier = ">=0.13.0,<0.14.0" },
     { name = "databricks-labs-lsql", specifier = ">=0.16.0,<0.17.0" },
     { name = "databricks-sdk", specifier = ">=0.58.0,<0.59.0" },
     { name = "python-lsp-server", marker = "extra == 'pylsp'", specifier = ">=1.13.0,<1.14.0" },
