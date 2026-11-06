@@ -33,7 +33,13 @@ from databricks.labs.ucx.assessment.dashboards import LakeviewDashboardCrawler, 
 from databricks.labs.ucx.assessment.export import AssessmentExporter
 from databricks.labs.ucx.aws.credentials import CredentialManager
 from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.framework.owners import AdministratorLocator, WorkspacePathOwnership, LegacyQueryOwnership
+from databricks.labs.ucx.framework.owners import (
+    AdministratorLocator,
+    WorkspacePathOwnership,
+    Ownership,
+    LegacyQueryOwnership,
+    Record,
+)
 from databricks.labs.ucx.hive_metastore import ExternalLocations, MountsCrawler, TablesCrawler
 from databricks.labs.ucx.hive_metastore.catalog_schema import CatalogSchema
 from databricks.labs.ucx.hive_metastore.grants import (
@@ -666,6 +672,20 @@ class GlobalContext(abc.ABC):
     @cached_property
     def administrator_locator(self) -> AdministratorLocator:
         return AdministratorLocator(self.workspace_client)
+
+    @cached_property
+    def ownership_factory(self) -> Callable[[Record], Ownership]:
+        # ensure registration of Ownerships
+        _ = [
+            self.directfs_access_ownership,
+            self.grant_ownership,
+            self.legacy_query_ownership,
+            self.table_migration_ownership,
+            self.table_ownership,
+            self.udf_ownership,
+            self.workspace_path_ownership,
+        ]
+        return Ownership.for_record
 
 
 class CliContext(GlobalContext, abc.ABC):

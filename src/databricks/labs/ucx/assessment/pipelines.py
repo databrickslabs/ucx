@@ -2,7 +2,7 @@ import json
 import logging
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import ClassVar
+from typing import ClassVar, Any
 
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
@@ -95,6 +95,9 @@ class PipelineOwnership(Ownership[PipelineInfo]):
 
     This is the pipeline creator (if known).
     """
+
+    def is_applicable_to(self, record: Any) -> bool:
+        return isinstance(record, PipelineInfo)
 
     def _maybe_direct_owner(self, record: PipelineInfo) -> str | None:
         return record.creator_name
