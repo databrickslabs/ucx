@@ -1,11 +1,7 @@
-all: clean lint fmt test coverage
+all: clean dev fmt test
 
-# Ensure that all uv commands don't automatically update the lock file. If UV_FROZEN=1 (from the environment)
-# then UV_LOCKED should _not_ be set, but otherwise it needs to be set to ensure the lock-file is only ever
-# deliberately updated.
-ifneq ($(UV_FROZEN),1)
-export UV_LOCKED := 1
-endif
+# Ensure that all uv commands don't automatically update the lock file: instead they use the locked dependencies.
+export UV_FROZEN := 1
 # Ensure that hatchling is pinned when builds are needed.
 export UV_BUILD_CONSTRAINT := .build-constraints.txt
 
@@ -13,7 +9,7 @@ UV_RUN := uv run --exact --all-extras
 UV_TEST := $(UV_RUN) pytest -n 4 --timeout 30 --durations 20
 
 clean:
-	rm -fr .venv clean htmlcov .mypy_cache .pytest_cache .ruff_cache .coverage coverage.xml
+	rm -fr .venv htmlcov .mypy_cache .pytest_cache .ruff_cache .coverage coverage.xml
 	find . -name '__pycache__' -print0 | xargs -0 rm -fr
 
 dev:
@@ -44,12 +40,17 @@ coverage:
 build:
 	uv build --require-hashes --build-constraints=.build-constraints.txt
 
-lock-dependencies: UV_LOCKED := 0
+lock-dependencies: UV_FROZEN := 0
 lock-dependencies:
-	uv lock
+	uv lock --upgrade
 	$(UV_RUN) --group yq tomlq -r '.["build-system"].requires[]' pyproject.toml | \
-	    uv pip compile --generate-hashes --universal --no-header - > build-constraints-new.txt
+	    uv pip compile --upgrade --generate-hashes --universal --no-header --quiet - > build-constraints-new.txt
 	mv build-constraints-new.txt .build-constraints.txt
+	@perl -pi \
+		-e 's|registry = "https://[^"]*"|registry = "https://pypi.org/simple"|g;' \
+		-e 's|url = "https://[^"]*/packages/([^"]*)"|url = "https://files.pythonhosted.org/packages/$$1"|g;' \
+		uv.lock
+	@printf 'Stripped registry references from uv.lock.\n'
 
 known:
 	$(UV_RUN) python src/databricks/labs/ucx/source_code/known.py
@@ -72,4 +73,5 @@ docs-build:
 docs-serve: docs-build
 	yarn --cwd docs/ucx serve
 
+.DEFAULT: all
 .PHONY: all clean dev lint fmt test integration coverage build lock-dependencies known cmds solacc docs-install docs-serve-dev docs-build docs-serve
