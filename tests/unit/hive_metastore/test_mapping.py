@@ -208,15 +208,15 @@ def test_skip_happy_path(caplog):
     mapping.skip_table_or_view(schema_name="schema", table_name="table", load_table=lambda _schema, _table: table)
     ws.tables.get.assert_not_called()
     sbe.execute.assert_called_with(
-        f"ALTER TABLE `schema`.`table` SET TBLPROPERTIES('{mapping.UCX_SKIP_PROPERTY}' = true)"
+        f"ALTER TABLE `catalog`.`schema`.`table` SET TBLPROPERTIES('{mapping.UCX_SKIP_PROPERTY}' = true)"
     )
     view = Table(
-        catalog="catalog", database="schema", name="table", object_type="table", table_format="csv", view_text="stuff"
+        catalog="catalog", database="schema", name="view", object_type="table", table_format="csv", view_text="stuff"
     )
     mapping.skip_table_or_view(schema_name="schema", table_name="view", load_table=lambda _schema, _table: view)
     ws.tables.get.assert_not_called()
     sbe.execute.assert_called_with(
-        f"ALTER VIEW `schema`.`view` SET TBLPROPERTIES('{mapping.UCX_SKIP_PROPERTY}' = true)"
+        f"ALTER VIEW `catalog`.`schema`.`view` SET TBLPROPERTIES('{mapping.UCX_SKIP_PROPERTY}' = true)"
     )
     assert len(caplog.records) == 0
     mapping.skip_schema(schema="schema")

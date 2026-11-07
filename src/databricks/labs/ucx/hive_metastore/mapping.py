@@ -133,7 +133,7 @@ class TableMapping:
             if table is None:
                 raise NotFound("[TABLE_OR_VIEW_NOT_FOUND]")
             self._sql_backend.execute(
-                f"ALTER {table.kind} {escape_sql_identifier(schema_name)}.{escape_sql_identifier(table_name)} SET TBLPROPERTIES('{self.UCX_SKIP_PROPERTY}' = true)"
+                f"ALTER {table.kind} {escape_sql_identifier(table.full_name)} SET TBLPROPERTIES('{self.UCX_SKIP_PROPERTY}' = true)"
             )
         except NotFound as err:
             if "[TABLE_OR_VIEW_NOT_FOUND]" in str(err) or "[DELTA_TABLE_NOT_FOUND]" in str(err):
