@@ -124,6 +124,7 @@ class TablesMigrator:
         hiveserde_in_place_migrate: bool = False,
         managed_table_external_storage: str = "CLONE",
         check_uc_table: bool = True,
+        enable_uniform_iceberg: bool = False,
     ):
         if managed_table_external_storage == "CONVERT_TO_EXTERNAL":
             self._spark = self._spark_session
@@ -134,7 +135,11 @@ class TablesMigrator:
         if what == What.VIEW:
             return self._migrate_views()
         return self._migrate_tables(
-            what, managed_table_external_storage.upper(), hiveserde_in_place_migrate, check_uc_table
+            what,
+            managed_table_external_storage.upper(),
+            hiveserde_in_place_migrate,
+            check_uc_table,
+            enable_uniform_iceberg,
         )
 
     def _migrate_tables(
@@ -143,6 +148,7 @@ class TablesMigrator:
         managed_table_external_storage: str,
         hiveserde_in_place_migrate: bool = False,
         check_uc_table: bool = True,
+        enable_uniform_iceberg: bool = False,
     ):
         tables_to_migrate = self._table_mapping.get_tables_to_migrate(self._tables_crawler, check_uc_table)
         tables_in_scope = filter(lambda t: t.src.what == what, tables_to_migrate)
@@ -154,6 +160,7 @@ class TablesMigrator:
                     table,
                     managed_table_external_storage,
                     hiveserde_in_place_migrate,
+                    enable_uniform_iceberg,
                 )
             )
         Threads.strict("migrate tables", tasks)
@@ -207,12 +214,16 @@ class TablesMigrator:
         src_table: TableToMigrate,
         managed_table_external_storage: str,
         hiveserde_in_place_migrate: bool = False,
+        enable_uniform_iceberg: bool = False,
     ) -> bool:
         if self._table_already_migrated(src_table.rule.as_uc_table_key):
             logger.info(f"Table {src_table.src.key} already migrated to {src_table.rule.as_uc_table_key}")
             return True
         try:
-            return self._migrate_table(src_table, managed_table_external_storage, hiveserde_in_place_migrate)
+            result = self._migrate_table(src_table, managed_table_external_storage, hiveserde_in_place_migrate)
+            if result and enable_uniform_iceberg and src_table.src.is_delta:
+                self._enable_uniform_iceberg(src_table.rule.as_uc_table_key)
+            return result
         except Exception as e:  # pylint: disable=broad-exception-caught
             # Catching a Spark AnalysisException here, for which we do not have the dependency to catch explicitly
             pattern = (  # See https://github.com/databrickslabs/ucx/issues/2891
@@ -746,6 +757,23 @@ class TablesMigrator:
     def _sql_add_migrated_comment(self, table: Table, target_table_key: str) -> str:
         """Docs: https://docs.databricks.com/en/data-governance/unity-catalog/migrate.html#add-comments-to-indicate-that-a-hive-table-has-been-migrated"""
         return f"COMMENT ON {table.kind} {escape_sql_identifier(table.key)} IS 'This {table.kind.lower()} is deprecated. Please use `{target_table_key}` instead of `{table.key}`.';"
+
+    def _enable_uniform_iceberg(self, target_table_key: str) -> None:
+        """Enables Delta UniForm (IcebergCompatV2) on the migrated table.
+        See https://docs.databricks.com/aws/en/delta/uniform#enable-iceberg-reads-on-an-existing-table"""
+        logger.info(f"Enabling UniForm Iceberg compatibility on {target_table_key}")
+        escaped = escape_sql_identifier(target_table_key)
+        self._sql_backend.execute(
+            f"ALTER TABLE {escaped} " f"SET TBLPROPERTIES ('delta.enableDeletionVectors' = 'false')"
+        )
+        self._sql_backend.execute(f"REORG TABLE {escaped} APPLY (PURGE)")
+        self._sql_backend.execute(
+            f"ALTER TABLE {escaped} "
+            f"SET TBLPROPERTIES ("
+            f"'delta.columnMapping.mode' = 'name', "
+            f"'delta.universalFormat.enabledFormats' = 'iceberg', "
+            f"'delta.enableIcebergCompatV2' = 'true')"
+        )
 
     def _sql_alter_from(self, table: Table, target_table_key: str, ws_id: int) -> str:
         """Adds a property to the table indicating the source of the migration.
