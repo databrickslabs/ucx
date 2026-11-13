@@ -28,9 +28,9 @@ class ViewToMigrate(TableToMigrate):
         try:
             statements = sqlglot.parse(self.src.view_text, read='databricks')
         except ParseError as e:
-            raise ValueError(f"Could not analyze view SQL: {self.src.view_text}") from e
+            raise ValueError(f"Could not analyze view SQL: {self.src.view_text} for view {self.src.key}") from e
         if len(statements) != 1 or statements[0] is None:
-            raise ValueError(f"Could not analyze view SQL: {self.src.view_text}")
+            raise ValueError(f"Could not analyze view SQL: {self.src.view_text} for view {self.src.key}")
         statement = statements[0]
         aliases = self._read_aliases(statement)
         for old_table in statement.find_all(expressions.Table):
@@ -40,7 +40,7 @@ class ViewToMigrate(TableToMigrate):
                 continue
             src_db = old_table.db if old_table.db else self.src.database
             if not src_db:
-                logger.error(f"Could not determine schema for table {old_table.name}")
+                logger.error(f"Could not determine schema for table {old_table.name} in view {self.src.key}")
                 continue
             yield TableView("hive_metastore", src_db, old_table.name)
 
