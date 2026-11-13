@@ -33,6 +33,10 @@ class UsedTablesCrawler(CrawlerBase[UsedTable]):
     def for_queries(cls, backend: SqlBackend, schema: str) -> UsedTablesCrawler:
         return UsedTablesCrawler(backend, schema, "used_tables_in_queries")
 
+    @classmethod
+    def for_workspace(cls, backend: SqlBackend, schema: str) -> UsedTablesCrawler:
+        return UsedTablesCrawler(backend, schema, "used_tables_in_workspace")
+
     def dump_all(self, tables: Sequence[UsedTable]) -> None:
         """This crawler doesn't follow the pull model because the fetcher fetches data for 3 crawlers, not just one
         It's not **bad** because all records are pushed at once.
