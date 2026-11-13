@@ -569,10 +569,22 @@ class GroupManager(CrawlerBase[MigratedGroup]):
                 logger.info(f"Skipping {migrated_group.name_in_account}: already in workspace")
                 continue
             if migrated_group.name_in_account in workspace_groups_in_workspace:
-                ## After introduction of creating nested groups,
-                # we will come across groups that are already in the workspace
-                logger.warning(f"Skipping {migrated_group.name_in_account}: group already exists in workspace")
-                continue
+                existing_group = workspace_groups_in_workspace[migrated_group.name_in_account]
+                if existing_group.id == migrated_group.id_in_workspace:
+                    # The groups API is not monotonically consistent: after renaming a workspace group,
+                    # a subsequent listing call may still return the old name from a stale cache.
+                    # Since rename_groups() already confirmed this group was renamed, we can safely
+                    # ignore the stale entry and proceed with reflecting the account group.
+                    logger.warning(
+                        f"Stale workspace group listing for {migrated_group.name_in_account} "
+                        f"(id={migrated_group.id_in_workspace}): group was already renamed to "
+                        f"{migrated_group.temporary_name}, proceeding with account group reflection"
+                    )
+                else:
+                    # After introduction of creating nested groups,
+                    # we will come across groups that are already in the workspace
+                    logger.warning(f"Skipping {migrated_group.name_in_account}: group already exists in workspace")
+                    continue
             if migrated_group.name_in_account not in account_groups_in_account:
                 logger.warning(f"Skipping {migrated_group.name_in_account}: not in account")
                 continue

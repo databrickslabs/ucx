@@ -522,6 +522,50 @@ def test_reflect_account_groups_on_workspace_should_filter_account_groups_not_in
         wsclient.api_client.do.assert_called_with("PUT")
 
 
+def test_reflect_account_groups_on_workspace_proceeds_when_stale_listing_shows_old_group_name():
+    """When the groups API returns stale data showing the renamed group under its old name,
+    reflect_account_groups_on_workspace should detect this (same group ID) and proceed with
+    reflecting the account group rather than skipping it."""
+    # Migration state: group id="1", name_in_workspace="de", name_in_account="de", temporary_name="db-temp-de"
+    backend = MockBackend(rows={"SELECT": [("1", "de", "de", "db-temp-de", "", "", "", "")]})
+    wsclient = create_autospec(WorkspaceClient)
+    account_group = Group(id="11", display_name="de")
+    wsclient.api_client.do.return_value = {
+        "Resources": [g.as_dict() for g in (account_group,)],
+    }
+
+    # Stale listing: group id="1" still shows display_name="de" (should be "db-temp-de" after rename)
+    stale_group = Group(id="1", display_name="de", meta=ResourceMeta(resource_type="WorkspaceGroup"))
+    wsclient.groups.list.return_value = [stale_group]
+    wsclient.groups.get.return_value = stale_group
+    GroupManager(backend, wsclient, inventory_database="inv").reflect_account_groups_on_workspace()
+
+    wsclient.api_client.do.assert_called_with(
+        "PUT", "/api/2.0/preview/permissionassignments/principals/11", data='{"permissions": ["USER"]}'
+    )
+
+
+def test_reflect_account_groups_on_workspace_skips_when_different_workspace_group_exists():
+    """When a different workspace group (different ID) has the same name as the account group,
+    reflect_account_groups_on_workspace should skip it (not stale cache, genuinely different group)."""
+    # Migration state: group id="1", name_in_workspace="de", name_in_account="de", temporary_name="db-temp-de"
+    backend = MockBackend(rows={"SELECT": [("1", "de", "de", "db-temp-de", "", "", "", "")]})
+    wsclient = create_autospec(WorkspaceClient)
+    account_group = Group(id="11", display_name="de")
+    wsclient.api_client.do.return_value = {
+        "Resources": [g.as_dict() for g in (account_group,)],
+    }
+
+    # Different group (id="99") with the same display name — this is a genuine conflict, not stale cache
+    different_group = Group(id="99", display_name="de", meta=ResourceMeta(resource_type="WorkspaceGroup"))
+    wsclient.groups.list.return_value = [different_group]
+    wsclient.groups.get.return_value = different_group
+    GroupManager(backend, wsclient, inventory_database="inv").reflect_account_groups_on_workspace()
+
+    with pytest.raises(AssertionError):
+        wsclient.api_client.do.assert_called_with("PUT")
+
+
 def test_reflect_account_should_fail_if_error_is_thrown():
     backend = MockBackend(rows={"SELECT": [("1", "de", "de", "test-group-de", "", "", "", "")]})
     wsclient = create_autospec(WorkspaceClient)
