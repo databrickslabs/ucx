@@ -4,7 +4,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from hashlib import sha256
-from typing import ClassVar
+from typing import ClassVar, Any
 
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
@@ -200,6 +200,9 @@ class JobOwnership(Ownership[JobInfo]):
 
     This is the job creator (if known).
     """
+
+    def is_applicable_to(self, record: Any) -> bool:
+        return isinstance(record, JobInfo)
 
     def _maybe_direct_owner(self, record: JobInfo) -> str | None:
         return record.creator
