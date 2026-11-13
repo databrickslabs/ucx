@@ -35,7 +35,7 @@ We welcome your feedback! Please submit an [an issue](https://github.com/databri
 
 # Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=databrickslabs/ucx&type=Date)](https://star-history.com/#databrickslabs/ucx)
+[![Star History Chart](https://star-history.dera.page/svg?repos=databrickslabs/ucx&type=Date)](https://star-history.dera.page/#databrickslabs/ucx&type=Date)
 
 
 # Project Support
