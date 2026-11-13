@@ -61,7 +61,7 @@ classifiers = [
 ]
 
 
-dependencies = ["databricks-sdk>=0.58.0,<0.59.0",
+dependencies = ["databricks-sdk>=0.62.0,<0.63.0",
                 "databricks-labs-lsql>=0.16.0,<0.17.0",
                 "databricks-labs-blueprint>=0.13.0,<0.14.0",
                 "certifi>=2026.10.19",  # Transitive via requests; earlier bundles still trust "emSign ECC Root CA - G3".
