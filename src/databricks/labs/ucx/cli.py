@@ -13,6 +13,7 @@ from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service.workspace import ExportFormat
 from databricks.labs.ucx.__about__ import __version__
+from databricks.labs.ucx.app.deploy import AppDeployer
 
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.contexts.account_cli import AccountContext
@@ -979,6 +980,23 @@ def migrate_dlt_pipelines(
 
     for workspace_context in workspace_contexts:
         workspace_context.pipelines_migrator.migrate_pipelines()
+
+
+@ucx.command
+def deploy_app(
+    w: WorkspaceClient,
+    app_name: str = "ucx",
+    run_as_sp: bool = False,
+    wheel: str | None = None,
+    ctx: WorkspaceContext | None = None,
+) -> None:
+    """Deploy the UCX Databricks App, a web UI to run the assessment, edit the table mapping and migrate tables."""
+    ctx = ctx or WorkspaceContext(w)
+    deployer = AppDeployer(ctx.workspace_client, ctx.installation, ctx.config, ctx.install_state)
+    app = deployer.deploy(app_name=app_name, run_as_sp=run_as_sp, wheel=Path(wheel) if wheel else None)
+    logger.info(f"UCX app deployed: {app.url}")
+    if app.url:
+        webbrowser.open(app.url)
 
 
 if __name__ == "__main__":

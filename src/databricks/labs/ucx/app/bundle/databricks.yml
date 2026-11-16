@@ -1,0 +1,45 @@
+# Asset bundle of the UCX Databricks App, deployed by `databricks labs ucx deploy-app`.
+#
+# deploy-app copies this file into a staging folder next to `app/` (app.yaml, requirements.txt and the UCX wheel),
+# then runs `databricks bundle deploy` and `databricks bundle run ucx_app` there with the variables below.
+bundle:
+  name: ucx-app
+
+variables:
+  app_name:
+    description: Name of the app in the workspace.
+    default: ucx
+  warehouse_id:
+    description: SQL warehouse of the UCX installation (warehouse_id in its config.yml).
+  bundle_root:
+    description: Workspace folder for the bundle files, inside the UCX installation folder.
+
+resources:
+  apps:
+    ucx_app:
+      name: ${var.app_name}
+      description: "UCX: run the assessment, review the table mapping and migrate tables to Unity Catalog."
+      source_code_path: ./app
+      resources:
+        # Lets the app's service principal use the warehouse when the app runs with UCX_APP_AUTH_MODE=sp.
+        - name: sql-warehouse
+          sql_warehouse:
+            id: ${var.warehouse_id}
+            permission: CAN_USE
+      # On-behalf-of-user access. There is no scope for the Jobs API: workflows always run as the app's service
+      # principal, which deploy-app grants CAN_MANAGE_RUN on the UCX jobs.
+      user_api_scopes:
+        - iam.current-user:read
+        - iam.access-control:read
+        - sql
+        - workspace.workspace
+        - catalog.catalogs:read
+        - catalog.schemas:read
+        - catalog.tables:read
+
+targets:
+  default:
+    default: true
+    mode: production
+    workspace:
+      root_path: ${var.bundle_root}

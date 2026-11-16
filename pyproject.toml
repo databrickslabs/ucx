@@ -15,9 +15,14 @@ only-include = [
     "/tests/",
     "/uv.lock",
 ]
+# Built by `make app-ui` and `make app-requirements`, not checked in: the wheel is built from the sdist, so they
+# have to be in it.
+artifacts = ["/src/databricks/labs/ucx/app/static/", "/src/databricks/labs/ucx/app/bundle/requirements.txt"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/databricks"]
+# Built by `make app-ui` and `make app-requirements`, not checked in, so they have to be included explicitly.
+artifacts = ["src/databricks/labs/ucx/app/static/", "src/databricks/labs/ucx/app/bundle/requirements.txt"]
 
 [tool.uv]
 required-version = "~=0.13.7"
@@ -73,6 +78,11 @@ dependencies = ["databricks-sdk>=0.58.0,<0.59.0",
 pylsp = [
     "python-lsp-server>=1.13.0,<1.14.0"
 ]
+app = [
+    "fastapi>=0.135,<0.136",
+    "uvicorn>=0.42,<0.43",
+    "gunicorn>=23.0,<24",
+]
 
 [project.entry-points.databricks]
 runtime = "databricks.labs.ucx.runtime:main"
@@ -105,6 +115,7 @@ lint = [
 pytest = [
     "coverage[toml]~=7.4.4",
     "databricks-labs-pytester>=0.7.2",
+    "httpx~=0.28.1",
     "pytest~=8.3.3",
     "pytest-cov~=4.1.0",
     "pytest-mock~=3.14.0",

@@ -392,3 +392,15 @@ commands:
         description: (Optional) Comma separated list of pipeline IDs to include in the migration
       - name: exclude-pipeline-ids
         description: (Optional) Comma separated list of pipeline IDs to exclude from the migration
+
+  - name: deploy-app
+    description: Deploy the UCX Databricks App, a web UI to run the assessment, review and edit the table mapping, and
+      migrate tables. Requires the Databricks CLI with bundle support.
+    flags:
+      - name: app-name
+        description: (Optional) Name of the app in the workspace. Default is "ucx".
+      - name: run-as-sp
+        description: (Optional) Run every operation as the app's service principal instead of the logged-in user.
+          Workflows always run as the service principal. Default is false.
+      - name: wheel
+        description: (Optional) Path to a UCX wheel built with `make build`, instead of downloading the released one.

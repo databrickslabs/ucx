@@ -1,0 +1,20 @@
+# Runtime of the UCX Databricks App. deploy-app fills in the values of the environment variables below.
+command:
+  - gunicorn
+  - databricks.labs.ucx.app.main:app
+  - --workers
+  - "2"
+  - --worker-class
+  - uvicorn.workers.UvicornWorker
+  - --timeout
+  - "120"
+  - --log-level
+  - info
+env:
+  # obo: the logged-in user for files, SQL and Unity Catalog, the app's service principal for jobs.
+  # sp: the app's service principal for everything.
+  - name: UCX_APP_AUTH_MODE
+    value: "$auth_mode"
+  # The UCX installation the app works with. Empty: found like the CLI does, from the logged-in user.
+  - name: UCX_INSTALL_FOLDER
+    value: "$install_folder"

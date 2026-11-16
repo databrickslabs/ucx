@@ -19,6 +19,9 @@ UCX is a toolkit for enabling Unity Catalog (UC) in your Databricks workspace. U
 
 Please refer to the [UCX documentation](https://databrickslabs.github.io/ucx/) for detailed information on how to use UCX.
 
+To run the assessment, review the table mapping and migrate tables from a web UI, deploy the
+[UCX App](https://databrickslabs.github.io/ucx/docs/reference/app) with `databricks labs ucx deploy-app`.
+
 
 # Developer documentation
 

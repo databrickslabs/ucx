@@ -153,3 +153,7 @@ dev/cleanup.py
 .databricks-login.json
 *.out
 foo
+
+# UCX app frontend, built by `make app-ui`
+src/databricks/labs/ucx/app/static/
+src/databricks/labs/ucx/app/bundle/requirements.txt
