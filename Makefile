@@ -37,7 +37,22 @@ coverage:
 	$(UV_TEST) --cov src tests/unit --cov-report=html --cov-fail-under=89
 	open htmlcov/index.html
 
-build:
+# The app frontend is a static export, built into the Python package so that it ships in the wheel.
+APP_UI_STATIC := src/databricks/labs/ucx/app/static
+
+app-ui:
+	cd app-ui && pnpm install --frozen-lockfile && NEXT_TELEMETRY_DISABLED=1 pnpm build
+	rm -rf $(APP_UI_STATIC)
+	cp -R app-ui/out $(APP_UI_STATIC)
+
+# Hashed requirements of the app, from uv.lock: `deploy-app` installs exactly these in the app environment.
+APP_REQUIREMENTS := src/databricks/labs/ucx/app/bundle/requirements.txt
+
+app-requirements:
+	uv export --frozen --extra app --no-default-groups --no-emit-project --no-header --no-annotate \
+		--format requirements-txt --output-file $(APP_REQUIREMENTS)
+
+build: app-ui app-requirements
 	uv build --require-hashes --build-constraints=.build-constraints.txt
 
 lock-dependencies: UV_FROZEN := 0
@@ -74,4 +89,4 @@ docs-serve: docs-build
 	yarn --cwd docs/ucx serve
 
 .DEFAULT: all
-.PHONY: all clean dev lint fmt test integration coverage build lock-dependencies known cmds solacc docs-install docs-serve-dev docs-build docs-serve
+.PHONY: all clean dev lint fmt test integration coverage app-ui app-requirements build lock-dependencies known cmds solacc docs-install docs-serve-dev docs-build docs-serve

@@ -123,3 +123,57 @@ jobs:
         run: |
           # Exit with status code 1 if there are differences (i.e. unformatted files)
           git diff --exit-code
+
+  app:
+    # The UCX Databricks App: type-check and build the frontend, then build the wheel and check that it contains the
+    # app. Release builds must run `make build` the same way, see docs/ucx/docs/dev/contributing.mdx.
+    runs-on:
+      group: databrickslabs-protected-runner-group
+      labels: linux-ubuntu-latest
+    permissions:
+      # Authenticate with JFrog for package resolution.
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@5a095e7a2014a4212f075830d4f7277575a9d098  # v7.3.1
+        with:
+          version: "0.13.7"
+          checksum: "c5221ff41b7892bfc223543883600125f6a47fe845093e0f5bdff4f359196d83"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  # v7.1.0
+        with:
+          node-version: "26"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115  # v6.1.1
+        with:
+          version: "9.15.9"
+
+      # After the tools: it configures npm (and so pnpm) for JFrog, with ignore-scripts=true.
+      - name: Setup for JFrog
+        uses: ./.github/actions/jfrog-auth
+
+      - name: Type-check the frontend
+        working-directory: app-ui
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm typecheck
+
+      - name: Build the wheel with the app
+        run: make build
+
+      - name: Check that the wheel contains the app
+        run: |
+          set -euo pipefail
+          wheel="$(ls dist/databricks_labs_ucx-*-py3-none-any.whl)"
+          for required in databricks/labs/ucx/app/static/index.html databricks/labs/ucx/app/bundle/requirements.txt \
+              databricks/labs/ucx/app/bundle/databricks.yml databricks/labs/ucx/app/bundle/app.yaml; do
+            if ! unzip -l "$wheel" "$required" > /dev/null; then
+              printf '::error::%s\n' "$wheel is missing $required"
+              exit 1
+            fi
+          done

@@ -1,0 +1,101 @@
+import Admonition from '@theme/Admonition';
+
+# UCX App
+
+The UCX App is a [Databricks App](https://docs.databricks.com/en/dev-tools/databricks-apps/index.html) that runs the
+main table migration steps from a web UI instead of the command line:
+
+| Page              | What it does                                                                                                       | CLI equivalent                                                                                       |
+|-------------------|--------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------|
+| **Overview**      | Shows the UCX installation, the latest run of each workflow, and the next step.                                    | [`workflows`](/docs/reference/commands#workflows)                                                    |
+| **Assessment**    | Runs the [`assessment` workflow](/docs/reference/workflows#assessment-workflow), and shows the assessment dashboard. | [`ensure-assessment-run`](/docs/reference/commands#ensure-assessment-run)                            |
+| **Table Mapping** | Creates the table mapping from the assessment, and lets you review and edit it.                                    | [`create-table-mapping`](/docs/reference/commands#create-table-mapping), then editing `mapping.csv` |
+| **Migration**     | Runs the selected table migration workflows, one after the other.                                                  | [`migrate-tables`](/docs/reference/commands#migrate-tables)                                          |
+
+Workflows run in the background. The **Active runs** window, on every page, shows the UCX runs that are in progress,
+including the ones started from the CLI or the Jobs UI. It refreshes every 10 seconds, and keeps a finished run with
+its final state for 5 minutes.
+
+The app works with an existing UCX installation: [install UCX](/docs/installation) first.
+
+## Deploying the app
+
+```text
+databricks labs ucx deploy-app [--app-name ucx] [--run-as-sp false] [--wheel <path>]
+```
+
+| Flag          | Default | Description                                                                                                  |
+|---------------|---------|--------------------------------------------------------------------------------------------------------------|
+| `--app-name`  | `ucx`   | Name of the app in the workspace. App names are unique per workspace.                                        |
+| `--run-as-sp` | `false` | Access the UCX installation, the inventory and Unity Catalog as the app's service principal, see [Authentication](#authentication). |
+| `--wheel`     |         | A UCX wheel built with `make build`, instead of the released wheel. For development and offline deployments. |
+
+The command:
+
+1. Downloads the released UCX wheel of the installed version from the package index (`PIP_INDEX_URL`, or PyPI), and
+   verifies it against the sha256 digest that the index publishes. The wheel contains the app, including its web UI.
+2. Deploys the app as an [asset bundle](https://docs.databricks.com/en/dev-tools/bundles/index.html) with the
+   Databricks CLI (`databricks bundle deploy`, then `databricks bundle run`). The bundle files go into the `app`
+   folder of the UCX installation.
+3. Grants the app's service principal `CAN MANAGE RUN` on the UCX jobs.
+4. Opens the app in your browser.
+
+The app installs exactly the dependency versions of the UCX release, with hashes, from `requirements.txt` in the
+wheel. Run `deploy-app` again after upgrading UCX, to deploy the matching app.
+
+## Authentication
+
+By default the app acts **on behalf of the logged-in user**: it reads and writes the UCX installation (including
+`mapping.csv`), queries the inventory, and checks Unity Catalog with the user's own permissions, like the CLI does. The
+app requests these [user authorization scopes](https://docs.databricks.com/en/dev-tools/databricks-apps/auth.html):
+`sql`, `workspace.workspace`, `catalog.catalogs:read`, `catalog.schemas:read`, `catalog.tables:read`, and the default
+`iam.current-user:read` and `iam.access-control:read`.
+
+User authorization has no scope for the Jobs API. So **workflows always run as the app's service principal**, which
+`deploy-app` grants `CAN MANAGE RUN` on the UCX jobs:
+
+- Runs started from the app show the app's service principal as the trigger in the Jobs UI. The app logs which user
+  started which run, and the name of a migration run records it: `[UCX] migrate-tables (requested by <user>)`.
+- Anyone who can use the app can start the UCX workflows through it. Grant `CAN USE` on the app only to the users who
+  run the migration.
+
+With `--run-as-sp true`, the app uses its service principal for everything. `deploy-app` then also grants the service
+principal `CAN EDIT` on the UCX installation folder, and the SQL warehouse is attached to the app. Grant the service
+principal read access to the inventory schema (`hive_metastore.<inventory_database>`) yourself.
+
+## Migration runs
+
+The **Migration** page runs any combination of these workflows, in this order:
+
+1. [`migrate-tables`](/docs/reference/workflows#migrate-tables)
+2. `migrate-external-hiveserde-tables-in-place-experimental`, for the Hive SerDe tables
+3. `migrate-external-tables-ctas`, for the external tables that can't be migrated with `SYNC`
+
+The selected workflows run as a single one-time job run, each one after the previous one finished successfully. If a
+workflow fails, the ones after it don't run. The run continues if the app restarts or you close the browser.
+
+The page checks the same prerequisites as the `migrate-tables` command (a Unity Catalog metastore, the
+[UCX catalog](/docs/reference/commands#create-ucx-catalog), and a successful assessment run), and disables **Run**
+while they are not met.
+
+## Assessment dashboard
+
+The **Assessment** page embeds the assessment dashboard that UCX deployed. Embedding needs to be allowed for the
+workspace, with the app's domain on the list of allowed domains: see
+[Embed a dashboard](https://docs.databricks.com/en/dashboards/embed.html). Otherwise, use **Open in new tab**.
+
+<Admonition type="tip" title="Table mapping edits">
+The app saves the mapping to the same `mapping.csv` as the CLI. **Create from assessment** replaces the existing mapping,
+including your edits: the app asks for confirmation first. The app rejects a mapping that maps one source table twice,
+or two source tables to the same destination table.
+</Admonition>
+
+## Troubleshooting
+
+| Problem                                                    | Solution                                                                                                                  |
+|------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------|
+| `No user token forwarded to the app`                       | User authorization is not enabled for the app. Redeploy with `deploy-app`, or deploy with `--run-as-sp true`.             |
+| `Workflow '...' is not installed`                          | The UCX installation doesn't have the workflow. Reinstall or upgrade UCX, then run `deploy-app` again.                    |
+| `<file> not found on the package index`                    | The installed UCX version isn't released, for example a development install. Build a wheel with `make build` and pass `--wheel`. |
+| The app can't find the UCX installation                    | On-behalf-of-user, the app looks for UCX like the CLI does: in your home folder or in `/Applications/ucx`. Install UCX for the user, or globally. |
+| The dashboard is blank                                     | See [Assessment dashboard](#assessment-dashboard).                                                                        |

@@ -160,6 +160,10 @@
   "aniso8601": {
     "aniso8601": []
   },
+  "annotated-doc": {
+    "annotated_doc": [],
+    "annotated_doc.main": []
+  },
   "annotated-types": {
     "annotated_types": [],
     "annotated_types.test_cases": []
@@ -32869,6 +32873,11 @@
   "typing-inspect": {
     "typing_inspect": []
   },
+  "typing-inspection": {
+    "typing_inspection": [],
+    "typing_inspection.introspection": [],
+    "typing_inspection.typing_objects": []
+  },
   "typing_extensions": {
     "typing_extensions": []
   },
@@ -33467,6 +33476,47 @@
   },
   "urllib3": {
     "urllib3": []
+  },
+  "uvicorn": {
+    "uvicorn": [],
+    "uvicorn._compat": [],
+    "uvicorn._subprocess": [],
+    "uvicorn._types": [],
+    "uvicorn.config": [],
+    "uvicorn.importer": [],
+    "uvicorn.lifespan": [],
+    "uvicorn.lifespan.off": [],
+    "uvicorn.lifespan.on": [],
+    "uvicorn.logging": [],
+    "uvicorn.loops": [],
+    "uvicorn.loops.asyncio": [],
+    "uvicorn.loops.auto": [],
+    "uvicorn.loops.uvloop": [],
+    "uvicorn.main": [],
+    "uvicorn.middleware": [],
+    "uvicorn.middleware.asgi2": [],
+    "uvicorn.middleware.message_logger": [],
+    "uvicorn.middleware.proxy_headers": [],
+    "uvicorn.middleware.wsgi": [],
+    "uvicorn.protocols": [],
+    "uvicorn.protocols.http": [],
+    "uvicorn.protocols.http.auto": [],
+    "uvicorn.protocols.http.flow_control": [],
+    "uvicorn.protocols.http.h11_impl": [],
+    "uvicorn.protocols.http.httptools_impl": [],
+    "uvicorn.protocols.utils": [],
+    "uvicorn.protocols.websockets": [],
+    "uvicorn.protocols.websockets.auto": [],
+    "uvicorn.protocols.websockets.websockets_impl": [],
+    "uvicorn.protocols.websockets.websockets_sansio_impl": [],
+    "uvicorn.protocols.websockets.wsproto_impl": [],
+    "uvicorn.server": [],
+    "uvicorn.supervisors": [],
+    "uvicorn.supervisors.basereload": [],
+    "uvicorn.supervisors.multiprocess": [],
+    "uvicorn.supervisors.statreload": [],
+    "uvicorn.supervisors.watchfilesreload": [],
+    "uvicorn.workers": []
   },
   "virtualenv": {
     "virtualenv": [],

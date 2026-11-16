@@ -274,6 +274,30 @@ Before every commit, apply the consistent styleguide and formatting of the code,
 make fmt test
 ```
 
+## UCX App development
+
+The [UCX App](/docs/reference/app) has a Python backend (FastAPI) in `src/databricks/labs/ucx/app/`, and a Next.js
+frontend in `app-ui/`. The frontend is a static export that is built into the UCX wheel; it is not checked in.
+
+You need [Node.js](https://nodejs.org/) 26 and [pnpm](https://pnpm.io/) 9.15.9 for the frontend. To develop locally,
+run the backend and the frontend side by side; `next dev` proxies `/api` to the backend:
+
+```shell
+UCX_APP_AUTH_MODE=sp uv run --all-extras uvicorn databricks.labs.ucx.app.main:app --port 8000
+cd app-ui && pnpm install --frozen-lockfile && pnpm dev
+```
+
+With `UCX_APP_AUTH_MODE=sp` the backend uses your local Databricks authentication instead of a forwarded user token.
+Set `UCX_INSTALL_FOLDER` to work with a specific UCX installation, instead of the one in your home folder.
+
+`make build` builds the frontend (`make app-ui`) and the app's hashed requirements from `uv.lock`
+(`make app-requirements`) before building the wheel. **Release builds must run `make build`**, with Node.js and pnpm
+available: `deploy-app` deploys the released wheel, and refuses a wheel without the app. To deploy a local build, run
+`make build`, then `databricks labs ucx deploy-app --wheel dist/databricks_labs_ucx-<version>-py3-none-any.whl`.
+
+The frontend dependencies are pinned to exact versions in `app-ui/package.json` and locked in `app-ui/pnpm-lock.yaml`.
+When updating them, pick versions that were released at least 7 days ago, like the rest of the UCX dependencies.
+
 ## Getting overview of linter message codes
 
 To get an overview of the linter message codes, run the following command:
