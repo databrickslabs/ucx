@@ -33,11 +33,14 @@ class AccountWorkspaces:
         self._include_workspace_ids = include_workspace_ids if include_workspace_ids else []
 
     def _workspaces(self):
-        for workspace in self._ac.workspaces.list():
-            if self._include_workspace_ids and workspace.workspace_id not in self._include_workspace_ids:
-                logger.debug(f"Skipping {workspace.workspace_name} ({workspace.workspace_id}): not in include list")
-                continue
-            yield workspace
+        if not self._include_workspace_ids:
+            yield from self._ac.workspaces.list()
+            return
+        for workspace_id in self._include_workspace_ids:
+            try:
+                yield self._ac.workspaces.get(workspace_id)
+            except (NotFound, PermissionDenied) as e:
+                logger.warning(f"Skipping workspace {workspace_id}: {e}")
 
     def client_for(self, workspace: Workspace) -> WorkspaceClient:
         try:

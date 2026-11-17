@@ -15,6 +15,18 @@ from databricks.sdk.service.provisioning import Workspace
 from databricks.labs.ucx.account.workspaces import AccountWorkspaces, WorkspaceInfo
 
 
+@pytest.fixture
+def acc_client(acc_client):
+    def get(workspace_id: int) -> Workspace:
+        for workspace in acc_client.workspaces.list.return_value:
+            if workspace.workspace_id == workspace_id:
+                return workspace
+        raise NotFound(f"Workspace not found: {workspace_id}")
+
+    acc_client.workspaces.get.side_effect = get
+    return acc_client
+
+
 def test_sync_workspace_info(acc_client):
     acc_client.workspaces.list.return_value = [
         Workspace(workspace_name="foo", workspace_id=123, workspace_status_message="Running", deployment_name="abc"),

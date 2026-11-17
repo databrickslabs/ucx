@@ -356,6 +356,7 @@ def test_create_account_groups_with_id():
     a = create_autospec(AccountClient)
     w = create_autospec(WorkspaceClient)
     a.get_workspace_client.return_value = w
+    a.workspaces.get.side_effect = NotFound()
     w.get_workspace_id.return_value = None
     prompts = MockPrompts({})
     ctx = AccountContext(a, {"workspace_ids": "123,456"})

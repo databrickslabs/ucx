@@ -1678,6 +1678,7 @@ def test_account_installer_with_workspace_ids(ws):
         Workspace(workspace_id=123, deployment_name="test"),
         Workspace(workspace_id=456, deployment_name="test2"),
     ]
+    acc.workspaces.get.return_value = Workspace(workspace_id=456, deployment_name="test2")
     acc.get_workspace_client.return_value = ws
 
     account_installer = AccountInstaller(acc, {"workspace_ids": "456"})
@@ -1697,6 +1698,8 @@ def test_account_installer_with_workspace_ids(ws):
     account_installer.install_on_account()
     # should have 2 uploaded call, 1 for config.yml, 1 for workspace.json
     assert ws.workspace.upload.call_count == 2
+    acc.workspaces.list.assert_not_called()
+    acc.workspaces.get.assert_called_once_with(456)
 
 
 @pytest.fixture
