@@ -296,6 +296,11 @@ Setting the environment variable `UCX_FORCE_INSTALL` to 'account' will install U
 
 * `UCX_FORCE_INSTALL=account databricks labs install ucx`
 
+To install on a subset of workspaces, pass a comma separated list of workspace ids with `UCX_WORKSPACE_IDS`. Ids that are
+not found or that you cannot administer are skipped with a warning.
+
+* `UCX_FORCE_INSTALL=account UCX_WORKSPACE_IDS=123,456 databricks labs install ucx`
+
 After the first installation, UCX will prompt the user to confirm whether to install UCX on the remaining workspaces with the same answers. If confirmed, the remaining installations will be completed silently.
 
 This installation mode will automatically select the following options:

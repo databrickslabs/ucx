@@ -794,6 +794,9 @@ class AccountInstaller(AccountContext):
         default_config = None
         confirmed = False
         accessible_workspaces = self.account_workspaces.get_accessible_workspaces()
+        if not accessible_workspaces:
+            logger.warning("No accessible workspaces found to install UCX on")
+            return
         msg = "\n".join([w.deployment_name for w in accessible_workspaces])
         installed_workspaces = []
         if not self.prompts.confirm(
@@ -953,7 +956,10 @@ if __name__ == "__main__":
         logging.getLogger('databricks').setLevel(logging.DEBUG)
     env = dict(os.environ.items())
     force_install = env.get("UCX_FORCE_INSTALL")
-    account_installer = AccountInstaller(AccountClient(product="ucx", product_version=__version__))
+    account_installer = AccountInstaller(
+        AccountClient(product="ucx", product_version=__version__),
+        {"workspace_ids": env.get("UCX_WORKSPACE_IDS", "")},
+    )
     if force_install == "account":
         account_installer.install_on_account()
     else:

@@ -1672,6 +1672,33 @@ def test_account_installer(ws):
     assert ws.workspace.upload.call_count == 4
 
 
+def test_account_installer_with_workspace_ids(ws):
+    acc = create_autospec(AccountClient)
+    acc.workspaces.list.return_value = [
+        Workspace(workspace_id=123, deployment_name="test"),
+        Workspace(workspace_id=456, deployment_name="test2"),
+    ]
+    acc.get_workspace_client.return_value = ws
+
+    account_installer = AccountInstaller(acc, {"workspace_ids": "456"})
+    account_installer.replace(
+        prompts=MockPrompts(
+            {
+                r"UCX has detected the following workspaces.*\ntest2\n": "Yes",
+                r".*PRO or SERVERLESS SQL warehouse.*": "1",
+                r"Choose how to map the workspace groups.*": "0",
+                r"Do you want to install UCX on the remaining*": "Yes",
+                r"If hive_metastore contains managed table with external.*": "0",
+                r".*": "",
+            }
+        ),
+        product_info=ProductInfo.for_testing(WorkspaceConfig),
+    )
+    account_installer.install_on_account()
+    # should have 2 uploaded call, 1 for config.yml, 1 for workspace.json
+    assert ws.workspace.upload.call_count == 2
+
+
 @pytest.fixture
 def mock_ws():
     def get_status(path: str):

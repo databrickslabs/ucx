@@ -193,9 +193,12 @@ class AccountWorkspaces:
         :return: list[Workspace]
         """
         accessible_workspaces = []
-        for workspace in self._ac.workspaces.list():
+        for workspace in self._workspaces():
             if self.can_administer(workspace):
                 accessible_workspaces.append(workspace)
+        missing = set(self._include_workspace_ids) - {w.workspace_id for w in accessible_workspaces}
+        if missing:
+            logger.warning(f"Workspaces not found or not administrable, skipping: {sorted(missing)}")
         return accessible_workspaces
 
     def can_administer(self, workspace: Workspace) -> bool:
